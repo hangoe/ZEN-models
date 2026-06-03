@@ -14,7 +14,7 @@
       "ScaleFlag": 2,
       "BarOrder": 0
     },
-    "add_duals": false,
+    "save_duals": false,
     "use_scaling": false,
     "run_diagnostics": true,
     "scaling_include_rhs": true
