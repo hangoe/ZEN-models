@@ -20,8 +20,8 @@ from zen_garden import Results
 
 OUTPUT_DIR = Path(__file__).parent / "data" / "outputs"
 FIGURES_DIR = OUTPUT_DIR / "figures"
-DEFAULT_MODEL_A = "Crystal_Ball"
-DEFAULT_MODEL_B = "Crystal_Ball_HG_v2_2"
+DEFAULT_MODEL_A = "Crystal_Ball_HG_v2_3"
+DEFAULT_MODEL_B = "Crystal_Ball_HG_v3_0"
 YEAR = 2025
 
 INDUSTRY_PROCESS_TECHS = [
@@ -32,10 +32,8 @@ INDUSTRY_PROCESS_TECHS = [
 ]
 
 INDUSTRY_HEATING_TECHS = [
-    "natural_gas_boiler_industry_0_100", "natural_gas_boiler_industry_100_200",
-    "electrode_boiler_industry_0_100", "electrode_boiler_industry_100_200",
-    "biomass_boiler_industry_0_100", "biomass_boiler_industry_100_200",
-    "heat_pump_industry_0_100", "heat_pump_industry_100_200",
+    "natural_gas_boiler_industry", "electrode_boiler_industry", "biomass_boiler_industry",
+    "heat_pump_industry_0_100", "heat_pump_industry_100_150", "heat_pump_industry_150_200",  
 ]
 
 HEAT_TECHS = [
@@ -67,8 +65,7 @@ COLOR_MAP = {
     # Fossil / fuel technologies
     "natural_gas_boiler":     "#d4a017",
     "natural_gas_boiler_DH":  "#c49000",
-    "natural_gas_boiler_industry_0_100":   "#b8860b",
-    "natural_gas_boiler_industry_100_200": "#daa520",
+    "natural_gas_boiler_industry":   "#b8860b",
     "natural_gas_turbine":    "#ffd700",
     "natural_gas_turbine_CCS": "#e6c200",
     "natural_gas_pipeline":   "#f0e68c",
@@ -110,8 +107,7 @@ COLOR_MAP = {
     "biomass_plant_CCS":      "#43a047",
     "biomass_boiler":         "#56b870",
     "biomass_boiler_DH":      "#3cb371",
-    "biomass_boiler_industry_0_100":   "#4caf50",
-    "biomass_boiler_industry_100_200": "#66bb6a",
+    "biomass_boiler_industry":   "#4caf50",
     "biomass_to_cement_fuel": "#7cb342",
     "biomethane_conversion":  "#76c76e",
     "anaerobic_digestion":    "#8fbc8f",
@@ -130,12 +126,12 @@ COLOR_MAP = {
     # Electric / heat pump
     "electrode_boiler":       "#ff7043",
     "electrode_boiler_DH":    "#f4511e",
-    "electrode_boiler_industry_0_100":   "#e64a19",
-    "electrode_boiler_industry_100_200": "#ff8a65",
+    "electrode_boiler_industry":   "#e64a19",
     "heat_pump":              "#e91e63",
     "heat_pump_DH":           "#c2185b",
     "heat_pump_industry_0_100":   "#f06292",
-    "heat_pump_industry_100_200": "#f48fb1",
+    "heat_pump_industry_100_150":  "#ec407a",
+    "heat_pump_industry_150_200": "#f48fb1",
     "battery":                "#7e57c2",
     "power_line":             "#9575cd",
     "district_heating_grid":  "#ef5350",
