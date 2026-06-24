@@ -38,6 +38,17 @@ INDUSTRY_HEATING_TECHS = [
     "heat_pump_industry_0_100", "heat_pump_industry_100_200",
 ]
 
+HEAT_TECHS = [
+    "natural_gas_boiler", "biomass_boiler", "heat_pump",
+    "electrode_boiler", "oil_boiler", "district_heating_grid",
+]
+
+DISTRICT_HEAT_TECHS = [
+    "natural_gas_boiler_DH", "hard_coal_boiler_DH", "waste_boiler_DH",
+    "biomass_boiler_DH", "oil_boiler_DH", "heat_pump_DH",
+    "electrode_boiler_DH",
+]
+
 # ── Consistent color palette ────────────────────────────────────────────────
 COLOR_MAP = {
     # Carriers (emissions plot)
@@ -156,12 +167,47 @@ COLOR_MAP = {
     "ceramic_production":     "#ba68c8",
     "paper_production":       "#ce93d8",
     "food_production":        "#f48fb1",
+    # Supply / imports
+    "natural_gas import":     "#d4a017",
+    "lng import":             "#e8a838",
+    "hard_coal import":       "#8b6e5a",
+    "waste import":           "#a0a0a0",
+    "crude_oil import":       "#a0795c",
     # Chemicals
     "fischer_tropsch":        "#8d6e63",
     "olefin_from_naphtha":    "#a1887f",
     "olefin_from_methanol":   "#bcaaa4",
     "methanol_from_hydrogen": "#80cbc4",
 }
+
+HATCH_MAP = {}
+for _name in COLOR_MAP:
+    if "boiler" in _name and "DH" in _name:
+        HATCH_MAP[_name] = "///"
+    elif "boiler" in _name:
+        HATCH_MAP[_name] = "//"
+    elif "turbine" in _name:
+        HATCH_MAP[_name] = ".."
+    elif "_DH" in _name or "district_heating" in _name:
+        HATCH_MAP[_name] = "///"
+    elif "_plant" in _name and "CCS" in _name:
+        HATCH_MAP[_name] = "xx"
+    elif "_plant" in _name:
+        HATCH_MAP[_name] = ""
+    elif "CCS" in _name:
+        HATCH_MAP[_name] = "xx"
+    elif "pipeline" in _name:
+        HATCH_MAP[_name] = "||"
+    elif "storage" in _name:
+        HATCH_MAP[_name] = "--"
+    elif "import" in _name:
+        HATCH_MAP[_name] = ""
+    elif "production" in _name:
+        HATCH_MAP[_name] = "oo"
+    elif "heat_pump" in _name:
+        HATCH_MAP[_name] = "\\\\"
+    elif "electrode" in _name:
+        HATCH_MAP[_name] = "**"
 
 FALLBACK_COLORS = (
     plt.cm.tab20.colors + plt.cm.tab20b.colors + plt.cm.tab20c.colors
@@ -172,6 +218,12 @@ def _get_color(name: str, fallback_idx: int) -> str | tuple:
     if name in COLOR_MAP:
         return COLOR_MAP[name]
     return FALLBACK_COLORS[fallback_idx % len(FALLBACK_COLORS)]
+
+
+def _get_hatch(name: str) -> str:
+    if name in HATCH_MAP:
+        return HATCH_MAP[name]
+    return ""
 
 
 def _text_color_for_bg(bg_color) -> str:
@@ -222,6 +274,30 @@ def get_fuel_consumption(r: Results, carrier: str) -> pd.Series:
     return series[series.abs() > 1e-3].sort_values(ascending=False)
 
 
+def get_fuel_supply(r: Results, carrier: str) -> pd.Series:
+    pieces = {}
+    imp = r.get_total("flow_import")
+    if carrier in imp.index.get_level_values("carrier"):
+        total_import = imp.xs(carrier, level="carrier").sum()[YEAR]
+        if abs(total_import) > 1e-3:
+            pieces[f"{carrier} import"] = total_import
+    flow_out = r.get_total("flow_conversion_output")
+    if carrier in flow_out.index.get_level_values("carrier"):
+        by_tech = flow_out.xs(carrier, level="carrier").groupby("technology").sum()[YEAR]
+        for tech, val in by_tech.items():
+            if abs(val) > 1e-3:
+                pieces[tech] = val
+    return pd.Series(pieces).sort_values(ascending=False)
+
+
+def get_carrier_production(r: Results, carrier: str) -> pd.Series:
+    flow_out = r.get_total("flow_conversion_output")
+    if carrier not in flow_out.index.get_level_values("carrier"):
+        return pd.Series(dtype=float)
+    series = flow_out.xs(carrier, level="carrier").groupby("technology").sum()[YEAR]
+    return series[series.abs() > 1e-3].sort_values(ascending=False)
+
+
 def filter_techs(series: pd.Series, tech_list: list[str]) -> pd.Series:
     present = [t for t in tech_list if t in series.index]
     filtered = series.loc[present]
@@ -259,12 +335,13 @@ def plot_stacked_bars(
             val_pos = positive_df.loc[category, model]
             val_neg = negative_df.loc[category, model]
             color = _get_color(category, cat_idx)
+            hatch = _get_hatch(category)
             add_label = category not in labeled
             if val_pos > 0:
                 ax.bar(
                     model_idx, val_pos, bar_width, bottom=bottom_pos,
                     color=color, label=category if add_label else None,
-                    edgecolor="white", linewidth=0.5,
+                    edgecolor="white", linewidth=0.5, hatch=hatch,
                 )
                 if show_segment_labels:
                     mid = bottom_pos + val_pos / 2
@@ -274,10 +351,11 @@ def plot_stacked_bars(
                 bottom_pos += val_pos
                 labeled.add(category)
             if val_neg < 0:
+                neg_hatch = hatch if hatch else "//"
                 ax.bar(
                     model_idx, val_neg, bar_width, bottom=bottom_neg,
                     color=color, label=category if add_label else None,
-                    edgecolor="white", linewidth=0.5, hatch="//",
+                    edgecolor="white", linewidth=0.5, hatch=neg_hatch,
                 )
                 if show_segment_labels:
                     mid = bottom_neg + val_neg / 2
@@ -462,13 +540,39 @@ def main():
         show_segment_labels=True,
     )
 
-    # --- Figure 4: Industry heating costs ---
-    plot_cost_figure(
-        df_capex_heat, df_opex_heat,
-        f"Industry Heating Costs: {model_a} vs {model_b}  (Year {YEAR})",
-        FIGURES_DIR / f"costs_industry_heating_{model_a}_vs_{model_b}.png",
-        show_segment_labels=True,
+    # --- Figure 4: Heating costs (industry heating + heat + district heat) ---
+    df_capex_ht = build_comparison_df(
+        filter_techs(capex_a, HEAT_TECHS),
+        filter_techs(capex_b, HEAT_TECHS), model_a, model_b)
+    df_opex_ht = build_comparison_df(
+        filter_techs(opex_a, HEAT_TECHS),
+        filter_techs(opex_b, HEAT_TECHS), model_a, model_b)
+    df_capex_dh = build_comparison_df(
+        filter_techs(capex_a, DISTRICT_HEAT_TECHS),
+        filter_techs(capex_b, DISTRICT_HEAT_TECHS), model_a, model_b)
+    df_opex_dh = build_comparison_df(
+        filter_techs(opex_a, DISTRICT_HEAT_TECHS),
+        filter_techs(opex_b, DISTRICT_HEAT_TECHS), model_a, model_b)
+
+    heating_groups = [
+        ("Heat", df_capex_ht, df_opex_ht),
+        ("District Heat", df_capex_dh, df_opex_dh),
+        ("Industry Heating", df_capex_heat, df_opex_heat),
+    ]
+    fig4, axes4 = plt.subplots(2, 3, figsize=(20, 10))
+    fig4.suptitle(
+        f"Heating Costs: {model_a} vs {model_b}  (Year {YEAR})",
+        fontsize=14, fontweight="bold",
     )
+    for col, (label, df_cx, df_ox) in enumerate(heating_groups):
+        plot_stacked_bars(df_cx, f"{label} — CAPEX", "MEUR",
+                          axes4[0, col], show_segment_labels=True)
+        plot_stacked_bars(df_ox, f"{label} — OPEX", "MEUR",
+                          axes4[1, col], show_segment_labels=True)
+    fig4.tight_layout(rect=[0, 0, 1, 0.95])
+    heat_path = FIGURES_DIR / f"costs_heating_{model_a}_vs_{model_b}.png"
+    fig4.savefig(heat_path, dpi=150, bbox_inches="tight")
+    print(f"Plot saved to {heat_path}")
 
     # --- Figure 5: Fuel consumption shift ---
     plot_fuel_consumption(
@@ -476,6 +580,29 @@ def main():
         ["natural_gas", "hard_coal", "lng", "waste"],
         FIGURES_DIR / f"fuel_consumption_{model_a}_vs_{model_b}.png",
     )
+
+    # --- Figure 6: Natural gas supply vs consumption ---
+    ng_supply_a = get_fuel_supply(r_a, "natural_gas")
+    ng_supply_b = get_fuel_supply(r_b, "natural_gas")
+    df_ng_supply = build_comparison_df(ng_supply_a, ng_supply_b, model_a, model_b)
+
+    ng_cons_a = get_fuel_consumption(r_a, "natural_gas")
+    ng_cons_b = get_fuel_consumption(r_b, "natural_gas")
+    df_ng_cons = build_comparison_df(ng_cons_a, ng_cons_b, model_a, model_b)
+
+    fig6, axes6 = plt.subplots(1, 2, figsize=(14, 7))
+    fig6.suptitle(
+        f"Natural Gas Balance: {model_a} vs {model_b}  (Year {YEAR})",
+        fontsize=14, fontweight="bold",
+    )
+    plot_stacked_bars(df_ng_supply, "Supply (imports + conversion)", "GWh",
+                      axes6[0], show_segment_labels=True)
+    plot_stacked_bars(df_ng_cons, "Consumption by Technology", "GWh",
+                      axes6[1], show_segment_labels=True)
+    fig6.tight_layout(rect=[0, 0, 1, 0.93])
+    fig6.savefig(FIGURES_DIR / f"natural_gas_balance_{model_a}_vs_{model_b}.png",
+                 dpi=150, bbox_inches="tight")
+    print(f"Plot saved to {FIGURES_DIR / 'natural_gas_balance_...'}")
 
     plt.show()
 
