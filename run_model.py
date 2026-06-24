@@ -3,7 +3,7 @@ import tempfile
 from pathlib import Path
 from zen_garden import run, Results
 
-my_dataset = str("Crystal_Ball_HG_v2_1")
+my_dataset = str("Crystal_Ball_HG_v2_2")
 
 DATA_DIR_CONFIG = Path(__file__).parent / "data"
 DATA_DIR = Path(__file__).parent.parent / "ZEN-creator" / "outputs"
@@ -13,7 +13,7 @@ system_overrides = {
     "conduct_time_series_aggregation": True,
     "aggregated_time_steps_per_year": 1,
     "reference_year": 2025,
-    "optimized_years": 6,
+    "optimized_years": 1,
     "interval_between_years": 5,
     "use_rolling_horizon": False,
 }
