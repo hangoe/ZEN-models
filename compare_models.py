@@ -12,6 +12,7 @@ Usage:
 """
 
 import sys
+from datetime import datetime
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -20,8 +21,8 @@ from zen_garden import Results
 
 OUTPUT_DIR = Path(__file__).parent / "data" / "outputs"
 FIGURES_DIR = OUTPUT_DIR / "figures"
-DEFAULT_MODEL_A = "Crystal_Ball_HG_v2_3"
-DEFAULT_MODEL_B = "Crystal_Ball_HG_v3_0"
+DEFAULT_MODEL_A = "Crystal_Ball_HG_v3_0"
+DEFAULT_MODEL_B = "Crystal_Ball_HG_v4_0"
 YEAR = 2025
 
 INDUSTRY_PROCESS_TECHS = [
@@ -453,9 +454,12 @@ def main():
     print(f"Loading {model_b} ...")
     r_b = load_results(model_b)
 
-    FIGURES_DIR.mkdir(parents=True, exist_ok=True)
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    run_dir = FIGURES_DIR / f"{timestamp}_{model_a}_{model_b}"
+    run_dir.mkdir(parents=True, exist_ok=True)
 
-    print(f"Comparing year {YEAR} across Europe ...\n")
+    print(f"Comparing year {YEAR} across Europe ...")
+    print(f"Saving figures to {run_dir}\n")
 
     # --- Emissions ---
     em_carrier_a = get_emissions_by_carrier(r_a)
@@ -517,7 +521,7 @@ def main():
     )
     plot_stacked_bars(df_em_all, "", "Mton CO2eq", ax1, show_segment_labels=True)
     fig1.tight_layout(rect=[0, 0, 1, 0.95])
-    fig1.savefig(FIGURES_DIR / f"emissions_{model_a}_vs_{model_b}.png",
+    fig1.savefig(run_dir / f"emissions_{model_a}_vs_{model_b}.png",
                  dpi=150, bbox_inches="tight")
     print(f"\nEmissions plot saved")
 
@@ -525,14 +529,14 @@ def main():
     plot_cost_figure(
         df_capex, df_opex,
         f"Total System Costs: {model_a} vs {model_b}  (Year {YEAR})",
-        FIGURES_DIR / f"costs_total_{model_a}_vs_{model_b}.png",
+        run_dir / f"costs_total_{model_a}_vs_{model_b}.png",
     )
 
     # --- Figure 3: Industry process costs ---
     plot_cost_figure(
         df_capex_ind, df_opex_ind,
         f"Industry Process Costs: {model_a} vs {model_b}  (Year {YEAR})",
-        FIGURES_DIR / f"costs_industry_{model_a}_vs_{model_b}.png",
+        run_dir / f"costs_industry_{model_a}_vs_{model_b}.png",
         show_segment_labels=True,
     )
 
@@ -566,7 +570,7 @@ def main():
         plot_stacked_bars(df_ox, f"{label} — OPEX", "MEUR",
                           axes4[1, col], show_segment_labels=True)
     fig4.tight_layout(rect=[0, 0, 1, 0.95])
-    heat_path = FIGURES_DIR / f"costs_heating_{model_a}_vs_{model_b}.png"
+    heat_path = run_dir / f"costs_heating_{model_a}_vs_{model_b}.png"
     fig4.savefig(heat_path, dpi=150, bbox_inches="tight")
     print(f"Plot saved to {heat_path}")
 
@@ -574,7 +578,7 @@ def main():
     plot_fuel_consumption(
         r_a, r_b, model_a, model_b,
         ["natural_gas", "hard_coal", "lng", "waste"],
-        FIGURES_DIR / f"fuel_consumption_{model_a}_vs_{model_b}.png",
+        run_dir / f"fuel_consumption_{model_a}_vs_{model_b}.png",
     )
 
     # --- Figure 6: Natural gas supply vs consumption ---
@@ -596,9 +600,9 @@ def main():
     plot_stacked_bars(df_ng_cons, "Consumption by Technology", "GWh",
                       axes6[1], show_segment_labels=True)
     fig6.tight_layout(rect=[0, 0, 1, 0.93])
-    fig6.savefig(FIGURES_DIR / f"natural_gas_balance_{model_a}_vs_{model_b}.png",
+    fig6.savefig(run_dir / f"natural_gas_balance_{model_a}_vs_{model_b}.png",
                  dpi=150, bbox_inches="tight")
-    print(f"Plot saved to {FIGURES_DIR / 'natural_gas_balance_...'}")
+    print(f"Plot saved to {run_dir / 'natural_gas_balance_...'}")
 
     plt.show()
 

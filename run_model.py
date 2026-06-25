@@ -3,7 +3,7 @@ import tempfile
 from pathlib import Path
 from zen_garden import run, Results
 
-my_dataset = str("Crystal_Ball_HG_v3_0")
+my_dataset = str("Crystal_Ball_HG_v4_0")
 
 DATA_DIR_CONFIG = Path(__file__).parent / "data"
 DATA_DIR = Path(__file__).parent.parent / "ZEN-creator" / "outputs"
