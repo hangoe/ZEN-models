@@ -4,6 +4,7 @@ from pathlib import Path
 from zen_garden import run, Results
 
 my_dataset = str("Crystal_Ball_HG_v4_0")
+my_comment = "test_run"
 
 DATA_DIR_CONFIG = Path(__file__).parent / "data"
 DATA_DIR = Path(__file__).parent.parent / "ZEN-creator" / "outputs"
@@ -32,11 +33,12 @@ if __name__ == "__main__":
         run(
             config=str(DATA_DIR_CONFIG / "config.json"),
             dataset=str(DATA_DIR / my_dataset),
+            folder_output=str(DATA_DIR_CONFIG / "outputs" / f"{my_dataset}_{my_comment}"),
         )
     finally:
         with open(system_json_path, "w") as f:
             json.dump(original_system, f, indent=2)
 
-#r = Results(path=DATA_DIR_CONFIG / "outputs" / my_dataset)
+#r = Results(path=DATA_DIR_CONFIG / "outputs" / f"{my_dataset}_{my_comment}")
 
 print(Results)
