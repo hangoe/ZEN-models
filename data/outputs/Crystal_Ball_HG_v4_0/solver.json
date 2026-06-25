@@ -11,7 +11,7 @@
     "BarOrder": 0
   },
   "check_unit_consistency": true,
-  "solver_dir": "data/outputs/solver_files",
+  "solver_dir": "data\\outputs\\solver_files",
   "keep_files": false,
   "io_api": "lp",
   "save_duals": false,

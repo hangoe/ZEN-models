@@ -122,8 +122,8 @@
     "biomass_boiler_industry",
     "electrode_boiler_industry",
     "natural_gas_boiler_industry",
-    "heat_industry_temp_conversion_150_100",
-    "heat_industry_temp_conversion_100_0",
+    "heat_industry_temp_conversion_150",
+    "heat_industry_temp_conversion_100",
     "natural_gas_turbine_CCS",
     "biomass_plant_CCS",
     "SMR_CCS",
@@ -170,8 +170,10 @@
     "oil_storage",
     "pumped_hydro",
     "salt_cavern_storage",
-    "industry_TES_water",
-    "industry_TES_steam"
+    "industry_TES_water_0_100",
+    "industry_TES_water_100_150",
+    "industry_TES_steam_100_150",
+    "industry_TES_steam_150_200"
   ],
   "set_conversion_technologies": [
     "BEV",
@@ -252,8 +254,8 @@
     "biomass_boiler_industry",
     "electrode_boiler_industry",
     "natural_gas_boiler_industry",
-    "heat_industry_temp_conversion_150_100",
-    "heat_industry_temp_conversion_100_0",
+    "heat_industry_temp_conversion_150",
+    "heat_industry_temp_conversion_100",
     "natural_gas_turbine_CCS",
     "biomass_plant_CCS",
     "SMR_CCS",
@@ -297,8 +299,10 @@
     "oil_storage",
     "pumped_hydro",
     "salt_cavern_storage",
-    "industry_TES_water",
-    "industry_TES_steam"
+    "industry_TES_water_0_100",
+    "industry_TES_water_100_150",
+    "industry_TES_steam_100_150",
+    "industry_TES_steam_150_200"
   ],
   "set_retrofitting_technologies": [
     "natural_gas_turbine_CCS",

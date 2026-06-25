@@ -1,5 +1,5 @@
 {
-  "dataset": "../ZEN-creator/outputs/Crystal_Ball_HG_v4_0",
+  "dataset": "..\\ZEN-creator\\outputs\\Crystal_Ball_HG_v4_0",
   "objective": "total_cost",
   "sense": "min",
   "subsets": {
@@ -44,9 +44,9 @@
     "representationMethod": "meanRepresentation",
     "resolution": 1
   },
-  "folder_output": "data/outputs",
+  "folder_output": "data\\outputs",
   "overwrite_output": true,
   "output_format": "h5",
   "earliest_year_of_data": 1900,
-  "zen_garden_version": "2.12.0"
+  "zen_garden_version": "2.12.2"
 }
