@@ -21,7 +21,7 @@ from zen_garden import Results
 
 OUTPUT_DIR = Path(__file__).parent / "data" / "outputs"
 FIGURES_DIR = OUTPUT_DIR / "figures"
-DEFAULT_MODEL_A = "Crystal_Ball_HG_v3_0"
+DEFAULT_MODEL_A = "Crystal_Ball_HG_v4_0_2025_6a_5a_interval_10ts"
 DEFAULT_MODEL_B = "Crystal_Ball_HG_v4_0"
 YEAR = 2025
 
