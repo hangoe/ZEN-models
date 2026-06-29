@@ -3,7 +3,7 @@ import tempfile
 from pathlib import Path
 from zen_garden import run, Results
 
-my_dataset = str("Crystal_Ball_HG_v4_0")
+my_dataset = str("Crystal_Ball_HG_v4_2")
 my_comment = "2025_6a_5a_interval_10ts"
 
 DATA_DIR_CONFIG = Path(__file__).parent / "data"
