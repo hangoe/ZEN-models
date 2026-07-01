@@ -108,6 +108,9 @@ COLOR_MAP = {
     "ceramic_DSM": "#66bb6a",
     "paper_DSM": "#a5d6a7",
     "food_DSM": "#ff8f00",
+    # Cross-sector storage
+    "battery":      "#7e57c2",
+    "pumped_hydro": "#6495ed",
 }
 
 HATCH_MAP = {
@@ -134,6 +137,8 @@ HATCH_MAP = {
     "ceramic_DSM": "xx",
     "paper_DSM": "xx",
     "food_DSM": "xx",
+    "battery":      "..",
+    "pumped_hydro": "//",
 }
 
 FALLBACK_COLORS = plt.cm.tab20.colors + plt.cm.tab20b.colors + plt.cm.tab20c.colors
@@ -533,6 +538,38 @@ def fig_dsm_charge_discharge(r: Results, model_name: str, save_path: Path):
     print(f"  Saved: {save_path.name}")
 
 
+def fig_storage_comparison(r: Results, model_name: str, save_path: Path):
+    """Figure 11: 1×3 — capacity addition for all storage types on comparable axes.
+
+    Panel 1 (GWh)      : TES energy + battery energy
+    Panel 2 (GW)       : TES power + battery power + pumped_hydro
+    Panel 3 (ktproduct/h): DSM power (all sectors)
+    """
+    GWH_TECHS  = INDUSTRY_TES_TECHS + ["battery"]
+    GW_TECHS   = INDUSTRY_TES_TECHS + ["battery", "pumped_hydro"]
+    DSM_TECHS  = INDUSTRY_DSM_TECHS
+
+    energy_add = get_capacity_addition(r, GWH_TECHS,  capacity_type="energy")
+    power_add  = get_capacity_addition(r, GW_TECHS,   capacity_type="power")
+    dsm_add    = get_capacity_addition(r, DSM_TECHS,  capacity_type="power")
+
+    fig, axes = plt.subplots(1, 3, figsize=(22, 7))
+    fig.suptitle(
+        f"Storage Technologies — Capacity Addition ({model_name})",
+        fontsize=14, fontweight="bold",
+    )
+    plot_stacked_bars_years(energy_add, "Energy Capacity Addition\nTES + Battery",
+                            "GWh", axes[0], show_segment_labels=True)
+    plot_stacked_bars_years(power_add,  "Power Capacity Addition\nTES + Battery + Pumped Hydro",
+                            "GW",  axes[1], show_segment_labels=True)
+    plot_stacked_bars_years(dsm_add,    "DSM Power Capacity Addition",
+                            "ktproduct/h", axes[2], show_segment_labels=True)
+
+    fig.tight_layout(rect=[0, 0, 1, 0.93])
+    fig.savefig(save_path, dpi=150, bbox_inches="tight")
+    print(f"  Saved: {save_path.name}")
+
+
 # -- Main ---------------------------------------------------------------------
 
 def main():
@@ -558,6 +595,7 @@ def main():
     fig_heat_demand_by_sector(r, short_name, run_dir / "8_heat_demand_by_sector.png")
     fig_dsm_capacity_addition(r, short_name, run_dir / "9_dsm_capacity_addition.png")
     fig_dsm_charge_discharge(r, short_name, run_dir / "10_dsm_charge_discharge.png")
+    fig_storage_comparison(r, short_name, run_dir / "11_storage_comparison.png")
 
     plt.show()
 
