@@ -21,8 +21,8 @@ from zen_garden import Results
 
 OUTPUT_DIR = Path(__file__).parent / "data" / "outputs"
 FIGURES_DIR = OUTPUT_DIR / "figures"
-DEFAULT_MODEL_A = "Crystal_Ball_HG_v4_3_2025_1a_1a_interval_1ts"
-DEFAULT_MODEL_B = "Crystal_Ball_HG_v4_4_2025_1a_1a_interval_1ts"
+DEFAULT_MODEL_A = "Crystal_Ball_HG_v4_4_2025_1a_1a_interval_1ts"
+DEFAULT_MODEL_B = "Crystal_Ball_HG_v4_6_2025_1a_1a_interval_1ts"
 YEAR = 2025
 
 INDUSTRY_PROCESS_TECHS = [
@@ -34,7 +34,9 @@ INDUSTRY_PROCESS_TECHS = [
 
 INDUSTRY_HEATING_TECHS = [
     "natural_gas_boiler_industry", "electrode_boiler_industry", "biomass_boiler_industry",
-    "heat_pump_industry_0_100", "heat_pump_industry_100_150", "heat_pump_industry_150_200",  
+    "heat_pump_industry_0_100_waste_heat", "heat_pump_industry_0_100_water",
+    "heat_pump_industry_100_150_waste_heat", "heat_pump_industry_100_150_water",
+    "heat_pump_industry_150_200_waste_heat", "heat_pump_industry_150_200_water",
 ]
 
 HEAT_TECHS = [
@@ -130,9 +132,12 @@ COLOR_MAP = {
     "electrode_boiler_industry":   "#e64a19",
     "heat_pump":              "#e91e63",
     "heat_pump_DH":           "#c2185b",
-    "heat_pump_industry_0_100":   "#f06292",
-    "heat_pump_industry_100_150":  "#ec407a",
-    "heat_pump_industry_150_200": "#f48fb1",
+    "heat_pump_industry_0_100_waste_heat":   "#f06292",
+    "heat_pump_industry_0_100_water":        "#f8bbd0",
+    "heat_pump_industry_100_150_waste_heat": "#ec407a",
+    "heat_pump_industry_100_150_water":      "#f48fb1",
+    "heat_pump_industry_150_200_waste_heat": "#c2185b",
+    "heat_pump_industry_150_200_water":      "#e91e63",
     "battery":                "#7e57c2",
     "power_line":             "#9575cd",
     "district_heating_grid":  "#ef5350",

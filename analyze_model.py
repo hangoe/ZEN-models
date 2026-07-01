@@ -26,7 +26,7 @@ from zen_garden import Results
 
 OUTPUT_DIR = Path(__file__).parent / "data" / "outputs"
 FIGURES_DIR = OUTPUT_DIR / "figures"
-DEFAULT_MODEL = "Crystal_Ball_HG_v4_2_2025_6a_5a_interval_10ts/Crystal_Ball_HG_v4_2"
+DEFAULT_MODEL = "Crystal_Ball_HG_v4_6_2025_6a_5a_interval_10ts/Crystal_Ball_HG_v4_6"
 
 INDUSTRY_HEAT_CARRIERS_ENERGY = [
     "heat_industry_0_100",
@@ -42,9 +42,12 @@ INDUSTRY_HEAT_CARRIERS_PRODUCT = [
 ]
 
 INDUSTRY_HEAT_TECHS_BOILERS_HP = [
-    "heat_pump_industry_0_100",
-    "heat_pump_industry_100_150",
-    "heat_pump_industry_150_200",
+    "heat_pump_industry_0_100_waste_heat",
+    "heat_pump_industry_0_100_water",
+    "heat_pump_industry_100_150_waste_heat",
+    "heat_pump_industry_100_150_water",
+    "heat_pump_industry_150_200_waste_heat",
+    "heat_pump_industry_150_200_water",
     "biomass_boiler_industry",
     "electrode_boiler_industry",
     "natural_gas_boiler_industry",
@@ -85,9 +88,12 @@ COLOR_MAP = {
     "natural_gas_boiler_industry": "#b8860b",
     "biomass_boiler_industry": "#4caf50",
     "electrode_boiler_industry": "#e64a19",
-    "heat_pump_industry_0_100": "#f06292",
-    "heat_pump_industry_100_150": "#ec407a",
-    "heat_pump_industry_150_200": "#f48fb1",
+    "heat_pump_industry_0_100_waste_heat": "#f06292",
+    "heat_pump_industry_0_100_water":      "#f8bbd0",
+    "heat_pump_industry_100_150_waste_heat": "#ec407a",
+    "heat_pump_industry_100_150_water":      "#f48fb1",
+    "heat_pump_industry_150_200_waste_heat": "#c2185b",
+    "heat_pump_industry_150_200_water":      "#e91e63",
     "heat_industry_temp_conversion_150": "#ffab91",
     "heat_industry_temp_conversion_100": "#ffcc80",
     "glass_production": "#9370db",
@@ -108,9 +114,12 @@ HATCH_MAP = {
     "natural_gas_boiler_industry": "//",
     "biomass_boiler_industry": "//",
     "electrode_boiler_industry": "**",
-    "heat_pump_industry_0_100": "\\\\",
-    "heat_pump_industry_100_150": "\\\\",
-    "heat_pump_industry_150_200": "\\\\",
+    "heat_pump_industry_0_100_waste_heat": "\\\\",
+    "heat_pump_industry_0_100_water":      "//",
+    "heat_pump_industry_100_150_waste_heat": "\\\\",
+    "heat_pump_industry_100_150_water":      "//",
+    "heat_pump_industry_150_200_waste_heat": "\\\\",
+    "heat_pump_industry_150_200_water":      "//",
     "heat_industry_temp_conversion_150": "||",
     "heat_industry_temp_conversion_100": "||",
     "glass_production": "oo",
@@ -454,22 +463,35 @@ def fig_tes_charge_discharge(r: Results, model_name: str, save_path: Path):
 
 
 def fig_heat_demand_by_sector(r: Results, model_name: str, save_path: Path):
-    """Figure 8: 2×2 — heat input by temperature level for each production sector."""
+    """Figure 8: 1×2 — heat input by temperature level for all sectors, 2025 vs 2050."""
     sectors = [
-        ("glass_production", "Glass"),
+        ("glass_production",   "Glass"),
         ("ceramic_production", "Ceramic"),
-        ("paper_production", "Paper"),
-        ("food_production", "Food"),
+        ("paper_production",   "Paper"),
+        ("food_production",    "Food"),
     ]
 
-    fig, axes = plt.subplots(2, 2, figsize=(16, 10))
+    # Collect per-sector data once, then slice by year
+    sector_data = {label: get_heat_demand_by_sector(r, tech) for tech, label in sectors}
+
+    all_years = next(iter(sector_data.values())).columns.tolist()
+    year_first, year_last = all_years[0], all_years[-1]
+
+    fig, axes = plt.subplots(1, 2, figsize=(14, 7), sharey=True)
     fig.suptitle(
         f"Industry Sectors — Heat Input by Temperature Level ({model_name})",
         fontsize=14, fontweight="bold",
     )
-    for ax, (tech, label) in zip(axes.flat, sectors):
-        df = get_heat_demand_by_sector(r, tech)
-        plot_stacked_bars_years(df, label, "GWh", ax, show_segment_labels=True)
+
+    for ax, year in zip(axes, [year_first, year_last]):
+        df_year = pd.DataFrame(
+            {label: sector_data[label][year] for label in [s[1] for s in sectors]}
+        ).fillna(0)
+        plot_stacked_bars_years(
+            df_year, str(year), "GWh", ax,
+            show_legend=(ax is axes[-1]), show_segment_labels=True,
+        )
+
     fig.tight_layout(rect=[0, 0, 1, 0.95])
     fig.savefig(save_path, dpi=150, bbox_inches="tight")
     print(f"  Saved: {save_path.name}")
