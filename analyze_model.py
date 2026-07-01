@@ -1,6 +1,6 @@
 """Analyze a single ZEN-garden model output across multiple time steps.
 
-Produces 8 figures for the industry_heat sector:
+Produces 10 figures for the industry_heat sector:
   1. carrier_heat_industry_all      — production & consumption for all 3 temp levels
   2. carrier_products_production    — production only for glass/ceramic/paper/food
   3. boiler_hp_production           — boiler & HP output (excl. temp conversion), NG price overlay
@@ -9,6 +9,8 @@ Produces 8 figures for the industry_heat sector:
   6. tes_capacity_addition          — TES energy + power capacity addition
   7. tes_charge_discharge           — TES charge + discharge flows
   8. heat_demand_by_sector          — heat input by temperature level for each production sector
+  9. dsm_capacity_addition          — DSM energy + power capacity addition (glass/ceramic/paper/food)
+ 10. dsm_charge_discharge           — DSM charge + discharge flows (glass/ceramic/paper/food)
 
 Usage:
     python analyze_model.py [model_name]
@@ -24,7 +26,7 @@ from zen_garden import Results
 
 OUTPUT_DIR = Path(__file__).parent / "data" / "outputs"
 FIGURES_DIR = OUTPUT_DIR / "figures"
-DEFAULT_MODEL = "Crystal_Ball_HG_v4_0_2025_6a_5a_interval_10ts/Crystal_Ball_HG_v4_0"
+DEFAULT_MODEL = "Crystal_Ball_HG_v4_2_2025_6a_5a_interval_10ts/Crystal_Ball_HG_v4_2"
 
 INDUSTRY_HEAT_CARRIERS_ENERGY = [
     "heat_industry_0_100",
@@ -69,6 +71,13 @@ INDUSTRY_TES_TECHS = [
     "industry_TES_steam_150_200",
 ]
 
+INDUSTRY_DSM_TECHS = [
+    "glass_DSM",
+    "ceramic_DSM",
+    "paper_DSM",
+    "food_DSM",
+]
+
 COLOR_MAP = {
     "heat_industry_0_100": "#1a237e",
     "heat_industry_100_150": "#64b5f6",
@@ -89,6 +98,10 @@ COLOR_MAP = {
     "industry_TES_water_100_150": "#6495ed",
     "industry_TES_steam_100_150": "#ff7043",
     "industry_TES_steam_150_200": "#ef5350",
+    "glass_DSM": "#2e7d32",
+    "ceramic_DSM": "#66bb6a",
+    "paper_DSM": "#a5d6a7",
+    "food_DSM": "#ff8f00",
 }
 
 HATCH_MAP = {
@@ -108,6 +121,10 @@ HATCH_MAP = {
     "industry_TES_water_100_150": "--",
     "industry_TES_steam_100_150": "--",
     "industry_TES_steam_150_200": "--",
+    "glass_DSM": "xx",
+    "ceramic_DSM": "xx",
+    "paper_DSM": "xx",
+    "food_DSM": "xx",
 }
 
 FALLBACK_COLORS = plt.cm.tab20.colors + plt.cm.tab20b.colors + plt.cm.tab20c.colors
@@ -303,6 +320,11 @@ def fig_carrier_energy_all(r: Results, model_name: str, save_path: Path):
         label = carrier.replace("_", " ").title()
         prod = get_carrier_production(r, carrier)
         cons = get_carrier_consumption(r, carrier)
+        # Put temp-conversion flows on top so constant end-use consumption is visible at the bottom
+        if not cons.empty:
+            end_use = [t for t in cons.index if t not in INDUSTRY_HEAT_TECHS_TEMP_CONV]
+            conv    = [t for t in cons.index if t in INDUSTRY_HEAT_TECHS_TEMP_CONV]
+            cons = cons.loc[end_use + conv]
         plot_stacked_bars_years(prod, f"{label} — Production", "GWh",
                                 axes[row, 0], show_segment_labels=True)
         plot_stacked_bars_years(cons, f"{label} — Consumption", "GWh",
@@ -453,6 +475,42 @@ def fig_heat_demand_by_sector(r: Results, model_name: str, save_path: Path):
     print(f"  Saved: {save_path.name}")
 
 
+def fig_dsm_capacity_addition(r: Results, model_name: str, save_path: Path):
+    """Figure 9: DSM capacity addition — energy (left) + power (right)."""
+    dsm_add_energy = get_capacity_addition(r, INDUSTRY_DSM_TECHS, capacity_type="energy")
+    dsm_add_power = get_capacity_addition(r, INDUSTRY_DSM_TECHS, capacity_type="power")
+
+    fig, axes = plt.subplots(1, 2, figsize=(18, 6))
+    fig.suptitle(
+        f"Industry DSM — Capacity Addition ({model_name})",
+        fontsize=14, fontweight="bold",
+    )
+    plot_stacked_bars_years(dsm_add_energy, "Energy Capacity Addition", "ktproduct",
+                            axes[0], show_segment_labels=True)
+    plot_stacked_bars_years(dsm_add_power, "Power Capacity Addition", "ktproduct/h",
+                            axes[1], show_segment_labels=True)
+    fig.tight_layout(rect=[0, 0, 1, 0.93])
+    fig.savefig(save_path, dpi=150, bbox_inches="tight")
+    print(f"  Saved: {save_path.name}")
+
+
+def fig_dsm_charge_discharge(r: Results, model_name: str, save_path: Path):
+    """Figure 10: DSM charge (left) + discharge (right)."""
+    charge = get_storage_flows(r, INDUSTRY_DSM_TECHS, "flow_storage_charge")
+    discharge = get_storage_flows(r, INDUSTRY_DSM_TECHS, "flow_storage_discharge")
+
+    fig, axes = plt.subplots(1, 2, figsize=(18, 6))
+    fig.suptitle(
+        f"Industry DSM — Charge & Discharge ({model_name})",
+        fontsize=14, fontweight="bold",
+    )
+    plot_stacked_bars_years(charge, "Charge", "ktproduct", axes[0], show_segment_labels=True)
+    plot_stacked_bars_years(discharge, "Discharge", "ktproduct", axes[1], show_segment_labels=True)
+    fig.tight_layout(rect=[0, 0, 1, 0.93])
+    fig.savefig(save_path, dpi=150, bbox_inches="tight")
+    print(f"  Saved: {save_path.name}")
+
+
 # -- Main ---------------------------------------------------------------------
 
 def main():
@@ -476,6 +534,8 @@ def main():
     fig_tes_capacity_addition(r, short_name, run_dir / "6_tes_capacity_addition.png")
     fig_tes_charge_discharge(r, short_name, run_dir / "7_tes_charge_discharge.png")
     fig_heat_demand_by_sector(r, short_name, run_dir / "8_heat_demand_by_sector.png")
+    fig_dsm_capacity_addition(r, short_name, run_dir / "9_dsm_capacity_addition.png")
+    fig_dsm_charge_discharge(r, short_name, run_dir / "10_dsm_charge_discharge.png")
 
     plt.show()
 

@@ -21,8 +21,8 @@ from zen_garden import Results
 
 OUTPUT_DIR = Path(__file__).parent / "data" / "outputs"
 FIGURES_DIR = OUTPUT_DIR / "figures"
-DEFAULT_MODEL_A = "Crystal_Ball_HG_v4_0_2025_6a_5a_interval_10ts"
-DEFAULT_MODEL_B = "Crystal_Ball_HG_v4_0"
+DEFAULT_MODEL_A = "Crystal_Ball_HG_v4_3_2025_1a_1a_interval_1ts"
+DEFAULT_MODEL_B = "Crystal_Ball_HG_v4_4_2025_1a_1a_interval_1ts"
 YEAR = 2025
 
 INDUSTRY_PROCESS_TECHS = [
@@ -236,6 +236,11 @@ def load_results(model_name: str) -> Results:
     path = OUTPUT_DIR / model_name
     if not path.exists():
         raise FileNotFoundError(f"Model output not found: {path}")
+    # If the directory has no result files but exactly one subdirectory, descend into it
+    if not (path / "system.json").exists():
+        subdirs = [d for d in path.iterdir() if d.is_dir()]
+        if len(subdirs) == 1:
+            path = subdirs[0]
     return Results(path=str(path))
 
 
