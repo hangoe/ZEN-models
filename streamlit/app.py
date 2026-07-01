@@ -80,12 +80,18 @@ with st.sidebar:
 
     years_a = get_available_years(r_a)
     years_b = get_available_years(r_b)
+    common_years = sorted(set(years_a) & set(years_b))
     all_years = sorted(set(years_a) | set(years_b))
+
+    # Default to the latest year both models share; fall back to first in union
+    default_idx = all_years.index(common_years[-1]) if common_years else 0
 
     st.divider()
     st.subheader("Costs & System year")
-    year = st.selectbox("Year", all_years,
-                        help="Applies to the Costs and System tabs only")
+    year = st.selectbox(
+        "Year", all_years, index=default_idx, key="year_sel",
+        help="Applies to the Costs and System tabs only",
+    )
 
     st.divider()
     st.caption(f"**{short(model_a)}** — years: {', '.join(str(y) for y in years_a)}")

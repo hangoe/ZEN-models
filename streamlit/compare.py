@@ -20,10 +20,19 @@ INDUSTRY_PROCESS_TECHS = [
 ]
 
 INDUSTRY_HEATING_TECHS = [
+    # Boilers (consistent across models)
     "natural_gas_boiler_industry", "electrode_boiler_industry", "biomass_boiler_industry",
+    # New models (v4_6+): split by temperature + source
     "heat_pump_industry_0_100_waste_heat", "heat_pump_industry_0_100_water",
     "heat_pump_industry_100_150_waste_heat", "heat_pump_industry_100_150_water",
     "heat_pump_industry_150_200_waste_heat", "heat_pump_industry_150_200_water",
+    # Intermediate models (v3_0, v4_0-v4_4): split by temperature only
+    "heat_pump_industry_0_100", "heat_pump_industry_100_150", "heat_pump_industry_150_200",
+    # Older models (v2_0): single generic industry HP
+    "heat_pump_industry",
+    # Very old models (v1_0): "industrial_" prefix naming
+    "industrial_biomass_boiler", "industrial_coal_boiler",
+    "industrial_electrode_boiler", "industrial_natural_gas_boiler", "industrial_oil_boiler",
 ]
 
 HEAT_TECHS = [

@@ -110,6 +110,12 @@ COLOR_MAP = {
     "electrode_boiler_industry": "#e64a19",
     "heat_pump": "#e91e63",
     "heat_pump_DH": "#c2185b",
+    # Old model names (v2: generic industry, v3/v4_0: temp-level only)
+    "heat_pump_industry": "#f06292",
+    "heat_pump_industry_0_100": "#f06292",
+    "heat_pump_industry_100_150": "#ec407a",
+    "heat_pump_industry_150_200": "#c2185b",
+    # New model names (v4_6+: temp + source)
     "heat_pump_industry_0_100_waste_heat": "#f06292",
     "heat_pump_industry_0_100_water": "#f8bbd0",
     "heat_pump_industry_100_150_waste_heat": "#ec407a",
@@ -141,6 +147,12 @@ COLOR_MAP = {
     "carbon_pipeline": "#90a4ae",
     "carbon_storage": "#78909c",
     "cement_post_comb": "#90a4ae",
+    # Very old model names (v1_0: "industrial_" prefix instead of "_industry" suffix)
+    "industrial_biomass_boiler": "#4caf50",
+    "industrial_coal_boiler": "#8b6e5a",
+    "industrial_electrode_boiler": "#e64a19",
+    "industrial_natural_gas_boiler": "#b8860b",
+    "industrial_oil_boiler": "#b8956e",
     # Cement & industry
     "cement_kiln": "#a0a0a0",
     "glass_production": "#9370db",
@@ -238,11 +250,23 @@ def load_results(model_name: str) -> Results:
     path = OUTPUT_DIR / model_name
     if not path.exists():
         raise FileNotFoundError(f"Model output not found: {path}")
-    if not (path / "system.json").exists():
-        subdirs = [d for d in path.iterdir() if d.is_dir() and not d.name.startswith(".")]
-        if len(subdirs) == 1:
-            path = subdirs[0]
+    # var_dict.h5 is the authoritative zen_garden data file; search for it
+    if (path / "var_dict.h5").exists():
+        return Results(path=str(path))
+    # Not in root — descend into first subdir that contains var_dict.h5
+    try:
+        candidates = sorted(
+            d for d in path.iterdir()
+            if d.is_dir() and not d.name.startswith(".") and (d / "var_dict.h5").exists()
+        )
+        if candidates:
+            return Results(path=str(candidates[0]))
+    except PermissionError:
+        pass
     return Results(path=str(path))
+
+
+_NON_MODEL_DIRS = {"figures", "solver_files"}
 
 
 def get_available_models() -> list[str]:
@@ -250,15 +274,15 @@ def get_available_models() -> list[str]:
         return []
     models = []
     for d in sorted(OUTPUT_DIR.iterdir()):
-        if not d.is_dir() or d.name == "figures":
+        if not d.is_dir() or d.name in _NON_MODEL_DIRS or d.name.startswith("."):
             continue
-        if (d / "var_dict.h5").exists() or (d / "system.json").exists():
+        if (d / "var_dict.h5").exists():
             models.append(d.name)
             continue
         try:
-            subdirs = [sd for sd in d.iterdir() if sd.is_dir() and not sd.name.startswith(".")]
-            if len(subdirs) == 1 and (
-                (subdirs[0] / "var_dict.h5").exists() or (subdirs[0] / "system.json").exists()
+            if any(
+                sd.is_dir() and not sd.name.startswith(".") and (sd / "var_dict.h5").exists()
+                for sd in d.iterdir()
             ):
                 models.append(d.name)
         except PermissionError:
@@ -267,14 +291,21 @@ def get_available_models() -> list[str]:
 
 
 def get_available_years(r: Results) -> list[int]:
-    try:
-        return sorted(int(y) for y in r.get_years())
-    except Exception:
+    # r.get_years() returns 0-based indices, not calendar years.
+    # Derive calendar years from actual data columns (always > 1000).
+    for var in ("flow_conversion_output", "capacity", "carbon_emissions_carrier"):
         try:
-            df = r.get_total("carbon_emissions_annual")
-            return sorted(int(y) for y in df.index)
+            df = r.get_total(var)
+            if isinstance(df, pd.DataFrame) and not df.empty:
+                years = sorted(
+                    int(c) for c in df.columns
+                    if isinstance(c, (int, float)) and float(c) > 1000
+                )
+                if years:
+                    return years
         except Exception:
-            return [2025]
+            continue
+    return [2025]
 
 
 # ── Plotting primitives ───────────────────────────────────────────────────────

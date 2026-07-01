@@ -24,15 +24,29 @@ INDUSTRY_HEAT_CARRIERS_PRODUCT = [
 ]
 
 INDUSTRY_HEAT_TECHS_BOILERS_HP = [
+    # New models (v4_6+): split by temperature + source
     "heat_pump_industry_0_100_waste_heat",
     "heat_pump_industry_0_100_water",
     "heat_pump_industry_100_150_waste_heat",
     "heat_pump_industry_100_150_water",
     "heat_pump_industry_150_200_waste_heat",
     "heat_pump_industry_150_200_water",
+    # Intermediate models (v3_0, v4_0-v4_4): split by temperature only
+    "heat_pump_industry_0_100",
+    "heat_pump_industry_100_150",
+    "heat_pump_industry_150_200",
+    # Older models (v2_0): single generic industry HP
+    "heat_pump_industry",
+    # Boilers (consistent across models)
     "biomass_boiler_industry",
     "electrode_boiler_industry",
     "natural_gas_boiler_industry",
+    # Very old models (v1_0): "industrial_" prefix naming
+    "industrial_biomass_boiler",
+    "industrial_coal_boiler",
+    "industrial_electrode_boiler",
+    "industrial_natural_gas_boiler",
+    "industrial_oil_boiler",
 ]
 
 INDUSTRY_HEAT_TECHS_TEMP_CONV = [
@@ -124,14 +138,19 @@ def get_heat_demand_by_sector(r: Results, tech: str) -> pd.DataFrame:
 
 
 def get_storage_flows(r: Results, techs: list[str], flow_type: str) -> pd.DataFrame:
-    df = r.get_total(flow_type)
-    rows = {}
-    for tech in techs:
-        if tech in df.index.get_level_values("technology"):
-            s = df.xs(tech, level="technology").sum()
-            if (s.abs() > 1e-3).any():
-                rows[tech] = s
-    return pd.DataFrame(rows).T if rows else pd.DataFrame()
+    try:
+        df = r.get_total(flow_type)
+        if df.empty or "technology" not in df.index.names:
+            return pd.DataFrame()
+        rows = {}
+        for tech in techs:
+            if tech in df.index.get_level_values("technology"):
+                s = df.xs(tech, level="technology").sum()
+                if (s.abs() > 1e-3).any():
+                    rows[tech] = s
+        return pd.DataFrame(rows).T if rows else pd.DataFrame()
+    except Exception:
+        return pd.DataFrame()
 
 
 def get_import_price_eur_per_mwh(r: Results, carrier: str) -> pd.Series:
