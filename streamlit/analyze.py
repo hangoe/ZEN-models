@@ -69,10 +69,16 @@ INDUSTRY_TES_TECHS = [
 ]
 
 INDUSTRY_DSM_TECHS = [
-    "glass_DSM",
+    "ammonia_DSM",
     "ceramic_DSM",
-    "paper_DSM",
+    "clinker_DSM",
     "food_DSM",
+    "glass_DSM",
+    "methanol_DSM",
+    "olefin_DSM",
+    "paper_DSM",
+    "primary_steel_DSM",
+    "secondary_steel_DSM",
 ]
 
 

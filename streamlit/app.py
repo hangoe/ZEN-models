@@ -29,6 +29,7 @@ from analyze import (
     fig_tes_charge_discharge,
 )
 from compare import (
+    fig_costs_flexibility,
     fig_costs_heating,
     fig_costs_industry,
     fig_costs_total,
@@ -194,9 +195,10 @@ with tab_costs:
         st.warning(f"Year {year} missing in: {', '.join(missing)}. "
                    "Those bars will be empty.")
 
-    _compare(fig_costs_total,    "Total System Costs (CAPEX & OPEX)")
-    _compare(fig_costs_industry, "Industry Process Costs")
-    _compare(fig_costs_heating,  "Heating Costs — Heat / District Heat / Industry Heating")
+    _compare(fig_costs_total,       "Total System Costs (CAPEX & OPEX)")
+    _compare(fig_costs_industry,    "Industry Process Costs")
+    _compare(fig_costs_heating,     "Heating Costs — Heat / District Heat / Industry Heating")
+    _compare(fig_costs_flexibility, "Flexibility Costs — TES & DSM")
 
 
 # ── Tab 5: System ─────────────────────────────────────────────────────────────

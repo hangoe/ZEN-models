@@ -12,6 +12,26 @@ from zen_garden import Results
 
 from utils import plot_stacked_bars
 
+INDUSTRY_TES_TECHS = [
+    "industry_TES_water_0_100",
+    "industry_TES_water_100_150",
+    "industry_TES_steam_100_150",
+    "industry_TES_steam_150_200",
+]
+
+INDUSTRY_DSM_TECHS = [
+    "ammonia_DSM",
+    "ceramic_DSM",
+    "clinker_DSM",
+    "food_DSM",
+    "glass_DSM",
+    "methanol_DSM",
+    "olefin_DSM",
+    "paper_DSM",
+    "primary_steel_DSM",
+    "secondary_steel_DSM",
+]
+
 INDUSTRY_PROCESS_TECHS = [
     "cement_kiln", "cement_post_comb", "biomass_to_cement_fuel",
     "coal_to_cement_fuel", "hydrogen_to_cement_fuel", "waste_to_cement_fuel",
@@ -189,10 +209,12 @@ def build_comparison_df(
     return combined.sort_values(name_a, ascending=True)
 
 
-def filter_techs(series: pd.Series, tech_list: list[str]) -> pd.Series:
+def filter_techs(series: pd.Series, tech_list: list[str], threshold: float = 1e-6) -> pd.Series:
     present = [t for t in tech_list if t in series.index]
+    if not present:
+        return pd.Series(dtype=float)
     filtered = series.loc[present]
-    return filtered[filtered.abs() > 1e-6].sort_values(ascending=False)
+    return filtered[filtered.abs() > threshold].sort_values(ascending=False)
 
 
 # ── Figure functions ──────────────────────────────────────────────────────────
@@ -295,6 +317,45 @@ def fig_costs_heating(
                                 filter_techs(opex_b, techs), name_a, name_b),
             f"{label} — OPEX", "MEUR", axes[1, col], show_segment_labels=True,
         )
+    fig.tight_layout(rect=[0, 0, 1, 0.95])
+    return fig
+
+
+def fig_costs_flexibility(
+    r_a: Results, r_b: Results, name_a: str, name_b: str, year: int
+) -> plt.Figure:
+    """TES + DSM CAPEX & OPEX, A vs B."""
+    capex_a = get_capex_by_technology(r_a, year)
+    capex_b = get_capex_by_technology(r_b, year)
+    opex_a = get_opex_by_technology(r_a, year)
+    opex_b = get_opex_by_technology(r_b, year)
+
+    all_flex = INDUSTRY_TES_TECHS + INDUSTRY_DSM_TECHS
+    # Use a low threshold so near-zero costs still appear
+    threshold = 1e-12
+
+    fig, axes = plt.subplots(2, 2, figsize=(16, 10))
+    fig.suptitle(f"Flexibility Costs (TES & DSM) — Year {year}", fontsize=13, fontweight="bold")
+    plot_stacked_bars(
+        build_comparison_df(filter_techs(capex_a, INDUSTRY_TES_TECHS, threshold),
+                            filter_techs(capex_b, INDUSTRY_TES_TECHS, threshold), name_a, name_b),
+        "TES — CAPEX", "MEUR", axes[0, 0], show_segment_labels=True,
+    )
+    plot_stacked_bars(
+        build_comparison_df(filter_techs(opex_a, INDUSTRY_TES_TECHS, threshold),
+                            filter_techs(opex_b, INDUSTRY_TES_TECHS, threshold), name_a, name_b),
+        "TES — OPEX", "MEUR", axes[0, 1], show_segment_labels=True,
+    )
+    plot_stacked_bars(
+        build_comparison_df(filter_techs(capex_a, INDUSTRY_DSM_TECHS, threshold),
+                            filter_techs(capex_b, INDUSTRY_DSM_TECHS, threshold), name_a, name_b),
+        "DSM — CAPEX", "MEUR", axes[1, 0], show_segment_labels=True,
+    )
+    plot_stacked_bars(
+        build_comparison_df(filter_techs(opex_a, INDUSTRY_DSM_TECHS, threshold),
+                            filter_techs(opex_b, INDUSTRY_DSM_TECHS, threshold), name_a, name_b),
+        "DSM — OPEX", "MEUR", axes[1, 1], show_segment_labels=True,
+    )
     fig.tight_layout(rect=[0, 0, 1, 0.95])
     return fig
 
