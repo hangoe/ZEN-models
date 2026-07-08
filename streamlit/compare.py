@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 from zen_garden import Results
 
-from utils import plot_stacked_bars
+from utils import get_available_years, plot_stacked_bars
 
 INDUSTRY_TES_TECHS = [
     "industry_TES_water_0_100",
@@ -189,6 +189,18 @@ def get_fuel_supply(r: Results, carrier: str, year: int) -> pd.Series:
     return pd.Series(pieces).sort_values(ascending=False)
 
 
+def get_annual_total_cost(r: Results, years: list[int]) -> pd.Series:
+    """Total system cost (CAPEX + OPEX) per year."""
+    values = {}
+    for y in years:
+        capex = _get_annual_scalar(r, "cost_capex_yearly_total", y)
+        opex = _get_annual_scalar(r, "cost_opex_yearly_total", y)
+        if capex is None and opex is None:
+            continue
+        values[y] = (capex or 0.0) + (opex or 0.0)
+    return pd.Series(values).sort_index()
+
+
 def get_summary_metrics(r_a: Results, r_b: Results, year: int) -> dict:
     return {
         "em_a":    _get_annual_scalar(r_a, "carbon_emissions_annual", year),
@@ -261,6 +273,61 @@ def fig_costs_total(
     plot_stacked_bars(build_comparison_df(opex_a, opex_b, name_a, name_b),
                       "OPEX by Technology", "MEUR", axes[1])
     fig.tight_layout(rect=[0, 0, 1, 0.95])
+    return fig
+
+
+def fig_costs_over_time(
+    r_a: Results, r_b: Results, name_a: str, name_b: str
+) -> plt.Figure:
+    """Annual and cumulative total system cost across all years, A vs B.
+
+    Useful to spot cases where a model is cheaper year-by-year early on
+    (e.g. lower upfront CAPEX) but the cumulative cost ranking flips later
+    once compounding OPEX savings pay off — e.g. flexibility investments
+    that look expensive short-term but are cheaper from a system
+    perspective over the full horizon.
+    """
+    years_a = get_available_years(r_a)
+    years_b = get_available_years(r_b)
+    s_a = get_annual_total_cost(r_a, years_a)
+    s_b = get_annual_total_cost(r_b, years_b)
+
+    color_a, color_b = "#1a237e", "#ff7043"
+
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 6))
+    fig.suptitle("Total System Cost Over Time (CAPEX + OPEX)", fontsize=13, fontweight="bold")
+
+    ax1.plot(s_a.index, s_a.values, marker="o", color=color_a, label=name_a)
+    ax1.plot(s_b.index, s_b.values, marker="o", color=color_b, label=name_b)
+    ax1.set_title("Annual Total Cost", fontsize=11, fontweight="bold")
+    ax1.set_ylabel("MEUR")
+    ax1.legend(fontsize=8)
+    ax1.grid(alpha=0.3)
+
+    cum_a = s_a.cumsum()
+    cum_b = s_b.cumsum()
+    ax2.plot(cum_a.index, cum_a.values, marker="o", color=color_a, label=name_a)
+    ax2.plot(cum_b.index, cum_b.values, marker="o", color=color_b, label=name_b)
+    ax2.set_title("Cumulative Total Cost", fontsize=11, fontweight="bold")
+    ax2.set_ylabel("MEUR")
+    ax2.legend(fontsize=8)
+    ax2.grid(alpha=0.3)
+
+    # Mark the year where the cheaper model switches, if it does.
+    common_years = sorted(set(cum_a.index) & set(cum_b.index))
+    if len(common_years) >= 2:
+        diff = (cum_b - cum_a).loc[common_years]
+        sign_changes = diff.values[:-1] * diff.values[1:]
+        cross_idx = next((i for i, v in enumerate(sign_changes) if v < 0), None)
+        if cross_idx is not None:
+            cross_year = common_years[cross_idx + 1]
+            ax2.axvline(cross_year, color="gray", linestyle="--", linewidth=1)
+            ax2.annotate(
+                f"Crossover\n{cross_year}", xy=(cross_year, cum_a.loc[cross_year]),
+                xytext=(5, 10), textcoords="offset points", fontsize=8, color="gray",
+            )
+
+    fig.tight_layout(rect=[0, 0, 1, 0.93])
     return fig
 
 

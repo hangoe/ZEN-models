@@ -32,6 +32,7 @@ from compare import (
     fig_costs_flexibility,
     fig_costs_heating,
     fig_costs_industry,
+    fig_costs_over_time,
     fig_costs_total,
     fig_emissions,
     fig_fuel_consumption,
@@ -113,7 +114,7 @@ def _compare(fig_fn, title: str = "", with_year: bool = True) -> None:
         st.markdown(f"##### {title}")
     try:
         fig = fig_fn(r_a, r_b, name_a, name_b, year) if with_year else fig_fn(r_a, r_b, name_a, name_b)
-        st.pyplot(fig, use_container_width=True, dpi=300)
+        st.pyplot(fig, width="stretch", dpi=300)
         plt.close(fig)
     except Exception as exc:
         st.warning(f"Could not render: {exc}")
@@ -177,6 +178,12 @@ with tab_costs:
     _compare(fig_costs_industry,    "Industry Process Costs")
     _compare(fig_costs_heating,     "Heating Costs — Heat / District Heat / Industry Heating")
     _compare(fig_costs_flexibility, "Flexibility Costs — TES & DSM")
+
+    st.divider()
+    st.caption("Annual and cumulative total system cost across the full model horizon — "
+               "reveals cases where one model looks cheaper year-by-year but the other "
+               "becomes cheaper once costs are accumulated over time.")
+    _compare(fig_costs_over_time, "Total System Cost Over Time (all years)", with_year=False)
 
 
 # ── Tab 5: System ─────────────────────────────────────────────────────────────
