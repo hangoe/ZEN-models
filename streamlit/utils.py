@@ -376,6 +376,30 @@ def plot_stacked_bars_years(
                       fontsize=7, frameon=False)
 
 
+def plot_stacked_bars_years_pair(
+    ax_a: plt.Axes,
+    ax_b: plt.Axes,
+    df_a: pd.DataFrame,
+    df_b: pd.DataFrame,
+    title: str,
+    unit: str,
+    name_a: str,
+    name_b: str,
+    show_segment_labels: bool = False,
+) -> None:
+    """Plot the same time-series chart for two models in adjacent axes.
+
+    The model name is put on its own title line (below the metric name) so
+    titles stay short and don't force the subplot to shrink. Legend is only
+    drawn on the Model B axis (`ax_b`) to avoid duplicating it, since both
+    axes share the same technology categories.
+    """
+    plot_stacked_bars_years(df_a, f"{title}\n{name_a}", unit, ax_a,
+                            show_legend=False, show_segment_labels=show_segment_labels)
+    plot_stacked_bars_years(df_b, f"{title}\n{name_b}", unit, ax_b,
+                            show_legend=True, show_segment_labels=show_segment_labels)
+
+
 def add_price_line(ax: plt.Axes, price_series: pd.Series, label: str, color: str) -> None:
     if price_series.empty or (price_series.abs() < 1e-9).all():
         return

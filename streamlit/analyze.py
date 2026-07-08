@@ -1,14 +1,23 @@
-"""Single-model analysis figure functions for the Streamlit dashboard.
+"""Two-model analysis figure functions for the Streamlit dashboard.
 
-Each function takes a zen_garden Results object and returns a matplotlib Figure.
-Figure sizes and styles are tuned for full-width Streamlit display.
+Each function takes two zen_garden Results objects (Model A, Model B) and
+returns a matplotlib Figure where every metric is rendered as a pair of
+adjacent axes — Model A on the left, Model B on the right — so the two
+models can be compared without switching tabs. To avoid duplicated legends,
+only the Model B axis of each pair shows a legend (see
+`plot_stacked_bars_years_pair` in utils.py).
 """
 
 import matplotlib.pyplot as plt
 import pandas as pd
 from zen_garden import Results
 
-from utils import HOURS_PER_YEAR, add_price_line, plot_stacked_bars_years
+from utils import (
+    HOURS_PER_YEAR,
+    add_price_line,
+    plot_stacked_bars_years,
+    plot_stacked_bars_years_pair,
+)
 
 INDUSTRY_HEAT_CARRIERS_ENERGY = [
     "heat_industry_0_100",
@@ -166,123 +175,204 @@ def get_import_price_eur_per_mwh(r: Results, carrier: str) -> pd.Series:
     return pi.xs(carrier, level="carrier").mean() / HOURS_PER_YEAR * 1000
 
 
-# ── Figure functions ──────────────────────────────────────────────────────────
+def _reorder_conversion_last(cons: pd.DataFrame) -> pd.DataFrame:
+    """Push temp-conversion techs to the end of the stack order."""
+    if cons.empty:
+        return cons
+    end_use = [t for t in cons.index if t not in INDUSTRY_HEAT_TECHS_TEMP_CONV]
+    conv = [t for t in cons.index if t in INDUSTRY_HEAT_TECHS_TEMP_CONV]
+    return cons.loc[end_use + conv]
 
-def fig_carrier_energy_all(r: Results) -> plt.Figure:
-    """3 rows × 2 cols: production & consumption for all 3 temperature levels."""
+
+def _filter_boiler_hp(prod: pd.DataFrame) -> pd.DataFrame:
+    if prod.empty:
+        return prod
+    prod = prod[prod.index.isin(INDUSTRY_HEAT_TECHS_BOILERS_HP)]
+    return prod[(prod.abs() > 1e-3).any(axis=1)]
+
+
+# ── Figure functions ──────────────────────────────────────────────────────────
+# Every metric is drawn as a pair of adjacent axes (Model A | Model B).
+
+def fig_carrier_energy_all(
+    r_a: Results, r_b: Results, name_a: str, name_b: str
+) -> plt.Figure:
+    """3 rows × 4 cols: production & consumption for all 3 temperature levels, A|B each."""
     n = len(INDUSTRY_HEAT_CARRIERS_ENERGY)
-    fig, axes = plt.subplots(n, 2, figsize=(16, 5 * n))
+    fig, axes = plt.subplots(n, 4, figsize=(30, 5.5 * n))
     fig.suptitle("Industry Heat Carriers — Production & Consumption",
                  fontsize=13, fontweight="bold")
     for row, carrier in enumerate(INDUSTRY_HEAT_CARRIERS_ENERGY):
         label = carrier.replace("_", " ").title()
-        prod = get_carrier_production(r, carrier)
-        cons = get_carrier_consumption(r, carrier)
-        if not cons.empty:
-            end_use = [t for t in cons.index if t not in INDUSTRY_HEAT_TECHS_TEMP_CONV]
-            conv = [t for t in cons.index if t in INDUSTRY_HEAT_TECHS_TEMP_CONV]
-            cons = cons.loc[end_use + conv]
-        plot_stacked_bars_years(prod, f"{label} — Production", "GWh", axes[row, 0])
-        plot_stacked_bars_years(cons, f"{label} — Consumption", "GWh", axes[row, 1])
+        prod_a = get_carrier_production(r_a, carrier)
+        prod_b = get_carrier_production(r_b, carrier)
+        cons_a = _reorder_conversion_last(get_carrier_consumption(r_a, carrier))
+        cons_b = _reorder_conversion_last(get_carrier_consumption(r_b, carrier))
+        plot_stacked_bars_years_pair(axes[row, 0], axes[row, 1], prod_a, prod_b,
+                                     f"{label} — Production", "GWh", name_a, name_b)
+        plot_stacked_bars_years_pair(axes[row, 2], axes[row, 3], cons_a, cons_b,
+                                     f"{label} — Consumption", "GWh", name_a, name_b)
     fig.tight_layout(rect=[0, 0, 1, 0.97])
     return fig
 
 
-def fig_carrier_products_production(r: Results) -> plt.Figure:
-    """2×2 grid: annual production for glass, ceramic, paper, food."""
-    fig, axes = plt.subplots(2, 2, figsize=(14, 9))
+def fig_carrier_products_production(
+    r_a: Results, r_b: Results, name_a: str, name_b: str
+) -> plt.Figure:
+    """2 rows × 4 cols: annual production for glass, ceramic, paper, food, A|B each."""
+    fig, axes = plt.subplots(2, 4, figsize=(26, 10))
     fig.suptitle("Industry Product Carriers — Annual Production",
                  fontsize=13, fontweight="bold")
-    for ax, carrier in zip(axes.flat, INDUSTRY_HEAT_CARRIERS_PRODUCT):
-        prod = get_carrier_production(r, carrier)
-        plot_stacked_bars_years(prod, carrier.title(), "GWh-eq", ax)
+    for i, carrier in enumerate(INDUSTRY_HEAT_CARRIERS_PRODUCT):
+        row, pair = divmod(i, 2)
+        col = pair * 2
+        prod_a = get_carrier_production(r_a, carrier)
+        prod_b = get_carrier_production(r_b, carrier)
+        plot_stacked_bars_years_pair(axes[row, col], axes[row, col + 1], prod_a, prod_b,
+                                     carrier.title(), "GWh-eq", name_a, name_b)
     fig.tight_layout(rect=[0, 0, 1, 0.95])
     return fig
 
 
-def fig_boiler_hp_production(r: Results) -> plt.Figure:
-    """1×3: boiler & HP output per temperature level with NG price overlay."""
-    ng_price = get_import_price_eur_per_mwh(r, "natural_gas")
-    fig, axes = plt.subplots(1, 3, figsize=(18, 6))
+def fig_boiler_hp_production(
+    r_a: Results, r_b: Results, name_a: str, name_b: str
+) -> plt.Figure:
+    """1×6: boiler & HP output per temperature level (A|B) with NG price overlay."""
+    ng_price_a = get_import_price_eur_per_mwh(r_a, "natural_gas")
+    ng_price_b = get_import_price_eur_per_mwh(r_b, "natural_gas")
+    fig, axes = plt.subplots(1, 6, figsize=(36, 7))
     fig.suptitle("Industry Heat — Boiler & HP Production (excl. temp conversion)\n"
                  "Right axis: natural gas import price [EUR/MWh]",
                  fontsize=12, fontweight="bold")
-    for ax, carrier in zip(axes, INDUSTRY_HEAT_CARRIERS_ENERGY):
-        prod = get_carrier_production(r, carrier)
-        if not prod.empty:
-            prod = prod[prod.index.isin(INDUSTRY_HEAT_TECHS_BOILERS_HP)]
-            prod = prod[(prod.abs() > 1e-3).any(axis=1)]
+    for i, carrier in enumerate(INDUSTRY_HEAT_CARRIERS_ENERGY):
+        col = i * 2
+        prod_a = _filter_boiler_hp(get_carrier_production(r_a, carrier))
+        prod_b = _filter_boiler_hp(get_carrier_production(r_b, carrier))
         label = carrier.replace("_", " ").title()
-        plot_stacked_bars_years(prod, label, "GWh", ax)
-        add_price_line(ax, ng_price, "NG import [EUR/MWh]", "#8b0000")
+        plot_stacked_bars_years_pair(axes[col], axes[col + 1], prod_a, prod_b,
+                                     label, "GWh", name_a, name_b)
+        add_price_line(axes[col], ng_price_a, "NG import [EUR/MWh]", "#8b0000")
+        add_price_line(axes[col + 1], ng_price_b, "NG import [EUR/MWh]", "#8b0000")
     fig.tight_layout(rect=[0, 0, 1, 0.90])
     return fig
 
 
-def fig_capacity_heat_supply(r: Results) -> plt.Figure:
-    """2×2: capacity addition & total for boilers+HPs and temp-conversion."""
-    fig, axes = plt.subplots(2, 2, figsize=(16, 10))
+def fig_capacity_heat_supply(
+    r_a: Results, r_b: Results, name_a: str, name_b: str
+) -> plt.Figure:
+    """2×4: capacity addition & total for boilers+HPs and temp-conversion, A|B each."""
+    fig, axes = plt.subplots(2, 4, figsize=(30, 11))
     fig.suptitle("Industry Heat Supply — Capacity Addition & Total",
                  fontsize=13, fontweight="bold")
-    plot_stacked_bars_years(get_capacity_addition(r, INDUSTRY_HEAT_TECHS_BOILERS_HP),
-                            "Capacity Addition — Boilers & HPs", "GW", axes[0, 0])
-    plot_stacked_bars_years(get_capacity_addition(r, INDUSTRY_HEAT_TECHS_TEMP_CONV),
-                            "Capacity Addition — Temp Conversion", "GW", axes[0, 1])
-    plot_stacked_bars_years(get_capacity(r, INDUSTRY_HEAT_TECHS_BOILERS_HP),
-                            "Total Capacity — Boilers & HPs", "GW", axes[1, 0])
-    plot_stacked_bars_years(get_capacity(r, INDUSTRY_HEAT_TECHS_TEMP_CONV),
-                            "Total Capacity — Temp Conversion", "GW", axes[1, 1])
+    plot_stacked_bars_years_pair(
+        axes[0, 0], axes[0, 1],
+        get_capacity_addition(r_a, INDUSTRY_HEAT_TECHS_BOILERS_HP),
+        get_capacity_addition(r_b, INDUSTRY_HEAT_TECHS_BOILERS_HP),
+        "Capacity Addition — Boilers & HPs", "GW", name_a, name_b,
+    )
+    plot_stacked_bars_years_pair(
+        axes[0, 2], axes[0, 3],
+        get_capacity_addition(r_a, INDUSTRY_HEAT_TECHS_TEMP_CONV),
+        get_capacity_addition(r_b, INDUSTRY_HEAT_TECHS_TEMP_CONV),
+        "Capacity Addition — Temp Conversion", "GW", name_a, name_b,
+    )
+    plot_stacked_bars_years_pair(
+        axes[1, 0], axes[1, 1],
+        get_capacity(r_a, INDUSTRY_HEAT_TECHS_BOILERS_HP),
+        get_capacity(r_b, INDUSTRY_HEAT_TECHS_BOILERS_HP),
+        "Total Capacity — Boilers & HPs", "GW", name_a, name_b,
+    )
+    plot_stacked_bars_years_pair(
+        axes[1, 2], axes[1, 3],
+        get_capacity(r_a, INDUSTRY_HEAT_TECHS_TEMP_CONV),
+        get_capacity(r_b, INDUSTRY_HEAT_TECHS_TEMP_CONV),
+        "Total Capacity — Temp Conversion", "GW", name_a, name_b,
+    )
     fig.tight_layout(rect=[0, 0, 1, 0.96])
     return fig
 
 
-def fig_capacity_production(r: Results) -> plt.Figure:
-    """1×2: capacity addition and total for production techs."""
-    fig, axes = plt.subplots(1, 2, figsize=(14, 6))
+def fig_capacity_production(
+    r_a: Results, r_b: Results, name_a: str, name_b: str
+) -> plt.Figure:
+    """1×4: capacity addition and total for production techs, A|B each."""
+    fig, axes = plt.subplots(1, 4, figsize=(28, 6.5))
     fig.suptitle("Industry Production Technologies — Capacity",
                  fontsize=13, fontweight="bold")
-    plot_stacked_bars_years(get_capacity_addition(r, INDUSTRY_HEAT_TECHS_PRODUCTION),
-                            "Capacity Addition", "ton/h", axes[0])
-    plot_stacked_bars_years(get_capacity(r, INDUSTRY_HEAT_TECHS_PRODUCTION),
-                            "Total Capacity", "ton/h", axes[1])
+    plot_stacked_bars_years_pair(
+        axes[0], axes[1],
+        get_capacity_addition(r_a, INDUSTRY_HEAT_TECHS_PRODUCTION),
+        get_capacity_addition(r_b, INDUSTRY_HEAT_TECHS_PRODUCTION),
+        "Capacity Addition", "ton/h", name_a, name_b,
+    )
+    plot_stacked_bars_years_pair(
+        axes[2], axes[3],
+        get_capacity(r_a, INDUSTRY_HEAT_TECHS_PRODUCTION),
+        get_capacity(r_b, INDUSTRY_HEAT_TECHS_PRODUCTION),
+        "Total Capacity", "ton/h", name_a, name_b,
+    )
     fig.tight_layout(rect=[0, 0, 1, 0.93])
     return fig
 
 
-def fig_tes_capacity_addition(r: Results) -> plt.Figure:
-    """1×2: TES energy (left) and power (right) capacity addition."""
-    fig, axes = plt.subplots(1, 2, figsize=(14, 6))
+def fig_tes_capacity_addition(
+    r_a: Results, r_b: Results, name_a: str, name_b: str
+) -> plt.Figure:
+    """1×4: TES energy and power capacity addition, A|B each."""
+    fig, axes = plt.subplots(1, 4, figsize=(28, 6.5))
     fig.suptitle("Industry TES — Capacity Addition", fontsize=13, fontweight="bold")
-    plot_stacked_bars_years(get_capacity_addition(r, INDUSTRY_TES_TECHS, "energy"),
-                            "Energy Capacity Addition", "GWh", axes[0])
-    plot_stacked_bars_years(get_capacity_addition(r, INDUSTRY_TES_TECHS, "power"),
-                            "Power Capacity Addition", "GW", axes[1])
+    plot_stacked_bars_years_pair(
+        axes[0], axes[1],
+        get_capacity_addition(r_a, INDUSTRY_TES_TECHS, "energy"),
+        get_capacity_addition(r_b, INDUSTRY_TES_TECHS, "energy"),
+        "Energy Capacity Addition", "GWh", name_a, name_b,
+    )
+    plot_stacked_bars_years_pair(
+        axes[2], axes[3],
+        get_capacity_addition(r_a, INDUSTRY_TES_TECHS, "power"),
+        get_capacity_addition(r_b, INDUSTRY_TES_TECHS, "power"),
+        "Power Capacity Addition", "GW", name_a, name_b,
+    )
     fig.tight_layout(rect=[0, 0, 1, 0.93])
     return fig
 
 
-def fig_tes_charge_discharge(r: Results) -> plt.Figure:
-    """1×2: TES charge (left) and discharge (right)."""
-    fig, axes = plt.subplots(1, 2, figsize=(14, 6))
+def fig_tes_charge_discharge(
+    r_a: Results, r_b: Results, name_a: str, name_b: str
+) -> plt.Figure:
+    """1×4: TES charge and discharge, A|B each."""
+    fig, axes = plt.subplots(1, 4, figsize=(28, 6.5))
     fig.suptitle("Industry TES — Charge & Discharge", fontsize=13, fontweight="bold")
-    plot_stacked_bars_years(get_storage_flows(r, INDUSTRY_TES_TECHS, "flow_storage_charge"),
-                            "Charge", "GWh", axes[0])
-    plot_stacked_bars_years(get_storage_flows(r, INDUSTRY_TES_TECHS, "flow_storage_discharge"),
-                            "Discharge", "GWh", axes[1])
+    plot_stacked_bars_years_pair(
+        axes[0], axes[1],
+        get_storage_flows(r_a, INDUSTRY_TES_TECHS, "flow_storage_charge"),
+        get_storage_flows(r_b, INDUSTRY_TES_TECHS, "flow_storage_charge"),
+        "Charge", "GWh", name_a, name_b,
+    )
+    plot_stacked_bars_years_pair(
+        axes[2], axes[3],
+        get_storage_flows(r_a, INDUSTRY_TES_TECHS, "flow_storage_discharge"),
+        get_storage_flows(r_b, INDUSTRY_TES_TECHS, "flow_storage_discharge"),
+        "Discharge", "GWh", name_a, name_b,
+    )
     fig.tight_layout(rect=[0, 0, 1, 0.93])
     return fig
 
 
-def fig_heat_demand_by_sector(r: Results) -> plt.Figure:
-    """Heat input by temperature level for all production sectors, first vs last year."""
+def fig_heat_demand_by_sector(
+    r_a: Results, r_b: Results, name_a: str, name_b: str
+) -> plt.Figure:
+    """Heat input by temperature level for all production sectors, first vs last year, A|B each."""
     sectors = [
         ("glass_production", "Glass"),
         ("ceramic_production", "Ceramic"),
         ("paper_production", "Paper"),
         ("food_production", "Food"),
     ]
-    sector_data = {label: get_heat_demand_by_sector(r, tech) for tech, label in sectors}
-    non_empty = [df for df in sector_data.values() if not df.empty]
+    sector_data_a = {label: get_heat_demand_by_sector(r_a, tech) for tech, label in sectors}
+    sector_data_b = {label: get_heat_demand_by_sector(r_b, tech) for tech, label in sectors}
+    non_empty = [df for data in (sector_data_a, sector_data_b)
+                 for df in data.values() if not df.empty]
 
     if not non_empty:
         fig, ax = plt.subplots(figsize=(8, 4))
@@ -294,66 +384,100 @@ def fig_heat_demand_by_sector(r: Results) -> plt.Figure:
     all_years = non_empty[0].columns.tolist()
     year_first, year_last = all_years[0], all_years[-1]
     sector_labels = [s[1] for s in sectors]
-
     single_year = (year_first == year_last)
     display_years = [year_first] if single_year else [year_first, year_last]
-    fig, axes_raw = plt.subplots(1, len(display_years), figsize=(7 * len(display_years), 7),
-                                 sharey=not single_year)
-    axes = [axes_raw] if single_year else list(axes_raw)
 
-    fig.suptitle("Industry Sectors — Heat Input by Temperature Level",
-                 fontsize=13, fontweight="bold")
-    for ax, yr in zip(axes, display_years):
-        df_yr = pd.DataFrame(
+    def build_df(sector_data: dict, yr) -> pd.DataFrame:
+        return pd.DataFrame(
             {lbl: sector_data[lbl][yr]
              for lbl in sector_labels
              if not sector_data[lbl].empty and yr in sector_data[lbl].columns}
         ).fillna(0)
-        plot_stacked_bars_years(df_yr, str(yr), "GWh", ax,
-                                show_legend=(ax is axes[-1]))
+
+    n_years = len(display_years)
+    fig, axes = plt.subplots(1, n_years * 2, figsize=(7.5 * n_years * 2, 7.5),
+                             sharey=not single_year)
+    axes = list(axes)
+
+    fig.suptitle("Industry Sectors — Heat Input by Temperature Level",
+                 fontsize=13, fontweight="bold")
+    for i, yr in enumerate(display_years):
+        plot_stacked_bars_years_pair(
+            axes[2 * i], axes[2 * i + 1],
+            build_df(sector_data_a, yr), build_df(sector_data_b, yr),
+            str(yr), "GWh", name_a, name_b,
+        )
     fig.tight_layout(rect=[0, 0, 1, 0.95])
     return fig
 
 
-def fig_dsm_capacity_addition(r: Results) -> plt.Figure:
-    """1×2: DSM energy (left) and power (right) capacity addition."""
-    fig, axes = plt.subplots(1, 2, figsize=(14, 6))
+def fig_dsm_capacity_addition(
+    r_a: Results, r_b: Results, name_a: str, name_b: str
+) -> plt.Figure:
+    """1×4: DSM energy and power capacity addition, A|B each."""
+    fig, axes = plt.subplots(1, 4, figsize=(28, 6.5))
     fig.suptitle("Industry DSM — Capacity Addition", fontsize=13, fontweight="bold")
-    plot_stacked_bars_years(get_capacity_addition(r, INDUSTRY_DSM_TECHS, "energy"),
-                            "Energy Capacity Addition", "ktproduct", axes[0])
-    plot_stacked_bars_years(get_capacity_addition(r, INDUSTRY_DSM_TECHS, "power"),
-                            "Power Capacity Addition", "ktproduct/h", axes[1])
+    plot_stacked_bars_years_pair(
+        axes[0], axes[1],
+        get_capacity_addition(r_a, INDUSTRY_DSM_TECHS, "energy"),
+        get_capacity_addition(r_b, INDUSTRY_DSM_TECHS, "energy"),
+        "Energy Capacity Addition", "ktproduct", name_a, name_b,
+    )
+    plot_stacked_bars_years_pair(
+        axes[2], axes[3],
+        get_capacity_addition(r_a, INDUSTRY_DSM_TECHS, "power"),
+        get_capacity_addition(r_b, INDUSTRY_DSM_TECHS, "power"),
+        "Power Capacity Addition", "ktproduct/h", name_a, name_b,
+    )
     fig.tight_layout(rect=[0, 0, 1, 0.93])
     return fig
 
 
-def fig_dsm_charge_discharge(r: Results) -> plt.Figure:
-    """1×2: DSM charge (left) and discharge (right)."""
-    fig, axes = plt.subplots(1, 2, figsize=(14, 6))
+def fig_dsm_charge_discharge(
+    r_a: Results, r_b: Results, name_a: str, name_b: str
+) -> plt.Figure:
+    """1×4: DSM charge and discharge, A|B each."""
+    fig, axes = plt.subplots(1, 4, figsize=(28, 6.5))
     fig.suptitle("Industry DSM — Charge & Discharge", fontsize=13, fontweight="bold")
-    plot_stacked_bars_years(get_storage_flows(r, INDUSTRY_DSM_TECHS, "flow_storage_charge"),
-                            "Charge", "ktproduct", axes[0])
-    plot_stacked_bars_years(get_storage_flows(r, INDUSTRY_DSM_TECHS, "flow_storage_discharge"),
-                            "Discharge", "ktproduct", axes[1])
+    plot_stacked_bars_years_pair(
+        axes[0], axes[1],
+        get_storage_flows(r_a, INDUSTRY_DSM_TECHS, "flow_storage_charge"),
+        get_storage_flows(r_b, INDUSTRY_DSM_TECHS, "flow_storage_charge"),
+        "Charge", "ktproduct", name_a, name_b,
+    )
+    plot_stacked_bars_years_pair(
+        axes[2], axes[3],
+        get_storage_flows(r_a, INDUSTRY_DSM_TECHS, "flow_storage_discharge"),
+        get_storage_flows(r_b, INDUSTRY_DSM_TECHS, "flow_storage_discharge"),
+        "Discharge", "ktproduct", name_a, name_b,
+    )
     fig.tight_layout(rect=[0, 0, 1, 0.93])
     return fig
 
 
-def fig_storage_comparison(r: Results) -> plt.Figure:
-    """1×3: capacity addition comparison across TES, battery, and DSM."""
-    fig, axes = plt.subplots(1, 3, figsize=(18, 6))
+def fig_storage_comparison(
+    r_a: Results, r_b: Results, name_a: str, name_b: str
+) -> plt.Figure:
+    """1×6: capacity addition comparison across TES, battery, and DSM, A|B each."""
+    fig, axes = plt.subplots(1, 6, figsize=(40, 7))
     fig.suptitle("Storage Technologies — Capacity Addition", fontsize=13, fontweight="bold")
-    plot_stacked_bars_years(
-        get_capacity_addition(r, INDUSTRY_TES_TECHS + ["battery"], "energy"),
-        "Energy Capacity\nTES + Battery", "GWh", axes[0],
+    plot_stacked_bars_years_pair(
+        axes[0], axes[1],
+        get_capacity_addition(r_a, INDUSTRY_TES_TECHS + ["battery"], "energy"),
+        get_capacity_addition(r_b, INDUSTRY_TES_TECHS + ["battery"], "energy"),
+        "Energy Capacity\nTES + Battery", "GWh", name_a, name_b,
     )
-    plot_stacked_bars_years(
-        get_capacity_addition(r, INDUSTRY_TES_TECHS + ["battery", "pumped_hydro"], "power"),
-        "Power Capacity\nTES + Battery + Pumped Hydro", "GW", axes[1],
+    plot_stacked_bars_years_pair(
+        axes[2], axes[3],
+        get_capacity_addition(r_a, INDUSTRY_TES_TECHS + ["battery", "pumped_hydro"], "power"),
+        get_capacity_addition(r_b, INDUSTRY_TES_TECHS + ["battery", "pumped_hydro"], "power"),
+        "Power Capacity\nTES + Battery + Pumped Hydro", "GW", name_a, name_b,
     )
-    plot_stacked_bars_years(
-        get_capacity_addition(r, INDUSTRY_DSM_TECHS, "power"),
-        "DSM Power Capacity", "ktproduct/h", axes[2],
+    plot_stacked_bars_years_pair(
+        axes[4], axes[5],
+        get_capacity_addition(r_a, INDUSTRY_DSM_TECHS, "power"),
+        get_capacity_addition(r_b, INDUSTRY_DSM_TECHS, "power"),
+        "DSM Power Capacity", "ktproduct/h", name_a, name_b,
     )
     fig.tight_layout(rect=[0, 0, 1, 0.93])
     return fig

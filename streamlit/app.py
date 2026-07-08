@@ -3,7 +3,7 @@
 Run:  streamlit run streamlit/app.py   (from repo root)
   or  streamlit run app.py             (from streamlit/ directory)
 
-5 thematic tabs:
+5 thematic tabs, each showing Model A and Model B side by side (no per-model tabs):
   1. Carrier Flows   — production, consumption, boiler/HP output
   2. Capacity        — heat supply, production, heat demand by sector
   3. Storage & DSM   — TES and DSM capacity, charge/discharge, cross-comparison
@@ -103,37 +103,20 @@ name_b = short(model_b)
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
-def _plot(r: Results, fig_fn, title: str = "") -> None:
-    """Render a single-model figure at full width."""
+def _compare(fig_fn, title: str = "", with_year: bool = True) -> None:
+    """Render an A-vs-B comparison figure at full width.
+
+    Every such figure already places Model A and Model B side by side as
+    adjacent axes, so no per-model tabs are needed.
+    """
     if title:
         st.markdown(f"##### {title}")
     try:
-        fig = fig_fn(r)
-        st.pyplot(fig, use_container_width=True)
+        fig = fig_fn(r_a, r_b, name_a, name_b, year) if with_year else fig_fn(r_a, r_b, name_a, name_b)
+        st.pyplot(fig, use_container_width=True, dpi=300)
         plt.close(fig)
     except Exception as exc:
         st.warning(f"Could not render: {exc}")
-
-
-def _compare(fig_fn, title: str = "") -> None:
-    """Render an A-vs-B comparison figure at full width."""
-    if title:
-        st.markdown(f"##### {title}")
-    try:
-        fig = fig_fn(r_a, r_b, name_a, name_b, year)
-        st.pyplot(fig, use_container_width=True)
-        plt.close(fig)
-    except Exception as exc:
-        st.warning(f"Could not render: {exc}")
-
-
-def _model_subtabs(plots_a_b: list[tuple]) -> None:
-    """Create [Model A | Model B] sub-tabs, each showing the given list of (fig_fn, title)."""
-    sub_a, sub_b = st.tabs([f"📊 {name_a}", f"📊 {name_b}"])
-    for sub, r in [(sub_a, r_a), (sub_b, r_b)]:
-        with sub:
-            for fig_fn, title in plots_a_b:
-                _plot(r, fig_fn, title)
 
 
 # ── 5 tabs ────────────────────────────────────────────────────────────────────
@@ -148,37 +131,32 @@ tab_carrier, tab_capacity, tab_storage, tab_costs, tab_system = st.tabs([
 
 # ── Tab 1: Carrier Flows ──────────────────────────────────────────────────────
 with tab_carrier:
-    st.caption("Industry heat carrier production, consumption, and boiler/HP output. "
-               "Switch between models with the sub-tabs.")
-    _model_subtabs([
-        (fig_carrier_energy_all,         "Carrier Energy — Production & Consumption"),
-        (fig_carrier_products_production, "Product Carriers — Annual Production"),
-        (fig_boiler_hp_production,        "Boiler & HP Production"),
-    ])
+    st.caption(f"Industry heat carrier production, consumption, and boiler/HP output — "
+               f"**{name_a}** vs **{name_b}**.")
+    _compare(fig_carrier_energy_all,          "Carrier Energy — Production & Consumption", with_year=False)
+    _compare(fig_carrier_products_production, "Product Carriers — Annual Production",       with_year=False)
+    _compare(fig_boiler_hp_production,        "Boiler & HP Production",                     with_year=False)
 
 
 # ── Tab 2: Capacity ───────────────────────────────────────────────────────────
 with tab_capacity:
-    st.caption("Installed capacity additions and totals for heat supply, production "
-               "technologies, and sector-level heat demand.")
-    _model_subtabs([
-        (fig_capacity_heat_supply,  "Heat Supply Capacity"),
-        (fig_capacity_production,   "Production Technology Capacity"),
-        (fig_heat_demand_by_sector, "Heat Demand by Sector (first vs last year)"),
-    ])
+    st.caption(f"Installed capacity additions and totals for heat supply, production "
+               f"technologies, and sector-level heat demand — **{name_a}** vs **{name_b}**.")
+    _compare(fig_capacity_heat_supply,  "Heat Supply Capacity",                        with_year=False)
+    _compare(fig_capacity_production,   "Production Technology Capacity",              with_year=False)
+    _compare(fig_heat_demand_by_sector, "Heat Demand by Sector (first vs last year)",  with_year=False)
 
 
 # ── Tab 3: Storage & DSM ──────────────────────────────────────────────────────
 with tab_storage:
-    st.caption("Thermal energy storage and demand-side management — capacity, "
-               "charge/discharge flows, and cross-technology comparison.")
-    _model_subtabs([
-        (fig_tes_capacity_addition, "TES Capacity Addition"),
-        (fig_tes_charge_discharge,  "TES Charge & Discharge"),
-        (fig_dsm_capacity_addition, "DSM Capacity Addition"),
-        (fig_dsm_charge_discharge,  "DSM Charge & Discharge"),
-        (fig_storage_comparison,    "Storage Technologies — Cross-type Comparison"),
-    ])
+    st.caption(f"Thermal energy storage and demand-side management — capacity, "
+               f"charge/discharge flows, and cross-technology comparison — "
+               f"**{name_a}** vs **{name_b}**.")
+    _compare(fig_tes_capacity_addition, "TES Capacity Addition",                       with_year=False)
+    _compare(fig_tes_charge_discharge,  "TES Charge & Discharge",                      with_year=False)
+    _compare(fig_dsm_capacity_addition, "DSM Capacity Addition",                       with_year=False)
+    _compare(fig_dsm_charge_discharge,  "DSM Charge & Discharge",                      with_year=False)
+    _compare(fig_storage_comparison,    "Storage Technologies — Cross-type Comparison", with_year=False)
 
 
 # ── Tab 4: Costs ──────────────────────────────────────────────────────────────
