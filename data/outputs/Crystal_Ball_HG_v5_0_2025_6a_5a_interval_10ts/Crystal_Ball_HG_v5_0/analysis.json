@@ -1,5 +1,5 @@
 {
-  "dataset": "../ZEN-creator/outputs/Crystal_Ball_HG_v5_0",
+  "dataset": "..\\ZEN-creator\\outputs\\Crystal_Ball_HG_v5_0",
   "objective": "total_cost",
   "sense": "min",
   "subsets": {
@@ -44,9 +44,9 @@
     "representationMethod": "meanRepresentation",
     "resolution": 1
   },
-  "folder_output": "data/outputs/Crystal_Ball_HG_v5_0_2025_6a_5a_interval_10ts",
+  "folder_output": "data\\outputs\\Crystal_Ball_HG_v5_0_2025_6a_5a_interval_10ts",
   "overwrite_output": true,
   "output_format": "h5",
   "earliest_year_of_data": 1900,
-  "zen_garden_version": "2.12.0"
+  "zen_garden_version": "2.12.2"
 }

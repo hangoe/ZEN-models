@@ -3,7 +3,7 @@ import tempfile
 from pathlib import Path
 from zen_garden import run, Results
 
-my_dataset = str("Crystal_Ball_HG_v5_0")
+my_dataset = str("Crystal_Ball_HG_v5_0_no_flexibility")
 my_comment = "2025_6a_5a_interval_10ts"
 
 DATA_DIR_CONFIG = Path(__file__).parent / "data"
@@ -14,7 +14,7 @@ system_overrides = {
     "conduct_time_series_aggregation": True,
     "aggregated_time_steps_per_year": 10,
     "reference_year": 2025,
-    "optimized_years": 1,
+    "optimized_years": 6,
     "interval_between_years": 5,
     "use_rolling_horizon": False,
 }
