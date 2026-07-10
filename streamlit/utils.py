@@ -25,17 +25,18 @@ COLOR_MAP = {
     "industry_TES_water_100_150": "#6495ed",
     "industry_TES_steam_100_150": "#ff7043",
     "industry_TES_steam_150_200": "#ef5350",
-    # DSM
-    "ammonia_DSM": "#00838f",
-    "ceramic_DSM": "#66bb6a",
-    "clinker_DSM": "#9e9e9e",
-    "food_DSM": "#ff8f00",
-    "glass_DSM": "#2e7d32",
-    "methanol_DSM": "#8d6e63",
-    "olefin_DSM": "#6d4c41",
-    "paper_DSM": "#a5d6a7",
-    "primary_steel_DSM": "#1565c0",
-    "secondary_steel_DSM": "#42a5f5",
+    # DSM — 10 mutually distinguishable hues, loosely tied to each product's
+    # colour where one exists (steel=blue, glass/ceramic=purple, food=warm).
+    "ammonia_DSM": "#00897b",          # teal (H2/ammonia family)
+    "ceramic_DSM": "#ab47bc",          # violet (ceramic_production is purple)
+    "clinker_DSM": "#757575",          # grey (cement/clinker)
+    "food_DSM": "#ff8f00",             # amber (food = warm)
+    "glass_DSM": "#7e57c2",            # deep purple (glass_production is purple)
+    "methanol_DSM": "#8d6e63",         # brown (chemicals)
+    "olefin_DSM": "#afb42b",           # olive-lime (chemicals, distinct from methanol)
+    "paper_DSM": "#d81b60",            # rose-pink
+    "primary_steel_DSM": "#1565c0",    # strong blue (steel)
+    "secondary_steel_DSM": "#4fc3f7",  # light blue (steel)
     # Carriers (emissions plot)
     "crude_oil (carrier)": "#a0795c",
     "natural_gas (carrier)": "#d4a017",
@@ -61,14 +62,14 @@ COLOR_MAP = {
     "SMR_CCS": "#d2a679",
     "methanol_from_natural_gas": "#c9a96e",
     "methanation": "#bdb76b",
-    "hard_coal_plant": "#8b6e5a",
+    "hard_coal_plant": "#5d4037",
     "hard_coal_boiler_DH": "#9c7f6b",
-    "lignite_coal_plant": "#a89070",
+    "lignite_coal_plant": "#a1887f",
     "coal_to_cement_fuel": "#9a8070",
     "lng_terminal": "#e8a838",
     "oil_boiler": "#b8956e",
     "oil_boiler_DH": "#c4a07a",
-    "oil_plant": "#a0795c",
+    "oil_plant": "#3e2723",
     "oil_pipeline": "#b08a6e",
     "oil_storage": "#c0a080",
     "oil_to_diesel_conversion": "#b89878",
@@ -81,12 +82,12 @@ COLOR_MAP = {
     "waste_plant": "#b0b0b0",
     "waste_to_cement_fuel": "#909090",
     # Renewables
-    "photovoltaics": "#f0c040",
-    "wind_onshore": "#4ca6a8",
-    "wind_offshore": "#5bb0b0",
-    "reservoir_hydro": "#5aacff",
-    "run-of-river_hydro": "#6a85e8",
-    "pumped_hydro": "#6495ed",
+    "photovoltaics": "#f0c040",        # solar yellow
+    "wind_onshore": "#4ca6a8",         # teal
+    "wind_offshore": "#1b7e9a",        # deep blue-teal (distinct from onshore)
+    "reservoir_hydro": "#1e88e5",      # blue
+    "run-of-river_hydro": "#64b5f6",   # light blue
+    "pumped_hydro": "#0d47a1",         # navy (storage)
     # Nuclear
     "nuclear": "#c850c0",
     # Biomass
@@ -132,7 +133,7 @@ COLOR_MAP = {
     "power_line": "#9575cd",
     "district_heating_grid": "#ef5350",
     # Transport
-    "BEV": "#43a047",
+    "BEV": "#558b2f",
     "ICE_petrol": "#bdbdbd",
     "ICE_diesel": "#9e9e9e",
     "HDT_diesel": "#9e9e9e",
@@ -364,8 +365,8 @@ def plot_stacked_bars_years(
 
     ax.set_xticks(range(len(years)))
     ax.set_xticklabels([str(y) for y in years], fontsize=9)
-    ax.set_ylabel(unit, fontsize=10)
-    ax.set_title(title, fontsize=11, fontweight="bold")
+    ax.set_ylabel(unit, fontsize=11)
+    ax.set_title(title, fontsize=12, fontweight="bold")
     ax.axhline(0, color="black", linewidth=0.5)
 
     if show_legend:
@@ -373,7 +374,47 @@ def plot_stacked_bars_years(
         if handles:
             ax.legend(handles[::-1], labels[::-1],
                       bbox_to_anchor=(1.02, 1), loc="upper left",
-                      fontsize=7, frameon=False)
+                      fontsize=10, frameon=False)
+
+
+def _stacked_extent(df: pd.DataFrame) -> tuple[float, float]:
+    """Return (negative_bottom, positive_top) of the per-year stacked totals.
+
+    For a stacked bar chart the visually relevant magnitude is the sum of all
+    positive segments (top of the stack) and the sum of all negative segments
+    (bottom of the stack) within each year/column. Returns (0.0, 0.0) for an
+    empty dataframe.
+    """
+    if df is None or df.empty:
+        return 0.0, 0.0
+    numeric = df.apply(pd.to_numeric, errors="coerce")
+    pos_top = numeric.clip(lower=0).sum(axis=0).max()
+    neg_bottom = numeric.clip(upper=0).sum(axis=0).min()
+    pos_top = float(pos_top) if pd.notna(pos_top) else 0.0
+    neg_bottom = float(neg_bottom) if pd.notna(neg_bottom) else 0.0
+    return neg_bottom, pos_top
+
+
+def _apply_shared_ylim(axes: list, dfs: list, headroom: float = 0.08) -> None:
+    """Give every axis in ``axes`` a common y-limit derived from ``dfs``.
+
+    The limit spans from the most-negative stacked bottom to the most-positive
+    stacked top across all supplied dataframes, with a little headroom. Does
+    nothing when there is no non-zero data to bound.
+    """
+    bottoms, tops = zip(*(_stacked_extent(df) for df in dfs))
+    bottom = min(bottoms)
+    top = max(tops)
+    if bottom == 0.0 and top == 0.0:
+        return
+    span = top - bottom
+    pad = span * headroom if span > 0 else abs(top or bottom) * headroom
+    lo = bottom - pad if bottom < 0 else bottom
+    hi = top + pad if top > 0 else top
+    if lo == hi:
+        return
+    for ax in axes:
+        ax.set_ylim(lo, hi)
 
 
 def plot_stacked_bars_years_pair(
@@ -393,11 +434,16 @@ def plot_stacked_bars_years_pair(
     titles stay short and don't force the subplot to shrink. Legend is only
     drawn on the Model B axis (`ax_b`) to avoid duplicating it, since both
     axes share the same technology categories.
+
+    Both axes are given a shared y-limit (computed from the per-year stacked
+    totals of *both* dataframes) so Model A and Model B are directly
+    comparable by eye.
     """
     plot_stacked_bars_years(df_a, f"{title}\n{name_a}", unit, ax_a,
                             show_legend=False, show_segment_labels=show_segment_labels)
     plot_stacked_bars_years(df_b, f"{title}\n{name_b}", unit, ax_b,
                             show_legend=True, show_segment_labels=show_segment_labels)
+    _apply_shared_ylim([ax_a, ax_b], [df_a, df_b])
 
 
 def add_price_line(ax: plt.Axes, price_series: pd.Series, label: str, color: str) -> None:
@@ -467,7 +513,7 @@ def plot_stacked_bars(
 
     ax.set_xticks(range(len(models)))
     ax.set_xticklabels(models, fontsize=9)
-    ax.set_ylabel(unit, fontsize=10)
+    ax.set_ylabel(unit, fontsize=11)
     ax.set_title(title, fontsize=12, fontweight="bold")
     ax.axhline(0, color="black", linewidth=0.5)
 
@@ -476,4 +522,4 @@ def plot_stacked_bars(
         if handles:
             ax.legend(handles[::-1], labels[::-1],
                       bbox_to_anchor=(1.02, 1), loc="upper left",
-                      fontsize=7, frameon=False)
+                      fontsize=10, frameon=False)

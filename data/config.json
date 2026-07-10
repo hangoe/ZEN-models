@@ -9,7 +9,7 @@
       "NodeMethod": 2,
       "BarHomogeneous": 1,
       "DualReductions": 0,
-      "Threads": 128,
+      "Threads": 16,
       "Crossover": 0,
       "ScaleFlag": 2,
       "BarOrder": 0

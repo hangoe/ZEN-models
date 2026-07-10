@@ -3,12 +3,15 @@
 Run:  streamlit run streamlit/app.py   (from repo root)
   or  streamlit run app.py             (from streamlit/ directory)
 
-5 thematic tabs, each showing Model A and Model B side by side (no per-model tabs):
-  1. Carrier Flows   — production, consumption, boiler/HP output
-  2. Capacity        — heat supply, production, heat demand by sector
-  3. Storage & DSM   — TES and DSM capacity, charge/discharge, cross-comparison
-  4. Costs           — CAPEX, OPEX broken down by technology (year-specific, A vs B)
-  5. System          — emissions, fuel consumption, natural gas balance (year-specific, A vs B)
+8 thematic tabs, each showing Model A and Model B side by side (no per-model tabs):
+  1. Heat Flows        — heat carrier production/consumption, boiler/HP output
+  2. Product Flows     — product carrier production
+  3. Heat Capacity     — heat supply capacity, heat demand by sector (dropdown)
+  4. Product Capacity  — production technology capacity
+  5. Flexibility       — TES and DSM capacity, charge/discharge, cross-comparison
+  6. Costs             — CAPEX/OPEX by technology (year-specific, A vs B)
+  7. Electricity       — generation capacity, production, consumption, net balance
+  8. System            — emissions, fuel, NG balance, cost-over-time (A vs B)
 """
 
 import matplotlib.pyplot as plt
@@ -23,15 +26,22 @@ from analyze import (
     fig_carrier_products_production,
     fig_dsm_capacity_addition,
     fig_dsm_charge_discharge,
+    fig_electricity_balance,
+    fig_electricity_capacity_production_consumption,
     fig_heat_demand_by_sector,
+    fig_residual_load,
     fig_storage_comparison,
+    fig_storage_use,
     fig_tes_capacity_addition,
     fig_tes_charge_discharge,
 )
 from compare import (
+    fig_carbon_costs_over_time,
+    fig_carrier_costs_over_time,
     fig_costs_flexibility,
     fig_costs_heating,
     fig_costs_industry,
+    fig_costs_other_storages,
     fig_costs_over_time,
     fig_costs_total,
     fig_emissions,
@@ -48,6 +58,12 @@ st.set_page_config(
 )
 
 st.title("ZEN-Garden Crystal Ball")
+
+# On-screen render resolution. Figures are shown at container width regardless,
+# so a moderate DPI keeps images small and fast; very high DPI (e.g. 450) makes
+# the tall multi-panel figures exceed browser image limits, which breaks the
+# tab layout. Raise later if you want sharper exports.
+RENDER_DPI = 100
 
 # ── Model discovery ───────────────────────────────────────────────────────────
 available = get_available_models()
@@ -114,42 +130,69 @@ def _compare(fig_fn, title: str = "", with_year: bool = True) -> None:
         st.markdown(f"##### {title}")
     try:
         fig = fig_fn(r_a, r_b, name_a, name_b, year) if with_year else fig_fn(r_a, r_b, name_a, name_b)
-        st.pyplot(fig, width="stretch", dpi=300)
+        st.pyplot(fig, width="stretch", dpi=RENDER_DPI)
         plt.close(fig)
     except Exception as exc:
         st.warning(f"Could not render: {exc}")
 
 
-# ── 5 tabs ────────────────────────────────────────────────────────────────────
-tab_carrier, tab_capacity, tab_storage, tab_costs, tab_system = st.tabs([
-    "⚡ Carrier Flows",
-    "🏭 Capacity",
-    "🔋 Storage & DSM",
+# ── 8 tabs ────────────────────────────────────────────────────────────────────
+(tab_heat_flows, tab_product_flows, tab_heat_cap, tab_product_cap,
+ tab_flex, tab_costs, tab_electricity, tab_residual, tab_system) = st.tabs([
+    "🔥 Heat Flows",
+    "📦 Product Flows",
+    "🏭 Heat Capacity",
+    "🧱 Product Capacity",
+    "🔋 Flexibility",
     "💰 Costs",
+    "⚡ Electricity",
+    "📉 Residual Load",
     "🌍 System",
 ])
 
 
-# ── Tab 1: Carrier Flows ──────────────────────────────────────────────────────
-with tab_carrier:
+# ── Tab 1: Heat Flows ─────────────────────────────────────────────────────────
+with tab_heat_flows:
     st.caption(f"Industry heat carrier production, consumption, and boiler/HP output — "
                f"**{name_a}** vs **{name_b}**.")
-    _compare(fig_carrier_energy_all,          "Carrier Energy — Production & Consumption", with_year=False)
-    _compare(fig_carrier_products_production, "Product Carriers — Annual Production",       with_year=False)
-    _compare(fig_boiler_hp_production,        "Boiler & HP Production",                     with_year=False)
+    _compare(fig_carrier_energy_all, "Carrier Energy — Production & Consumption", with_year=False)
+    _compare(fig_boiler_hp_production, "Boiler & HP Production",                  with_year=False)
 
 
-# ── Tab 2: Capacity ───────────────────────────────────────────────────────────
-with tab_capacity:
-    st.caption(f"Installed capacity additions and totals for heat supply, production "
-               f"technologies, and sector-level heat demand — **{name_a}** vs **{name_b}**.")
-    _compare(fig_capacity_heat_supply,  "Heat Supply Capacity",                        with_year=False)
-    _compare(fig_capacity_production,   "Production Technology Capacity",              with_year=False)
-    _compare(fig_heat_demand_by_sector, "Heat Demand by Sector (first vs last year)",  with_year=False)
+# ── Tab 2: Product Flows ──────────────────────────────────────────────────────
+with tab_product_flows:
+    st.caption(f"Industry product carrier annual production — **{name_a}** vs **{name_b}**.")
+    _compare(fig_carrier_products_production, "Product Carriers — Annual Production", with_year=False)
 
 
-# ── Tab 3: Storage & DSM ──────────────────────────────────────────────────────
-with tab_storage:
+# ── Tab 3: Heat Capacity ──────────────────────────────────────────────────────
+with tab_heat_cap:
+    st.caption(f"Installed capacity additions/totals for heat supply, plus sector-level "
+               f"heat demand by temperature level — **{name_a}** vs **{name_b}**.")
+    _compare(fig_capacity_heat_supply, "Heat Supply Capacity", with_year=False)
+
+    st.divider()
+    hd_years = common_years if common_years else all_years
+    heat_year = st.selectbox("Year", hd_years, index=len(hd_years) - 1, key="heat_demand_year",
+                             help="Heat input by temperature level, one bar per sector, for this year")
+    st.markdown("##### Heat Demand by Sector")
+    try:
+        fig = fig_heat_demand_by_sector(r_a, r_b, name_a, name_b, heat_year)
+        st.pyplot(fig, width="stretch", dpi=RENDER_DPI)
+        plt.close(fig)
+    except Exception as exc:
+        st.warning(f"Could not render: {exc}")
+
+
+# ── Tab 4: Product Capacity ───────────────────────────────────────────────────
+with tab_product_cap:
+    st.caption(f"Installed capacity additions and totals for production technologies — "
+               f"**{name_a}** vs **{name_b}**.")
+    _compare(fig_capacity_production, "Production Technology Capacity", with_year=False)
+
+
+# ── Tab 5: Flexibility ────────────────────────────────────────────────────────
+with tab_flex:
     st.caption(f"Thermal energy storage and demand-side management — capacity, "
                f"charge/discharge flows, and cross-technology comparison — "
                f"**{name_a}** vs **{name_b}**.")
@@ -160,7 +203,7 @@ with tab_storage:
     _compare(fig_storage_comparison,    "Storage Technologies — Cross-type Comparison", with_year=False)
 
 
-# ── Tab 4: Costs ──────────────────────────────────────────────────────────────
+# ── Tab 6: Costs ──────────────────────────────────────────────────────────────
 with tab_costs:
     st.caption(f"CAPEX and OPEX comparison for year **{year}** — "
                f"**{name_a}** vs **{name_b}**")
@@ -174,19 +217,74 @@ with tab_costs:
         st.warning(f"Year {year} missing in: {', '.join(missing)}. "
                    "Those bars will be empty.")
 
-    _compare(fig_costs_total,       "Total System Costs (CAPEX & OPEX)")
-    _compare(fig_costs_industry,    "Industry Process Costs")
-    _compare(fig_costs_heating,     "Heating Costs — Heat / District Heat / Industry Heating")
-    _compare(fig_costs_flexibility, "Flexibility Costs — TES & DSM")
+    _compare(fig_costs_total,          "Total System Costs (CAPEX & OPEX)")
+    _compare(fig_costs_industry,       "Industry Process Costs")
+    _compare(fig_costs_heating,        "Heating Costs — Industry Heating")
+    _compare(fig_costs_flexibility,    "Flexibility Costs — TES & DSM")
+    _compare(fig_costs_other_storages, "Other Storage Costs — Battery, Pumped Hydro, Gas/Oil/Salt-Cavern")
+
+
+# ── Tab 7: Electricity ────────────────────────────────────────────────────────
+with tab_electricity:
+    st.caption(f"Electricity system — generation capacity, production mix, consumption, "
+               f"and per-year net balance (production vs consumption, net import, battery) — "
+               f"**{name_a}** vs **{name_b}**.")
+    _compare(fig_electricity_capacity_production_consumption,
+             "Capacity, Production & Consumption", with_year=False)
+    _compare(fig_electricity_balance, "Net Balance", with_year=False)
+
+
+# ── Tab 8: Residual Load ──────────────────────────────────────────────────────
+with tab_residual:
+    st.caption(
+        "**Residual load = electricity load − non-dispatchable renewable "
+        "generation (PV + wind), each hour.** It is the load left for "
+        "dispatchable plants, storage, imports and flexibility to cover. Below "
+        "zero means a renewable surplus (curtailment / storage-charging / export "
+        f"opportunity) — **{name_a}** vs **{name_b}**."
+    )
+    st.info(
+        "These runs use time-series aggregation (10 representative steps/year), "
+        "so the curves are a ~10-step approximation mapped back onto 8760 hours — "
+        "the *shape* is meaningful but not a smooth hourly profile. For a smooth "
+        "curve, re-run a scenario with `conduct_time_series_aggregation: false`."
+    )
+    rl_years = common_years if common_years else all_years
+    rl_year = st.selectbox("Year", rl_years, index=len(rl_years) - 1,
+                           key="residual_year",
+                           help="Residual load is computed for this year")
+
+    def _residual(mode: str, title: str) -> None:
+        st.markdown(f"##### {title}")
+        try:
+            fig = fig_residual_load(r_a, r_b, name_a, name_b, rl_year, mode)
+            st.pyplot(fig, width="stretch", dpi=RENDER_DPI)
+            plt.close(fig)
+        except Exception as exc:
+            st.warning(f"Could not render: {exc}")
+
+    _residual("total",
+              "Total electricity demand (incl. heat pumps, electrolysis, EVs, …)")
 
     st.divider()
-    st.caption("Annual and cumulative total system cost across the full model horizon — "
-               "reveals cases where one model looks cheaper year-by-year but the other "
-               "becomes cheaper once costs are accumulated over time.")
-    _compare(fig_costs_over_time, "Total System Cost Over Time (all years)", with_year=False)
+    st.markdown("##### Storage Use")
+    st.caption(
+        "Which storages balance this system. **Top:** annual energy discharged by "
+        "each bulk storage over the horizon. **Bottom:** net electricity-storage "
+        "power for the selected year, sorted high→low (a duration curve) — "
+        "positive hours = discharging to the grid (covering a residual-load "
+        "deficit), negative hours = charging from a renewable surplus. (TES & DSM "
+        "flexibility are in the Flexibility tab.)"
+    )
+    try:
+        fig = fig_storage_use(r_a, r_b, name_a, name_b, rl_year)
+        st.pyplot(fig, width="stretch", dpi=RENDER_DPI)
+        plt.close(fig)
+    except Exception as exc:
+        st.warning(f"Could not render: {exc}")
 
 
-# ── Tab 5: System ─────────────────────────────────────────────────────────────
+# ── Tab 9: System ─────────────────────────────────────────────────────────────
 with tab_system:
     st.caption(f"System-level metrics for year **{year}** — "
                f"**{name_a}** vs **{name_b}**")
@@ -217,3 +315,18 @@ with tab_system:
     _compare(fig_emissions,           "Total System Emissions")
     _compare(fig_fuel_consumption,    "Fuel Consumption by Technology")
     _compare(fig_natural_gas_balance, "Natural Gas Balance (Supply vs Consumption)")
+
+    st.divider()
+    st.caption("**Discounted (net present) cost over the full horizon.** The total cost now "
+               "covers ALL objective components — technology CAPEX + OPEX **plus carrier "
+               "(fuel/import) and carbon-emission costs** — and is discounted, so the ranking "
+               "here matches the optimiser's objective. The Σ / total figures in the legends are "
+               "the discounted grand totals (the flexible model should not exceed the "
+               "no-flexibility one). Carrier and carbon costs — where flexibility pays off — are "
+               "broken out separately below.")
+    _compare(fig_costs_over_time, "Total System Cost Over Time (discounted, all components)",
+             with_year=False)
+    _compare(fig_carrier_costs_over_time, "Carrier (Fuel / Import) Cost Over Time (discounted)",
+             with_year=False)
+    _compare(fig_carbon_costs_over_time, "Carbon Emission Cost Over Time (discounted)",
+             with_year=False)
