@@ -23,7 +23,7 @@ These files lie into the `ZEN-models` repo.
 │       └── outputs/              <- local-run outputs (Euler outputs go to scratch)
 └── ZEN-creator/
     └── outputs/
-        └── Crystal_Ball_HG_v5_2_no_flexibility/   <- input dataset (system.json etc.)
+        └── Crystal_Ball_HG_v5_3_no_flexibility/   <- input dataset (system.json etc.)
 ```
 
 Both repos (`ZEN-models` and `ZEN-creator`) must be present in your Euler Home.
@@ -32,9 +32,11 @@ Both repos (`ZEN-models` and `ZEN-creator`) must be present in your Euler Home.
 
 ```
 parameters.csv           submit_euler.sh                compute nodes
- task_id 0 ─┐         sbatch --array=0-2 ─┐        ┌─ run_model.py --task_id 0
- task_id 1 ─┤───────► (SLURM array)       ├───────►├─ run_model.py --task_id 1
- task_id 2 ─┘                             ┘        └─ run_model.py --task_id 2
+ task_id 0 ─┐         sbatch --array=0-4 ─┐        ┌─ run_model.py --task_id 0
+ task_id 1 ─┤                             ├───────►├─ run_model.py --task_id 1
+ task_id 2 ─┤───────► (SLURM array)       ├        ├─ run_model.py --task_id 2
+ task_id 3 ─┤                             ├        ├─ run_model.py --task_id 3
+ task_id 4 ─┘                             ┘        └─ run_model.py --task_id 4
 ```
 
 `SLURM_ARRAY_TASK_ID` → `--task_id` → the matching row of `parameters.csv`. Each
@@ -50,12 +52,13 @@ combination.
 3. Applies the row's overrides to the **copy's** `system.json`.
 4. Runs `zen_garden.run(config=data/config.json, dataset=<staged copy>, folder_output=<scratch>/outputs/<my_dataset>_<my_comment>)`.
 
-Row 0 of the template reproduces the current settings
-(`aggregated_time_steps_per_year=10`, `interval_between_years=5`, etc.); rows 1–2
-are examples showing how to vary the sweep. **Edit `parameters.csv` to define the
-real runs** — add/remove columns to match exactly the keys you want in
-`system_overrides` (any column other than `my_dataset`/`my_comment` is applied as
-an override).
+All 5 rows share the same TSA/time settings (`aggregated_time_steps_per_year=10`,
+`reference_year=2025`, `optimized_years=10`, `interval_between_years=5`); only
+`my_dataset` varies, one row per model currently in `ZEN-creator/outputs`
+(`Crystal_Ball_HG_v5_3`, and its `_no_flexibility`, `_DSM_only`, `_TES_only`,
+`_single_temp` variants). **Edit `parameters.csv` to define the real runs** —
+add/remove columns to match exactly the keys you want in `system_overrides`
+(any column other than `my_dataset`/`my_comment` is applied as an override).
 
 ## Results go to scratch
 
@@ -78,7 +81,7 @@ python run_model.py --task_id 0 --run_on local   # quick smoke test (small setti
 sbatch --array=0     submit_euler.sh             # one row first, to size resources
 myjobs -j <jobID>                                # read actual CPU/RAM/time
 # ...edit --time / --cpus-per-task / --mem-per-cpu in submit_euler.sh...
-sbatch --array=1-2   submit_euler.sh             # launch the rest (match task_ids)
+sbatch --array=1-4   submit_euler.sh             # launch the rest (match task_ids)
 
 # MONITOR / COLLECT
 squeue                                            # PD = pending, R = running

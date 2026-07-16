@@ -1,4 +1,6 @@
 task_id,my_dataset,my_comment,conduct_time_series_aggregation,aggregated_time_steps_per_year,reference_year,optimized_years,interval_between_years,use_rolling_horizon
-0,Crystal_Ball_HG_v5_2_no_flexibility,2025_1a_5a_interval_1ts,True,1,2025,1,5,False
-1,Crystal_Ball_HG_v5_2_no_flexibility,2025_10a_5a_interval_10ts,True,10,2025,10,5,False
-2,Crystal_Ball_HG_v5_2,2025_10a_5a_interval_10ts,True,10,2025,10,5,False
+0,Crystal_Ball_HG_v5_3,2025_10a_5a_interval_10ts,True,10,2025,10,5,False
+1,Crystal_Ball_HG_v5_3_no_flexibility,2025_10a_5a_interval_10ts,True,10,2025,10,5,False
+2,Crystal_Ball_HG_v5_3_DSM_only,2025_10a_5a_interval_10ts,True,10,2025,10,5,False
+3,Crystal_Ball_HG_v5_3_TES_only,2025_10a_5a_interval_10ts,True,10,2025,10,5,False
+4,Crystal_Ball_HG_v5_3_single_temp,2025_10a_5a_interval_10ts,True,10,2025,10,5,False

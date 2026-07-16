@@ -115,7 +115,7 @@ in `ZEN-models` — described in full in **`README_euler.md`**. In short:
 2. **`parameters.csv`** — your sweep table, one row per run (columns = `my_dataset`,
    `my_comment`, and one column per `system.json` override).
 
-3. **`submit_euler.sh`** — the SLURM **array** job: `--array=0-2` launches one
+3. **`submit_euler.sh`** — the SLURM **array** job: `--array=0-4` launches one
    independent job per row, each passed its `SLURM_ARRAY_TASK_ID` as `--task_id`.
    That's the *"Array → verschiedene Jobs starten"* piece.
 
@@ -157,7 +157,7 @@ These disagree, and that's fine — the supervisor's point is: **you don't yet k
    sacct -j <jobID> --format=JobID,Elapsed,TotalCPU,MaxRSS,ReqMem,State
    ```
    `MaxRSS` = peak memory actually used; `Elapsed` = wall time used; CPU utilization tells you whether the cores were even helping.
-3. **Right-size and launch the rest.** If, say, it peaked at ~90 GB and used ~3 h, set memory a bit above the peak (e.g. `--mem-per-cpu` so total ≈ 120–140 GB) and `--time` above the observed wall time (over-estimate — but not wildly, since huge requests queue longer). Then run the remaining rows: `sbatch --array=1-2 submit_euler.sh`.
+3. **Right-size and launch the rest.** If, say, it peaked at ~90 GB and used ~3 h, set memory a bit above the peak (e.g. `--mem-per-cpu` so total ≈ 120–140 GB) and `--time` above the observed wall time (over-estimate — but not wildly, since huge requests queue longer). Then run the remaining rows: `sbatch --array=1-4 submit_euler.sh`.
 
 Guidance from the course: over-estimating time is safer than under-estimating (a job that exceeds its `--time` is **killed**), but very large requests wait longer in the queue and waste the shared resource — so tighten toward the measured values on the real runs. Max runtime on Euler is 15 days.
 
@@ -193,8 +193,9 @@ source .venv/bin/activate
 python -c "from zen_garden import run, Results; print('imports OK')"
 ```
 
-**4. Fill in `parameters.csv`** with your real runs (row 0 already matches your current
-settings). Optional tiny smoke test on the login node (keep settings small):
+**4. Fill in `parameters.csv`** with your real runs (all 5 rows already match your
+current TSA/time settings, one per model in `ZEN-creator/outputs`). Optional tiny
+smoke test on the login node (keep settings small):
 ```bash
 python run_model.py --task_id 0 --run_on local
 ```
@@ -212,7 +213,7 @@ Check `zen_run_<jobID>_0.out` and `..._0.err` for progress/errors.
 
 **7. Launch the remaining rows:**
 ```bash
-sbatch --array=1-2 submit_euler.sh    # match the task_ids in your parameters.csv
+sbatch --array=1-4 submit_euler.sh    # match the task_ids in your parameters.csv
 ```
 
 **8. Monitor.** `squeue` for state, `myjobs -j <id>` for detail, `scancel <id>` to kill.
@@ -242,7 +243,7 @@ module spider python           # find versions
 
 # Submit / monitor
 sbatch --array=0 submit_euler.sh           # submit one task (calibrate)
-sbatch --array=1-2 submit_euler.sh         # submit a range of rows
+sbatch --array=1-4 submit_euler.sh         # submit a range of rows
 squeue                                     # my queued/running jobs (PD/R)
 myjobs -j <jobID>                          # detailed job info + usage
 sacct -j <jobID> --format=JobID,Elapsed,TotalCPU,MaxRSS,ReqMem,State
@@ -262,5 +263,5 @@ scp -r euler:/cluster/scratch/hannegoericke/zen_runs/outputs/... ~/Downloads/   
    ZEN-garden source repo, from `ZEN-models` itself, or from PyPI? (Pick the right
    OPTION in `setup_euler_env.sh`.)
 2. **Gurobi license** on compute nodes, if `zen_garden` uses Gurobi (`echo $GRB_LICENSE_FILE`).
-3. The exact **rows/columns** you want in `parameters.csv` (row 0 reproduces your current settings).
+3. The exact **rows/columns** you want in `parameters.csv` (all 5 rows reproduce your current settings, one per model in `ZEN-creator/outputs`).
 4. Final **resource sizing** (`--time`, `--cpus-per-task`, `--mem-per-cpu`) after the calibration run.
