@@ -85,14 +85,6 @@ squeue                                            # PD = pending, R = running
 scancel <jobID>                                   # cancel if needed
 ```
 
-## Notes / things to confirm
-
-- **Gurobi:** the job loads `gurobi/13.0.0`. If `zen_garden` uses Gurobi, make sure
-  the license is picked up on compute nodes (check `echo $GRB_LICENSE_FILE`); if
-  not, see https://scicomp.ethz.ch/wiki. Remove the module line if you don't use it.
-- **Dataset copy cost:** staging copies the whole dataset per task. If your dataset
-  is very large and each task uses a *different* dataset, tell me and I'll switch to
-  a no-copy variant.
 
 For the full Euler setup (SSH keys, VS Code Remote-SSH, VPN, storage, modules,
 resource tuning), see `Euler_setup_and_run_guide.md`.
