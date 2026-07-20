@@ -33,12 +33,12 @@ if __name__ == "__main__":
         run(
             config=str(DATA_DIR_CONFIG / "config.json"),
             dataset=str(DATA_DIR / my_dataset),
-            folder_output=str(DATA_DIR_CONFIG / "outputs" / f"{my_dataset}_{my_comment}"),
+            folder_output=str(DATA_DIR_CONFIG / "outputs" / "local_outputs" / f"{my_dataset}_{my_comment}"),
         )
     finally:
         with open(system_json_path, "w") as f:
             json.dump(original_system, f, indent=2)
 
-#r = Results(path=DATA_DIR_CONFIG / "outputs" / f"{my_dataset}_{my_comment}")
+#r = Results(path=DATA_DIR_CONFIG / "outputs" / "local_outputs" / f"{my_dataset}_{my_comment}")
 
 print(Results)
