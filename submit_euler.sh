@@ -7,10 +7,16 @@
 #
 # Submit from the ZEN-models directory (where run_model.py + parameters.csv are):
 #   sbatch --array=0        submit_euler.sh     # calibrate: run ONE row first
-#   sbatch --array=1-5      submit_euler.sh     # then the rest
-#   sbatch --array=0-5      submit_euler.sh     # or all rows at once
+#   sbatch --array=1-4      submit_euler.sh     # then the rest
+#   sbatch --array=0-4      submit_euler.sh     # or all rows at once
 #
 # The --array range must match the task_id values in parameters.csv.
+#
+# TODO: switch parameters.csv (and this array range -> 0-5) to the v6_0
+# datasets in ZEN-creator/outputs once the v6_0 results are ready. v6_0 adds
+# a 6th scenario, Crystal_Ball_HG_v6_0_DSM_pessimistic (optimistic/pessimistic
+# DSM variants for fig2b). See scripts/figure_settings.py for the matching
+# TODO on EULER_SCENARIO_ORDER/LABELS/PALETTE.
 ###############################################################################
 
 #SBATCH --job-name=zen_run

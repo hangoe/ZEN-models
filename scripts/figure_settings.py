@@ -18,6 +18,11 @@ HOURS_PER_YEAR = 8760
 # ── Euler scenario metadata ────────────────────────────────────────────────────
 # All 5 scenarios are the same model version (Crystal_Ball_HG_v5_3), differing
 # only in which flexibility technologies are included (see parameters.csv).
+# TODO: switch to v6_0 once results are ready — rename all "Crystal_Ball_HG_v5_3*"
+# entries below to "Crystal_Ball_HG_v6_0*" and add the 6th scenario,
+# Crystal_Ball_HG_v6_0_DSM_pessimistic (pairs with DSM_only as
+# optimistic/pessimistic DSM variants — see fig2b), to EULER_SCENARIO_ORDER,
+# EULER_SCENARIO_LABELS, and SCENARIO_PALETTE (needs a 6th color).
 EULER_SCENARIO_ORDER = [
     "Crystal_Ball_HG_v5_3",
     "Crystal_Ball_HG_v5_3_no_flexibility",
