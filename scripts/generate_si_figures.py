@@ -9,7 +9,8 @@ TES only, Single temperature level, DSM pessimistic) plus the unmodified
 `Crystal_Ball_HG_v6_0` prefix, staged from data/Crystal_Ball, see
 run_model.py):
 
-  0.  fig0_benchmark_comparison       — cost & emissions increase of each v6_0 scenario vs Crystal Ball base
+  0a. fig0a_benchmark_comparison       — cost & emissions increase of each v6_0 scenario vs Crystal Ball base
+  0b. fig0b_cost_composition           — CAPEX/OPEX/carrier/carbon-cost breakdown of that increase
   1a. fig1a_cost_delta                — discounted system cost delta vs Full flexibility
   1b. fig1b_industry_capacity         — industry heat-supply & production capacity, 2050
   2a. fig2a_tes_dsm_utilization       — TES vs DSM lifetime charge/discharge, log scale
@@ -26,15 +27,33 @@ bars. fig0 carries this finding instead — the 6 v6_0 scenarios cluster
 tightly relative to each other there, in visible contrast to the much larger
 gap vs "Crystal Ball (base)" — without a dedicated, mostly-flat 3a/3b pair.
 
-"Crystal Ball (base)" only feeds fig0. Its euler run hadn't converged as of
-this writing, so fig0 is skipped (with a printed note) until
+"Crystal Ball (base)" only feeds fig0a/0b. Its euler run hadn't converged as
+of this writing, so both are skipped (with a printed note) until
 Crystal_Ball_2025_10a_5a_interval_10ts/ exists under EULER_ROOT — everything
 else still generates. It's deliberately NOT a 7th entry in SCENARIOS below or
 in any other figure: it has no industry heat/DSM/TES sector at all, so
 capacity/utilization figures (1b, 2a, 2b, 3a's capacity term, 3b, 4's
 capacity panel) would show a misleading 0 for it rather than a meaningful
 absence. Cost and emissions totals, by contrast, are well-defined for any
-run regardless of sector structure, which is what makes it fig0 material.
+run regardless of sector structure, which is what makes it fig0a/0b material.
+
+CAUTION on fig0a/0b's headline numbers (found while building fig0b): the
+~15-16% cost / ~20-23% emissions increase in fig0a is NOT evenly spread
+across the horizon or across cost components — see fig0b_cost_composition's
+docstring for the full breakdown. In short: (1) ~half the cost delta is
+concentrated in the single final year 2070, which behaves very differently
+between the base run (a smooth declining tail) and every v6_0 scenario (a
+sharp late-horizon spike) — a likely end-of-horizon/terminal-value artifact,
+not a flexibility-extension cost; (2) of the remaining delta, the majority is
+`cost_carbon_emissions_total`, not CAPEX/OPEX — and that variable itself is
+~0 in every year except 2050 and 2070, i.e. it behaves like a carbon-BUDGET
+shadow price at specific checkpoint years (see carbon_emissions_annual_limit.
+csv, identical 0-limit-at-2050 in both datasets) rather than a smooth $/ton
+price. This is very likely a real ZEN-garden framework/dataset behavior, not
+a bug in this script — the % deltas exactly reproduce the model's own
+net_present_cost/carbon_emissions_annual outputs — but it means the headline
+fig0a percentages should not be read as "the extension costs 15% more to
+build/operate" without this context.
 
 Reuses the data-access helpers and color/plotting primitives shared with the
 Streamlit dashboard (`figure_settings.py`, `figures_by_run.py`,
@@ -67,6 +86,7 @@ from figures_by_run import (
 from figures_by_scenario import (
     _annual_series,
     build_comparison_df,
+    get_annual_cost,
     get_annual_total_cost,
     plot_stacked_bars,
 )
@@ -159,9 +179,9 @@ def compute_headline_metrics(runs: list[Run]) -> pd.DataFrame:
     return pd.DataFrame(rows).T
 
 
-# ── 0: v6_0 scenarios vs unmodified Crystal Ball base ───────────────────────
+# ── 0a: v6_0 scenarios vs unmodified Crystal Ball base ──────────────────────
 
-def fig0_benchmark_comparison(metrics_with_base: pd.DataFrame) -> None:
+def fig0a_benchmark_comparison(metrics_with_base: pd.DataFrame) -> None:
     """Cost & emissions of each v6_0 scenario relative to the unmodified
     Crystal Ball base (Table~SIScenarios) — makes the case that resolving
     industry heat and flexibility is worth the added cost/complexity, by
@@ -192,7 +212,97 @@ def fig0_benchmark_comparison(metrics_with_base: pd.DataFrame) -> None:
     fig.suptitle("Industry Heat & Flexibility Extension vs Unmodified Crystal Ball Base\n"
                  f"(vs {base_label}, discounted full horizon)", fontsize=12, fontweight="bold")
     fig.tight_layout(rect=[0, 0, 1, 0.92])
-    savefig(fig, "fig0_benchmark_comparison")
+    savefig(fig, "fig0a_benchmark_comparison")
+
+
+# ── 0b: Cost-increase composition (CAPEX/OPEX/carrier/carbon) ───────────────
+
+# (variable, display label). Matches the Streamlit dashboard's own CAPEX/OPEX
+# metrics (figures_by_scenario.get_summary_metrics) plus the two remaining
+# components (carrier, carbon) needed to fully reconstruct net_present_cost —
+# verified to sum exactly to it (see the caution note in the module docstring).
+COST_COMPONENTS = [
+    ("cost_capex_yearly_total", "CAPEX"),
+    ("cost_opex_yearly_total", "OPEX"),
+    ("cost_carrier", "Carrier (fuel/import)"),
+    ("cost_carbon_emissions_total", "Carbon emissions cost"),
+]
+COST_COMPONENT_COLORS = ["#215CAF", "#007894", "#8E6713", "#B7352D"]  # ETH blue/petrol/bronze/red
+
+
+def compute_cost_components(runs: list[Run]) -> pd.DataFrame:
+    """Discounted, horizon-total cost by component, one row per scenario."""
+    rows = {}
+    for r in runs:
+        years = get_available_years(r.results)
+        rows[r.label] = {
+            label: float(get_annual_cost(r.results, years, var, discount=True).sum())
+            for var, label in COST_COMPONENTS
+        }
+    return pd.DataFrame(rows).T
+
+
+# Carbon emissions cost is computed (see compute_cost_components) but
+# deliberately excluded from this figure's bars/legend: at ~60% of the total
+# delta and behaving like a 2050/2070 budget-checkpoint shadow cost rather
+# than a smooth $/ton price (see docstring below), it dwarfs and obscures the
+# CAPEX/OPEX/carrier story this figure exists to show.
+PLOTTED_COST_COMPONENTS = COST_COMPONENTS[:3]
+PLOTTED_COST_COMPONENT_COLORS = COST_COMPONENT_COLORS[:3]
+
+
+def fig0b_cost_composition(components_with_base: pd.DataFrame) -> None:
+    """Decomposes fig0a's cost-increase-vs-base bars into CAPEX/OPEX/carrier
+    (carbon emissions cost excluded — see PLOTTED_COST_COMPONENTS above), to
+    show what's actually driving the non-carbon part of the increase.
+
+    Built after a real surprise: the total increase is NOT primarily new
+    CAPEX/OPEX from the added industry-heat/flexibility technologies (each
+    contributes only ~600-800k MEUR here, a few % of baseline total cost) —
+    it's overwhelmingly `cost_carbon_emissions_total` (~60% of the total
+    delta), which is why that component is excluded from this plot rather
+    than swamping it. That variable itself is ~0 in every year except 2050
+    and 2070: at 2050 both the base and every v6_0 scenario pay a matching
+    ~6712 EUR/ton shadow price for exceeding the shared
+    carbon_emissions_annual_limit.csv (limit=0 in 2050, identical file in
+    both datasets); at 2070 there is no explicit limit in that file at all,
+    yet every v6_0 scenario pays a large cost there (base pays ~0) despite
+    NEGATIVE (net-removal) emissions that year — consistent with a
+    cumulative/horizon-level carbon-budget cost being attributed entirely to
+    the final period, not a real 2070 emissions price. Treat fig0a's
+    percentages with that in mind.
+    """
+    base_label = BASE_SCENARIO[1]
+    baseline = components_with_base.loc[base_label]
+    others = components_with_base.drop(base_label)
+    delta = others.subtract(baseline, axis=1)
+    baseline_total_cost = baseline.sum()  # all 4 components, i.e. full net_present_cost
+
+    fig, ax = plt.subplots(figsize=(11, 6.5))
+    x = np.arange(len(delta))
+    bottom_pos = np.zeros(len(delta))
+    bottom_neg = np.zeros(len(delta))
+    for (_, comp_label), color in zip(PLOTTED_COST_COMPONENTS, PLOTTED_COST_COMPONENT_COLORS):
+        vals = delta[comp_label].to_numpy()
+        bottoms = np.where(vals >= 0, bottom_pos, bottom_neg)
+        ax.bar(x, vals, bottom=bottoms, label=comp_label, color=color, edgecolor="white")
+        bottom_pos += np.clip(vals, 0, None)
+        bottom_neg += np.clip(vals, None, 0)
+    totals = delta[[label for _, label in PLOTTED_COST_COMPONENTS]].sum(axis=1)
+    pct_of_baseline_total = totals / baseline_total_cost * 100
+    for xi, t, pct in zip(x, totals, pct_of_baseline_total):
+        ax.text(xi, t, f"{pct:+.2f}%", ha="center", va="bottom" if t >= 0 else "top",
+                fontsize=9, fontweight="bold")
+    ax.axhline(0, color="black", linewidth=0.8)
+    ax.set_xticks(x)
+    ax.set_xticklabels(delta.index, rotation=25, ha="right", fontsize=9)
+    ax.set_ylabel("Δ discounted system cost vs Crystal Ball base [MEUR]")
+    ax.set_title("Non-Carbon Cost Increase vs Crystal Ball Base", fontsize=12, fontweight="bold")
+    ax.set_ylim(top=ax.get_ylim()[1] * 1.15)  # headroom so the legend clears the bars
+    ax.legend(fontsize=9, frameon=True, facecolor="white", framealpha=0.9, loc="upper center", ncol=3)
+    ax.grid(axis="y", alpha=0.3)
+    fig.tight_layout()
+    savefig(fig, "fig0b_cost_composition")
 
 
 # ── 1a: Cost delta vs Full flexibility ─────────────────────────────────────
@@ -221,6 +331,53 @@ def fig1a_cost_delta(metrics: pd.DataFrame) -> None:
 
 # ── 1b: Industry capacity, 2050 ─────────────────────────────────────────────
 
+def _eth_tint(hex_color: str, pct: float) -> str:
+    """Blend hex_color toward white by pct (0=original, 1=white) — mirrors
+    ETH's documented 20/40/60/80% corporate-design tint system."""
+    from matplotlib.colors import to_rgb
+    r, g, b = to_rgb(hex_color)
+    r, g, b = (c + (1 - c) * pct for c in (r, g, b))
+    return f"#{int(round(r * 255)):02x}{int(round(g * 255)):02x}{int(round(b * 255)):02x}"
+
+
+# Print-figure-specific palette (does NOT touch the shared, dashboard-wide
+# COLOR_MAP in figure_settings.py) — see plot_stacked_bars(color_map=...).
+# Heat supply: heat source (water vs. waste heat) sets the hue — blue vs.
+# turquoise — since that is the more physically meaningful distinction (waste
+# heat is a byproduct/free input, water is an ambient draw); temperature band
+# sets the shade within that hue, lighter for lower bands; ALL heat pumps
+# get a hatch, so "textured = heat pump" reads at a glance regardless of hue.
+# Boilers stay solid (no hatch); electrode boiler is green, the other two
+# boilers keep their existing ETH-red-family shades.
+_ETH_BLUE, _ETH_TURQUOISE, _ETH_GREEN, _ETH_RED = "#215CAF", "#007894", "#627313", "#B7352D"
+_HP_HATCH = "/"  # subtle, sparse diagonal — repeat the character (e.g. "//") for denser hatching
+HEAT_SUPPLY_COLOR_MAP = {
+    # water source: ETH blue, darker at higher temperature
+    "heat_pump_industry_150_200_water": _ETH_BLUE,
+    "heat_pump_industry_100_150_water": _eth_tint(_ETH_BLUE, 0.3),
+    "heat_pump_industry_0_100_water": _eth_tint(_ETH_BLUE, 0.55),
+    # waste heat source: ETH turquoise/petrol, darker at higher temperature
+    "heat_pump_industry_150_200_waste_heat": _ETH_TURQUOISE,
+    "heat_pump_industry_100_150_waste_heat": _eth_tint(_ETH_TURQUOISE, 0.3),
+    "heat_pump_industry_0_100_waste_heat": _eth_tint(_ETH_TURQUOISE, 0.55),
+    # boilers: electrode = green, others keep their ETH-red-family shades
+    "electrode_boiler_industry": _ETH_GREEN,
+    "natural_gas_boiler_industry": _ETH_RED,
+    "biomass_boiler_industry": _eth_tint(_ETH_RED, 0.55),
+}
+HEAT_SUPPLY_HATCH_MAP = {tech: _HP_HATCH for tech in [
+    "heat_pump_industry_150_200_water", "heat_pump_industry_100_150_water", "heat_pump_industry_0_100_water",
+    "heat_pump_industry_150_200_waste_heat", "heat_pump_industry_100_150_waste_heat", "heat_pump_industry_0_100_waste_heat",
+]}
+# Production techs: solid ETH colors only, no hatching (hatch_map={} below).
+PRODUCTION_COLOR_MAP = {
+    "glass_production": "#215CAF",    # ETH blue
+    "ceramic_production": "#007894",  # ETH petrol
+    "paper_production": "#8E6713",    # ETH bronze
+    "food_production": "#A7117A",     # ETH purple
+}
+
+
 def fig1b_industry_capacity(runs: list[Run]) -> None:
     # temp-conversion capacity excluded here — see industry_heat_capacity() docstring;
     # its own direct-vs-conversion pathway is the subject of fig3b instead.
@@ -229,12 +386,20 @@ def fig1b_industry_capacity(runs: list[Run]) -> None:
     prod_series = [(r.label, get_capacity(r.results, INDUSTRY_HEAT_TECHS_PRODUCTION, "power")
                     .get(YEAR, pd.Series(dtype=float))) for r in runs]
 
+    heat_df = build_comparison_df(heat_series)
+    # electrode_boiler_industry drawn first -> bottom of the stack, below all heat pumps.
+    heat_df = heat_df.reindex(
+        ["electrode_boiler_industry"] + [t for t in heat_df.index if t != "electrode_boiler_industry"])
+
     fig, axes = plt.subplots(1, 2, figsize=(15, 7))
     fig.suptitle(f"Industry Technology Capacity — Year {YEAR}", fontsize=13, fontweight="bold")
-    plot_stacked_bars(build_comparison_df(heat_series), "Heat Supply (boilers & heat pumps)",
-                      "GW", axes[0], show_segment_labels=True)
+    with plt.rc_context({"hatch.linewidth": 0.5}):  # subtler hatch lines than the 1.0 default
+        plot_stacked_bars(heat_df, "Heat Supply (boilers & heat pumps)",
+                          "GW", axes[0], show_segment_labels=True,
+                          color_map=HEAT_SUPPLY_COLOR_MAP, hatch_map=HEAT_SUPPLY_HATCH_MAP)
     plot_stacked_bars(build_comparison_df(prod_series), "Production Technologies",
-                      "ton/h", axes[1], show_segment_labels=True)
+                      "ton/h", axes[1], show_segment_labels=True,
+                      color_map=PRODUCTION_COLOR_MAP, hatch_map={})
     for ax in axes:
         plt.setp(ax.get_xticklabels(), rotation=20, ha="right")
     fig.tight_layout(rect=[0, 0, 1, 0.95])
@@ -283,9 +448,7 @@ def fig2a_tes_dsm_utilization(runs: list[Run]) -> None:
     ax.set_xticks(x)
     ax.set_xticklabels(categories, fontsize=9)
     ax.set_ylabel("Lifetime throughput (log scale)")
-    ax.set_title("TES vs DSM — Lifetime Utilization Scale\n"
-                  "(mixed units for DSM — see Table SIDSM; TES throughput is ~$10^5$–$10^6\\times$ smaller)",
-                  fontsize=11, fontweight="bold")
+    ax.set_title("TES vs DSM — Lifetime Utilization Scale", fontsize=11, fontweight="bold")
     ymin, _ = ax.get_ylim()
     for xi, color in zero_bars:
         ax.text(xi, ymin, "0", ha="center", va="bottom", fontsize=9, fontweight="bold", color=color)
@@ -333,8 +496,8 @@ def fig2b_dsm_cycles_by_product(runs: list[Run]) -> None:
     ax.set_xticks(x)
     ax.set_xticklabels(df.index, rotation=30, ha="right", fontsize=9)
     ax.set_ylabel("Discharge cycles / year")
-    ax.set_title(f"DSM Utilization by Product — Year {YEAR}\n"
-                 "Sensitivity to Demand-Shiftability Assumption", fontsize=12, fontweight="bold")
+    ax.set_title(f"DSM Utilization by Product, {YEAR}\n"
+                 "Demand-Shiftability Assumption (DSM Categories)", fontsize=12, fontweight="bold")
     ax.legend(fontsize=9, frameon=False)
     ax.grid(axis="y", alpha=0.3)
     fig.tight_layout()
@@ -367,28 +530,82 @@ def fig3a_temp_sensitivity_summary(metrics: pd.DataFrame) -> None:
 
 # ── 3b: Direct vs temperature-conversion heat pathway, 2050 ─────────────────
 
-def heat_pathway_split(r, year: int) -> pd.Series:
-    direct, conversion = 0.0, 0.0
-    for carrier in INDUSTRY_HEAT_CARRIERS_ENERGY:
+def heat_pathway_split_by_band(r, year: int) -> pd.DataFrame:
+    """Net (non-double-counted) end-use heat demand met per temperature band,
+    split into direct (boiler/HP) vs. conversion-cascade-sourced.
+
+    `get_carrier_production` per carrier is GROSS output onto that carrier,
+    which for a mid/high band includes energy that gets immediately consumed
+    again as input to the next-lower conversion technology (lossless, 1:1).
+    Naively summing gross production across bands therefore double- (or
+    triple-) counts any energy that cascades down more than one step — see
+    fig3b's module-level note for the numbers this produced. This function
+    nets that out: for each band, the amount forwarded to the band below
+    (`downstream_draw`, = the conversion-sourced gross production of that
+    lower band) is subtracted before splitting into direct/conversion, so
+    summing the result across bands gives actual net end-use demand met, not
+    an inflated pass-through total. INDUSTRY_HEAT_CARRIERS_ENERGY must be
+    ordered low-to-high for the downstream-draw lookup below to be correct.
+    """
+    bands = INDUSTRY_HEAT_CARRIERS_ENERGY
+    gross = {}
+    for carrier in bands:
         prod = get_carrier_production(r, carrier)
         if prod.empty or year not in prod.columns:
+            gross[carrier] = (0.0, 0.0)
             continue
-        direct += prod.loc[prod.index.isin(INDUSTRY_HEAT_TECHS_BOILERS_HP), year].sum()
-        conversion += prod.loc[prod.index.isin(INDUSTRY_HEAT_TECHS_TEMP_CONV), year].sum()
-    return pd.Series({"Direct (boiler/HP)": direct, "Temp-conversion cascade": conversion})
+        direct = prod.loc[prod.index.isin(INDUSTRY_HEAT_TECHS_BOILERS_HP), year].sum()
+        conversion = prod.loc[prod.index.isin(INDUSTRY_HEAT_TECHS_TEMP_CONV), year].sum()
+        gross[carrier] = (direct, conversion)
+
+    rows = {}
+    for i, carrier in enumerate(bands):
+        direct, conversion = gross[carrier]
+        total = direct + conversion
+        downstream_draw = gross[bands[i - 1]][1] if i > 0 else 0.0
+        frac_forwarded = downstream_draw / total if total > 1e-9 else 0.0
+        rows[carrier] = {
+            "Direct (boiler/HP)": direct * (1 - frac_forwarded),
+            "Via conversion cascade": conversion * (1 - frac_forwarded),
+        }
+    return pd.DataFrame(rows).T  # index: carrier (low to high); columns: Direct, Via conversion cascade
+
+
+BAND_LABELS = {"heat_industry_0_100": "0-100°C", "heat_industry_100_150": "100-150°C",
+               "heat_industry_150_200": "150-200°C"}
 
 
 def fig3b_heat_pathway(runs: list[Run]) -> None:
     scenarios = ["Full flexibility", "Single temperature level"]
-    series = [(label, heat_pathway_split(by_label(runs, label).results, YEAR)) for label in scenarios]
-    df = build_comparison_df(series)
+    bands = INDUSTRY_HEAT_CARRIERS_ENERGY
+    dfs = {label: heat_pathway_split_by_band(by_label(runs, label).results, YEAR) for label in scenarios}
+    colors = {"Direct (boiler/HP)": "#215CAF", "Via conversion cascade": "#8E6713"}  # ETH blue / bronze
+    hatches = {"Full flexibility": "", "Single temperature level": "//"}
 
-    fig, ax = plt.subplots(figsize=(7, 6))
-    plot_stacked_bars(df, f"Heat Production Pathway — Year {YEAR}", "GWh", ax, show_segment_labels=True)
-    ax.set_title(ax.get_title() +
-                 "\n(Single-temp routes end-use demand through the conversion cascade;\n"
-                 "totals are not directly comparable to end-use demand — see text)",
-                 fontsize=10, fontweight="bold")
+    fig, ax = plt.subplots(figsize=(9, 3.8))
+    n = len(scenarios)
+    bar_h = 0.8 / n
+    y = np.arange(len(bands))
+    for i, label in enumerate(scenarios):
+        offsets = y + (i - (n - 1) / 2) * bar_h
+        df = dfs[label]
+        left = np.zeros(len(bands))
+        for col in ["Direct (boiler/HP)", "Via conversion cascade"]:
+            vals = df.loc[bands, col].to_numpy()
+            ax.barh(offsets, vals, left=left, height=bar_h, color=colors[col], edgecolor="white",
+                     hatch=hatches[label], label=col if i == 0 else None)
+            left += vals
+        for yi, t in zip(offsets, left):
+            ax.text(t, yi, f" {label} ({t:,.0f})", va="center", fontsize=7.5)
+    ax.set_yticks(y)
+    ax.set_yticklabels([BAND_LABELS[b] for b in bands], fontsize=9)
+    ax.set_xlim(right=ax.get_xlim()[1] * 1.55)  # headroom for the end-of-bar labels
+    ax.set_xlabel("Net end-use heat demand met [GWh]")
+    ax.set_title(f"Heat Demand Met by Temperature Band, {YEAR}\n"
+                 "(equal per-band totals confirm identical end-use demand across scenarios)",
+                 fontsize=11, fontweight="bold")
+    ax.legend(fontsize=9, frameon=False, loc="lower right")
+    ax.grid(axis="x", alpha=0.3)
     fig.tight_layout()
     savefig(fig, "fig3b_heat_pathway")
 
@@ -445,9 +662,11 @@ def main() -> None:
     print("Generating figures...")
     if base_run is not None:
         metrics_with_base = compute_headline_metrics([base_run] + runs)
-        fig0_benchmark_comparison(metrics_with_base)
+        fig0a_benchmark_comparison(metrics_with_base)
+        components_with_base = compute_cost_components([base_run] + runs)
+        fig0b_cost_composition(components_with_base)
     else:
-        print(f"  skipping fig0_benchmark_comparison: {BASE_SCENARIO[0]} not yet under {EULER_ROOT}")
+        print(f"  skipping fig0a/fig0b: {BASE_SCENARIO[0]} not yet under {EULER_ROOT}")
     fig1a_cost_delta(metrics)
     fig1b_industry_capacity(runs)
     fig2a_tes_dsm_utilization(runs)

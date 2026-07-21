@@ -586,7 +586,12 @@ def plot_stacked_bars(
     ax: plt.Axes,
     show_legend: bool = True,
     show_segment_labels: bool = False,
+    color_map: dict | None = None,
+    hatch_map: dict | None = None,
 ) -> None:
+    """color_map/hatch_map override the global COLOR_MAP/HATCH_MAP for this
+    call only (e.g. a print-figure-specific palette) — omit for the default,
+    dashboard-shared look-up used everywhere else."""
     if df.empty:
         ax.set_title(title, fontsize=12, fontweight="bold")
         ax.text(0.5, 0.5, "No data", ha="center", va="center", transform=ax.transAxes)
@@ -598,14 +603,24 @@ def plot_stacked_bars(
     negative_df = df.clip(upper=0)
     labeled: set[str] = set()
 
+    def get_color(category: str, idx: int) -> str | tuple:
+        if color_map is not None:
+            return color_map.get(category, FALLBACK_COLORS[idx % len(FALLBACK_COLORS)])
+        return _get_color(category, idx)
+
+    def get_hatch(category: str) -> str:
+        if hatch_map is not None:
+            return hatch_map.get(category, "")
+        return _get_hatch(category)
+
     for model_idx, model in enumerate(models):
         bottom_pos = 0.0
         bottom_neg = 0.0
         for cat_idx, category in enumerate(df.index):
             val_pos = positive_df.loc[category, model]
             val_neg = negative_df.loc[category, model]
-            color = _get_color(category, cat_idx)
-            hatch = _get_hatch(category)
+            color = get_color(category, cat_idx)
+            hatch = get_hatch(category)
             add_label = category not in labeled
 
             if val_pos > 0:
