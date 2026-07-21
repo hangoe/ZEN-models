@@ -12,11 +12,11 @@
 #
 # The --array range must match the task_id values in parameters.csv.
 #
-# TODO: once the v6_0 results are in, update scripts/figure_settings.py
-# (EULER_SCENARIO_ORDER/LABELS/PALETTE) from v5_3 to v6_0 — it still targets
-# the old 5-scenario v5_3 set used for the SI figures. v6_0 adds a 6th
-# scenario, Crystal_Ball_HG_v6_0_DSM_pessimistic (optimistic/pessimistic DSM
-# variants for fig2b).
+# TODO: task_id 6 (dataset "Crystal_Ball", the unmodified pre-extension
+# reference case) still needs to run and land in data/outputs/euler_outputs/
+# as Crystal_Ball_2025_10a_5a_interval_10ts/. Once it has, it needs deliberate
+# handling in scripts/generate_si_figures.py rather than a routine re-run of
+# this script — see that file's module docstring for why.
 ###############################################################################
 
 #SBATCH --job-name=zen_run
