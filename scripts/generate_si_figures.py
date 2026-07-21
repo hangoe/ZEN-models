@@ -121,8 +121,8 @@ def by_label(runs: list[Run], label: str) -> Run:
 
 def savefig(fig: plt.Figure, name: str) -> None:
     FIGURES_DIR.mkdir(parents=True, exist_ok=True)
-    path = FIGURES_DIR / f"{name}.png"
-    fig.savefig(path, dpi=200, bbox_inches="tight")
+    path = FIGURES_DIR / f"{name}.svg"
+    fig.savefig(path, bbox_inches="tight")
     plt.close(fig)
     print(f"  wrote {path.relative_to(REPO_ROOT)}")
 
