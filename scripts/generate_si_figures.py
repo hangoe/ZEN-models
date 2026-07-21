@@ -85,10 +85,10 @@ YEAR = 2050  # single-year snapshot used throughout; horizon totals used where n
 SCENARIOS = [
     ("Crystal_Ball_HG_v6_0_no_flexibility_2025_10a_5a_interval_10ts", "No flexibility"),
     ("Crystal_Ball_HG_v6_0_2025_10a_5a_interval_10ts", "Full flexibility"),
+    ("Crystal_Ball_HG_v6_0_DSM_pessimistic_2025_10a_5a_interval_10ts", "DSM pessimistic"),
     ("Crystal_Ball_HG_v6_0_DSM_only_2025_10a_5a_interval_10ts", "DSM only"),
     ("Crystal_Ball_HG_v6_0_TES_only_2025_10a_5a_interval_10ts", "TES only"),
     ("Crystal_Ball_HG_v6_0_single_temp_2025_10a_5a_interval_10ts", "Single temperature level"),
-    ("Crystal_Ball_HG_v6_0_DSM_pessimistic_2025_10a_5a_interval_10ts", "DSM pessimistic"),
 ]
 
 # fig0 only. Uses SCENARIO_PALETTE slot 6 (grey) — see the comment there.
@@ -395,17 +395,17 @@ def fig3b_heat_pathway(runs: list[Run]) -> None:
 # ── 4: Flexibility-mechanism equivalence ─────────────────────────────────────
 
 def fig4_flexibility_equivalence(metrics: pd.DataFrame) -> None:
-    # Order matches Table SIScenarios (see SCENARIOS above), which still
-    # keeps "Full flexibility" and "DSM only" adjacent (the equivalence this
-    # figure is named for). "No flexibility" and "TES only" — the other
-    # equivalent pair — are no longer adjacent under table order; the
-    # equivalence is still readable from the bar heights regardless of
-    # x-position. "DSM pessimistic" sits last, matching the table: it reruns
-    # "Full flexibility" (DSM+TES both active) with the pessimistic instead
-    # of optimistic demand-shiftability categorization, testing whether the
-    # DSM-only == Full-flexibility equivalence survives, or is an artifact of
-    # the optimistic categorization making DSM cheap enough to fully
-    # substitute for TES.
+    # Order matches Table SIScenarios (see SCENARIOS above): neither
+    # equivalent pair this figure is named for ("Full flexibility" ==
+    # "DSM only", "No flexibility" == "TES only") is adjacent under table
+    # order — the equivalence is still readable from the matching bar heights
+    # regardless of x-position. "DSM pessimistic" sits right after "Full
+    # flexibility", matching the table: it reruns "Full flexibility" (DSM+TES
+    # both active) with the pessimistic instead of optimistic
+    # demand-shiftability categorization, testing whether the DSM-only ==
+    # Full-flexibility equivalence survives, or is an artifact of the
+    # optimistic categorization making DSM cheap enough to fully substitute
+    # for TES.
     order = [label for _, label in SCENARIOS]
     m = metrics.loc[order]
     panels = [

@@ -32,18 +32,18 @@ HOURS_PER_YEAR = 8760
 EULER_SCENARIO_ORDER = [
     "Crystal_Ball_HG_v6_0_no_flexibility",
     "Crystal_Ball_HG_v6_0",
+    "Crystal_Ball_HG_v6_0_DSM_pessimistic",
     "Crystal_Ball_HG_v6_0_DSM_only",
     "Crystal_Ball_HG_v6_0_TES_only",
     "Crystal_Ball_HG_v6_0_single_temp",
-    "Crystal_Ball_HG_v6_0_DSM_pessimistic",
 ]
 EULER_SCENARIO_LABELS = {
     "Crystal_Ball_HG_v6_0_no_flexibility": "No Flexibility",
     "Crystal_Ball_HG_v6_0": "Baseline",
+    "Crystal_Ball_HG_v6_0_DSM_pessimistic": "DSM Pessimistic",
     "Crystal_Ball_HG_v6_0_DSM_only": "DSM Only",
     "Crystal_Ball_HG_v6_0_TES_only": "TES Only",
     "Crystal_Ball_HG_v6_0_single_temp": "Single-Temp",
-    "Crystal_Ball_HG_v6_0_DSM_pessimistic": "DSM Pessimistic",
 }
 # Positional per-run colors (run slot -> color), independent of the
 # technology-keyed COLOR_MAP below. Used for run-identity lines/swatches only
