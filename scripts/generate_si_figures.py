@@ -72,6 +72,21 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
+# Match MT_report_HG's font: 00_Preamble.sty loads no font package, so the
+# report is plain LaTeX default (Computer Modern). "cmr10" ships inside
+# matplotlib itself (no system LaTeX/font install needed, so this is portable
+# to Euler too) and is Computer Modern Roman — the same face. Its bundled
+# Type-1 file has no linked bold companion, so fontweight="bold" requests
+# below silently render at regular weight rather than a mismatched fallback
+# font; that's an acceptable trade-off for font consistency with the report.
+plt.rcParams.update({
+    "font.family": "serif",
+    "font.serif": ["cmr10"],
+    "mathtext.fontset": "cm",
+    "axes.formatter.use_mathtext": True,
+    "axes.unicode_minus": False,
+})
+
 from figures_by_run import (
     INDUSTRY_DSM_TECHS,
     INDUSTRY_HEAT_CARRIERS_ENERGY,
@@ -196,8 +211,8 @@ def fig0a_benchmark_comparison(metrics_with_base: pd.DataFrame) -> None:
 
     fig, axes = plt.subplots(1, 2, figsize=(14, 6))
     for ax, values, ylabel, title in [
-        (axes[0], cost_pct, "Δ discounted system cost [%]", "System Cost"),
-        (axes[1], em_pct, "Δ system emissions, horizon total [%]", "System Emissions"),
+        (axes[0], cost_pct, r"$\Delta$ discounted system cost [%]", "System Cost"),
+        (axes[1], em_pct, r"$\Delta$ system emissions, horizon total [%]", "System Emissions"),
     ]:
         bars = ax.bar(others.index, values.values, color=colors, edgecolor="white")
         for bar, v in zip(bars, values.values):
@@ -296,7 +311,7 @@ def fig0b_cost_composition(components_with_base: pd.DataFrame) -> None:
     ax.axhline(0, color="black", linewidth=0.8)
     ax.set_xticks(x)
     ax.set_xticklabels(delta.index, rotation=25, ha="right", fontsize=9)
-    ax.set_ylabel("Δ discounted system cost vs Crystal Ball base [MEUR]")
+    ax.set_ylabel(r"$\Delta$ discounted system cost vs Crystal Ball base [MEUR]")
     ax.set_title("Non-Carbon Cost Increase vs Crystal Ball Base", fontsize=12, fontweight="bold")
     ax.set_ylim(top=ax.get_ylim()[1] * 1.15)  # headroom so the legend clears the bars
     ax.legend(fontsize=9, frameon=True, facecolor="white", framealpha=0.9, loc="upper center", ncol=3)
@@ -321,7 +336,7 @@ def fig1a_cost_delta(metrics: pd.DataFrame) -> None:
         ax.text(bar.get_x() + bar.get_width() / 2, bar.get_height(),
                 f"+{p:.2f}%", ha="center", va="bottom", fontsize=9, fontweight="bold")
     ax.axhline(0, color="black", linewidth=0.8)
-    ax.set_ylabel("Δ discounted system cost vs Full flexibility [MEUR]")
+    ax.set_ylabel(r"$\Delta$ discounted system cost vs Full flexibility [MEUR]")
     ax.set_title("System Cost Delta vs Full Flexibility\n(discounted, full horizon)",
                   fontsize=12, fontweight="bold")
     plt.setp(ax.get_xticklabels(), rotation=20, ha="right")
@@ -392,7 +407,7 @@ def fig1b_industry_capacity(runs: list[Run]) -> None:
         ["electrode_boiler_industry"] + [t for t in heat_df.index if t != "electrode_boiler_industry"])
 
     fig, axes = plt.subplots(1, 2, figsize=(15, 7))
-    fig.suptitle(f"Industry Technology Capacity — Year {YEAR}", fontsize=13, fontweight="bold")
+    fig.suptitle(f"Industry Technology Capacity - Year {YEAR}", fontsize=13, fontweight="bold")
     with plt.rc_context({"hatch.linewidth": 0.5}):  # subtler hatch lines than the 1.0 default
         plot_stacked_bars(heat_df, "Heat Supply (boilers & heat pumps)",
                           "GW", axes[0], show_segment_labels=True,
@@ -448,7 +463,7 @@ def fig2a_tes_dsm_utilization(runs: list[Run]) -> None:
     ax.set_xticks(x)
     ax.set_xticklabels(categories, fontsize=9)
     ax.set_ylabel("Lifetime throughput (log scale)")
-    ax.set_title("TES vs DSM — Lifetime Utilization Scale", fontsize=11, fontweight="bold")
+    ax.set_title("TES vs DSM - Lifetime Utilization Scale", fontsize=11, fontweight="bold")
     ymin, _ = ax.get_ylim()
     for xi, color in zero_bars:
         ax.text(xi, ymin, "0", ha="center", va="bottom", fontsize=9, fontweight="bold", color=color)
@@ -522,7 +537,7 @@ def fig3a_temp_sensitivity_summary(metrics: pd.DataFrame) -> None:
                 f"{v:+.2f}%", ha="center", va="bottom" if v >= 0 else "top",
                 fontsize=10, fontweight="bold")
     ax.axhline(0, color="black", linewidth=0.8)
-    ax.set_ylabel("Δ Single temperature level vs Full flexibility [%]")
+    ax.set_ylabel(r"$\Delta$ Single temperature level vs Full flexibility [%]")
     ax.set_title("Sensitivity to Temperature-Band Resolution", fontsize=12, fontweight="bold")
     fig.tight_layout()
     savefig(fig, "fig3a_temp_sensitivity_summary")
@@ -638,7 +653,7 @@ def fig4_flexibility_equivalence(metrics: pd.DataFrame) -> None:
         ax.set_ylabel(ylabel, fontsize=9)
         plt.setp(ax.get_xticklabels(), rotation=30, ha="right", fontsize=8)
         ax.grid(axis="y", alpha=0.3)
-    fig.suptitle("DSM Alone Reproduces Full Flexibility — TES Alone Reproduces No Flexibility\n"
+    fig.suptitle("DSM Alone Reproduces Full Flexibility - TES Alone Reproduces No Flexibility\n"
                  "(...Under the Optimistic DSM Assumption)",
                  fontsize=12, fontweight="bold")
     fig.tight_layout(rect=[0, 0, 1, 0.93])
