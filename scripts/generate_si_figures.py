@@ -351,8 +351,9 @@ def fig3a_temp_sensitivity_summary(metrics: pd.DataFrame) -> None:
     labels = ["Discounted\nsystem cost", "System\nemissions", f"Industry heat\ncapacity ({YEAR})"]
     values = [pct["npc_total_meur"], pct["emissions_total_mton"], pct["industry_heat_capacity_gw"]]
 
+    color = SCENARIO_PALETTE[[l for _, l in SCENARIOS].index("Single temperature level")]
     fig, ax = plt.subplots(figsize=(7, 5))
-    bars = ax.bar(labels, values, color="#ff7043", edgecolor="white")
+    bars = ax.bar(labels, values, color=color, edgecolor="white")
     for bar, v in zip(bars, values):
         ax.text(bar.get_x() + bar.get_width() / 2, bar.get_height(),
                 f"{v:+.2f}%", ha="center", va="bottom" if v >= 0 else "top",

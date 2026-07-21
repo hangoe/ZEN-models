@@ -47,10 +47,13 @@ EULER_SCENARIO_LABELS = {
 }
 # Positional per-run colors (run slot -> color), independent of the
 # technology-keyed COLOR_MAP below. Used for run-identity lines/swatches only
-# (e.g. cost-over-time curves, sidebar scenario list). 7th slot (#757575, grey)
-# is reserved for the future "Crystal Ball (base)" reference run — grey reads
-# as "the neutral baseline" against the six saturated extension-scenario colors.
-SCENARIO_PALETTE = ["#1a237e", "#ff7043", "#00838f", "#8e24aa", "#43a047", "#6d4c41", "#757575"]
+# (e.g. cost-over-time curves, sidebar scenario list). The 7 ETH Zurich
+# corporate design colors (https://ethz.ch/staffnet/en/service/communication/
+# corporate-design/colours.html: blue, petrol, green, bronze, red, purple,
+# grey), in that order. 7th slot (ETH grey) is reserved for the future
+# "Crystal Ball (base)" reference run — grey reads as "the neutral baseline"
+# against the six saturated extension-scenario colors.
+SCENARIO_PALETTE = ["#215CAF", "#007894", "#627313", "#8E6713", "#B7352D", "#A7117A", "#6F6F6F"]
 
 # ── Merged color palette ──────────────────────────────────────────────────────
 # Base: compare_models.py (system-wide coverage)
