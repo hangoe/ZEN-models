@@ -8,8 +8,8 @@ CHANGES:
   * Instead of patching the dataset's shared system.json in place (which races
     when several array tasks run at once, and can leave the file corrupted if a
     job is killed), each task STAGES A PRIVATE COPY of the dataset, patches that
-    copy, and runs on it. Your pristine dataset in ZEN-creator/outputs is never
-    modified.
+    copy, and runs on it. Your pristine dataset (in ZEN-creator/outputs or
+    data/) is never modified.
   * On Euler, the staged dataset and the results go to $SCRATCH.
 
 Run one row by hand (local test):   python run_model.py --task_id 0 --run_on local
@@ -29,11 +29,27 @@ from zen_garden import run, Results  # noqa: F401  (Results kept for post-proces
 # --- Fixed locations (same layout as your original script) ----------------------
 REPO_DIR = Path(__file__).parent                                  # .../ZEN-models
 DATA_DIR_CONFIG = REPO_DIR / "data"                               # config.json + local outputs
-DATASET_SRC_DIR = REPO_DIR.parent / "ZEN-creator" / "outputs"     # pristine datasets
+
+# Places `my_dataset` is looked up, in order. Most datasets are pristine,
+# version-numbered copies living in ZEN-creator/outputs; a few one-off/local
+# datasets (e.g. data/Crystal_Ball) live directly in this repo instead.
+DATASET_SEARCH_DIRS = [
+    REPO_DIR.parent / "ZEN-creator" / "outputs",
+    REPO_DIR / "data",
+]
 
 # Columns in parameters.csv that are NOT system.json overrides.
 # Everything else in a row is applied as a system_overrides key.
 META_COLUMNS = {"my_dataset", "my_comment"}
+
+
+def resolve_dataset_dir(name: str) -> Path:
+    for base in DATASET_SEARCH_DIRS:
+        candidate = base / name
+        if candidate.exists():
+            return candidate
+    searched = ", ".join(str(base) for base in DATASET_SEARCH_DIRS)
+    raise SystemExit(f"Dataset '{name}' not found in any of: {searched}")
 
 
 def to_native(v):
@@ -97,7 +113,7 @@ def main() -> None:
     if staged_dataset.exists():
         shutil.rmtree(staged_dataset)
     staged_dataset.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copytree(DATASET_SRC_DIR / my_dataset, staged_dataset)
+    shutil.copytree(resolve_dataset_dir(my_dataset), staged_dataset)
 
     # --- 3. Apply the system.json overrides to the COPY --------------------------
     system_json_path = staged_dataset / "system.json"
