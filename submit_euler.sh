@@ -11,12 +11,6 @@
 #   sbatch --array=0-6      submit_euler.sh     # or all rows at once
 #
 # The --array range must match the task_id values in parameters.csv.
-#
-# TODO: task_id 6 (dataset "Crystal_Ball", the unmodified pre-extension
-# reference case) still needs to run and land in data/outputs/euler_outputs/
-# as Crystal_Ball_2025_10a_5a_interval_10ts/. Once it has, it needs deliberate
-# handling in scripts/generate_si_figures.py rather than a routine re-run of
-# this script — see that file's module docstring for why.
 ###############################################################################
 
 #SBATCH --job-name=zen_run
