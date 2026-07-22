@@ -1,8 +1,8 @@
 task_id,my_dataset,my_comment,conduct_time_series_aggregation,aggregated_time_steps_per_year,reference_year,optimized_years,interval_between_years,use_rolling_horizon
-0,Crystal_Ball_HG_v6_0,2025_10a_5a_interval_10ts,True,10,2025,10,5,False
-1,Crystal_Ball_HG_v6_0_no_flexibility,2025_10a_5a_interval_10ts,True,10,2025,10,5,False
-2,Crystal_Ball_HG_v6_0_DSM_only,2025_10a_5a_interval_10ts,True,10,2025,10,5,False
-3,Crystal_Ball_HG_v6_0_DSM_pessimistic,2025_10a_5a_interval_10ts,True,10,2025,10,5,False
-4,Crystal_Ball_HG_v6_0_TES_only,2025_10a_5a_interval_10ts,True,10,2025,10,5,False
-5,Crystal_Ball_HG_v6_0_single_temp,2025_10a_5a_interval_10ts,True,10,2025,10,5,False
+0,Crystal_Ball_HG_v6_1,2025_10a_5a_interval_10ts,True,10,2025,10,5,False
+1,Crystal_Ball_HG_v6_1_no_flexibility,2025_10a_5a_interval_10ts,True,10,2025,10,5,False
+2,Crystal_Ball_HG_v6_1_DSM_only,2025_10a_5a_interval_10ts,True,10,2025,10,5,False
+3,Crystal_Ball_HG_v6_1_DSM_pessimistic,2025_10a_5a_interval_10ts,True,10,2025,10,5,False
+4,Crystal_Ball_HG_v6_1_TES_only,2025_10a_5a_interval_10ts,True,10,2025,10,5,False
+5,Crystal_Ball_HG_v6_1_single_temp,2025_10a_5a_interval_10ts,True,10,2025,10,5,False
 6,Crystal_Ball,2025_10a_5a_interval_10ts,True,10,2025,10,5,False
