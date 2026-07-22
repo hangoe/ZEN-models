@@ -16,31 +16,44 @@ EULER_ROOT = OUTPUT_DIR / "euler_outputs"
 HOURS_PER_YEAR = 8760
 
 # ── Euler scenario metadata ────────────────────────────────────────────────────
-# All 5 scenarios are the same model version (Crystal_Ball_HG_v5_3), differing
-# only in which flexibility technologies are included (see parameters.csv).
-# TODO: switch to v6_0 once results are ready — rename all "Crystal_Ball_HG_v5_3*"
-# entries below to "Crystal_Ball_HG_v6_0*" and add the 6th scenario,
-# Crystal_Ball_HG_v6_0_DSM_pessimistic (pairs with DSM_only as
-# optimistic/pessimistic DSM variants — see fig2b), to EULER_SCENARIO_ORDER,
-# EULER_SCENARIO_LABELS, and SCENARIO_PALETTE (needs a 6th color).
+# 6 of the 7 case-study scenarios (MT_report_HG/Sections/03_SI.tex, Table
+# SIScenarios) are the same model version (Crystal_Ball_HG_v6_0), differing
+# only in which flexibility technologies / DSM categorization are included
+# (see parameters.csv). The 7th, the unmodified "Crystal Ball (base)" dataset
+# (data/Crystal_Ball, run as bare "Crystal_Ball" with no Crystal_Ball_HG_v6_0
+# prefix — see run_model.py), is the pre-industry-heat-extension reference
+# point and is intentionally NOT in this list: it has no industry heat/DSM/TES
+# sector, doesn't match this prefix scheme, and its euler run hadn't completed
+# as of this writing. Once its output folder exists, it needs deliberate
+# handling in generate_si_figures.py rather than folding it in here — see the
+# comment on SCENARIOS in that file.
+# Order matches Table SIScenarios (excluding "Crystal Ball (base)", the row
+# before "No flexibility" there — see the module docstring above).
 EULER_SCENARIO_ORDER = [
-    "Crystal_Ball_HG_v5_3",
-    "Crystal_Ball_HG_v5_3_no_flexibility",
-    "Crystal_Ball_HG_v5_3_DSM_only",
-    "Crystal_Ball_HG_v5_3_TES_only",
-    "Crystal_Ball_HG_v5_3_single_temp",
+    "Crystal_Ball_HG_v6_0_no_flexibility",
+    "Crystal_Ball_HG_v6_0",
+    "Crystal_Ball_HG_v6_0_DSM_pessimistic",
+    "Crystal_Ball_HG_v6_0_DSM_only",
+    "Crystal_Ball_HG_v6_0_TES_only",
+    "Crystal_Ball_HG_v6_0_single_temp",
 ]
 EULER_SCENARIO_LABELS = {
-    "Crystal_Ball_HG_v5_3": "Baseline",
-    "Crystal_Ball_HG_v5_3_no_flexibility": "No Flexibility",
-    "Crystal_Ball_HG_v5_3_DSM_only": "DSM Only",
-    "Crystal_Ball_HG_v5_3_TES_only": "TES Only",
-    "Crystal_Ball_HG_v5_3_single_temp": "Single-Temp",
+    "Crystal_Ball_HG_v6_0_no_flexibility": "No Flexibility",
+    "Crystal_Ball_HG_v6_0": "Baseline",
+    "Crystal_Ball_HG_v6_0_DSM_pessimistic": "DSM Pessimistic",
+    "Crystal_Ball_HG_v6_0_DSM_only": "DSM Only",
+    "Crystal_Ball_HG_v6_0_TES_only": "TES Only",
+    "Crystal_Ball_HG_v6_0_single_temp": "Single-Temp",
 }
 # Positional per-run colors (run slot -> color), independent of the
 # technology-keyed COLOR_MAP below. Used for run-identity lines/swatches only
-# (e.g. cost-over-time curves, sidebar scenario list).
-SCENARIO_PALETTE = ["#1a237e", "#ff7043", "#00838f", "#8e24aa", "#43a047"]
+# (e.g. cost-over-time curves, sidebar scenario list). The 7 ETH Zurich
+# corporate design colors (https://ethz.ch/staffnet/en/service/communication/
+# corporate-design/colours.html: blue, petrol, green, bronze, red, purple,
+# grey), in that order. 7th slot (ETH grey) is reserved for the future
+# "Crystal Ball (base)" reference run — grey reads as "the neutral baseline"
+# against the six saturated extension-scenario colors.
+SCENARIO_PALETTE = ["#215CAF", "#007894", "#627313", "#8E6713", "#B7352D", "#A7117A", "#6F6F6F"]
 
 # ── Merged color palette ──────────────────────────────────────────────────────
 # Base: compare_models.py (system-wide coverage)
@@ -351,9 +364,9 @@ def get_available_models(root: Path, max_depth: int = 3) -> list[str]:
 
 def _match_scenario_base(name: str) -> str | None:
     """Match a discovered folder name (which may carry a run-comment suffix,
-    e.g. "Crystal_Ball_HG_v5_3_no_flexibility_2025_10a_5a_interval_10ts") to
+    e.g. "Crystal_Ball_HG_v6_0_no_flexibility_2025_10a_5a_interval_10ts") to
     its EULER_SCENARIO_ORDER base name. Longest matching prefix wins, since
-    "Crystal_Ball_HG_v5_3" is itself a prefix of the other 4 scenario names."""
+    "Crystal_Ball_HG_v6_0" is itself a prefix of the other 5 scenario names."""
     matches = [b for b in EULER_SCENARIO_ORDER if name == b or name.startswith(b + "_")]
     return max(matches, key=len) if matches else None
 
@@ -573,7 +586,12 @@ def plot_stacked_bars(
     ax: plt.Axes,
     show_legend: bool = True,
     show_segment_labels: bool = False,
+    color_map: dict | None = None,
+    hatch_map: dict | None = None,
 ) -> None:
+    """color_map/hatch_map override the global COLOR_MAP/HATCH_MAP for this
+    call only (e.g. a print-figure-specific palette) — omit for the default,
+    dashboard-shared look-up used everywhere else."""
     if df.empty:
         ax.set_title(title, fontsize=12, fontweight="bold")
         ax.text(0.5, 0.5, "No data", ha="center", va="center", transform=ax.transAxes)
@@ -585,14 +603,24 @@ def plot_stacked_bars(
     negative_df = df.clip(upper=0)
     labeled: set[str] = set()
 
+    def get_color(category: str, idx: int) -> str | tuple:
+        if color_map is not None:
+            return color_map.get(category, FALLBACK_COLORS[idx % len(FALLBACK_COLORS)])
+        return _get_color(category, idx)
+
+    def get_hatch(category: str) -> str:
+        if hatch_map is not None:
+            return hatch_map.get(category, "")
+        return _get_hatch(category)
+
     for model_idx, model in enumerate(models):
         bottom_pos = 0.0
         bottom_neg = 0.0
         for cat_idx, category in enumerate(df.index):
             val_pos = positive_df.loc[category, model]
             val_neg = negative_df.loc[category, model]
-            color = _get_color(category, cat_idx)
-            hatch = _get_hatch(category)
+            color = get_color(category, cat_idx)
+            hatch = get_hatch(category)
             add_label = category not in labeled
 
             if val_pos > 0:
