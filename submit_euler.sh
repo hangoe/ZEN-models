@@ -20,13 +20,13 @@
 ###############################################################################
 
 #SBATCH --job-name=zen_run
-#SBATCH --time=04:00:00              # TUNABLE: overestimate first, then trim (max 15 days)
+#SBATCH --time=04:00:00              # TUNABLE: max 15 days
 #SBATCH --ntasks=1                   # one process per array task -> keep at 1
-#SBATCH --cpus-per-task=16           # TUNABLE: cores (e.g. for Gurobi threads)
-#SBATCH --mem-per-cpu=8G             # TUNABLE: RAM per core. Total = cpus-per-task x this (16x8 = 128 GB)
+#SBATCH --cpus-per-task=16           # TUNABLE: cores 
+#SBATCH --mem-per-cpu=8G             # TUNABLE: RAM per core. Total = cpus-per-task x this (e.g. 16x8 = 128 GB)
 #SBATCH --output=zen_run_%A_%a.out   # %A = array id, %a = task id
 #SBATCH --error=zen_run_%A_%a.err
-#SBATCH --mail-type=END,FAIL         # email when a task ends/fails (your ETH address)
+#SBATCH --mail-type=END,FAIL         # email when a task ends/fails (ETH address)
 
 set -euo pipefail
 
@@ -35,7 +35,7 @@ module purge
 module load stack/2024-06
 module load gcc/12.2.0
 module load python/3.12.8
-module load gurobi/13.0.0            # remove if your model doesn't use Gurobi
+module load gurobi/13.0.0            
 
 # --- 2. Activate the environment you built ONCE with setup_euler_env.sh -----------
 VENV="$HOME/ZEN-models/.venv"
