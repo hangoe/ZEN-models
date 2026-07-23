@@ -1,0 +1,38 @@
+{
+  "analysis": { "dataset": "snapshot" },
+  "solver": {
+    "name": "gurobi",
+    "solver_options": { 
+      "Method": 2, 
+      "NodeMethod": 2, 
+      "BarHomogeneous": 1,
+      "DualReductions": 0, 
+      "Threads": 16, 
+      "Crossover": 0, 
+      "ScaleFlag": 2, 
+      "BarOrder": 0 },
+    "save_duals": false, 
+    "use_scaling": false,
+    "run_diagnostics": true, 
+    "scaling_include_rhs": true
+  },
+  "plugins": {
+    "mga": {
+      "epsilon": 0.1,
+      "mode": "oracle",
+      "include_techs": [
+        "photovoltaics",
+        { "wind": ["wind_onshore", "wind_offshore"] },
+        "hard_coal_plant",
+        "natural_gas_turbine"
+      ],
+      "oracle": {
+        "tolerance": 0.01,
+        "max_iterations": 200,
+        "formulation": "kkt_milp",
+        "use_bigM": false,
+        "include_cost": false
+      }
+    }
+  }
+}
