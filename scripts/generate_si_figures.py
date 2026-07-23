@@ -3,13 +3,13 @@
 Covers the SI Results subsections in `MT_report_HG/Sections/03_SI.tex`
 (`\\label{sec:si-results}`) plus one additional figure, across the 7
 case-study scenarios in that section's Table~SIScenarios — 6
-Crystal_Ball_HG_v6_0 euler runs (Full flexibility, No flexibility, DSM only,
+Crystal_Ball_HG_v6_1 euler runs (Full flexibility, No flexibility, DSM only,
 TES only, Single temperature level, DSM pessimistic) plus the unmodified
 "Crystal Ball (base)" reference case (dataset `Crystal_Ball`, plain — no
-`Crystal_Ball_HG_v6_0` prefix, staged from data/Crystal_Ball, see
+`Crystal_Ball_HG_v6_1` prefix, staged from data/Crystal_Ball, see
 run_model.py):
 
-  0a. fig0a_benchmark_comparison       — cost & emissions increase of each v6_0 scenario vs Crystal Ball base
+  0a. fig0a_benchmark_comparison       — cost & emissions increase of each v6_1 scenario vs Crystal Ball base
   0b. fig0b_cost_composition           — CAPEX/OPEX/carrier/carbon-cost breakdown of that increase
   1a. fig1a_cost_delta                — discounted system cost delta vs Full flexibility
   1b. fig1b_industry_capacity         — industry heat-supply & production capacity, 2050
@@ -20,17 +20,17 @@ run_model.py):
   4.  fig4_flexibility_equivalence    — DSM-only == Full flex, TES-only == No flex, DSM-pessimistic breaks it
 
 The planned "Emissions" subsection (fig3a/3b) is intentionally NOT built as a
-standalone comparison across the 6 v6_0 scenarios: their horizon-total
+standalone comparison across the 6 v6_1 scenarios: their horizon-total
 emissions only span ~2.3% of each other (headline_metrics.csv), so an
 absolute-scale trajectory or decomposition just shows six overlapping lines/
-bars. fig0 carries this finding instead — the 6 v6_0 scenarios cluster
+bars. fig0 carries this finding instead — the 6 v6_1 scenarios cluster
 tightly relative to each other there, in visible contrast to the much larger
 gap vs "Crystal Ball (base)" — without a dedicated, mostly-flat 3a/3b pair.
 
-"Crystal Ball (base)" only feeds fig0a/0b. Its euler run hadn't converged as
-of this writing, so both are skipped (with a printed note) until
-Crystal_Ball_2025_10a_5a_interval_10ts/ exists under EULER_ROOT — everything
-else still generates. It's deliberately NOT a 7th entry in SCENARIOS below or
+"Crystal Ball (base)" only feeds fig0a/0b. `load_base_scenario()` still skips
+them gracefully (with a printed note) if Crystal_Ball_2025_10a_5a_interval_10ts/
+isn't present under EULER_ROOT, but as of v6_1 it has converged and is loaded
+normally. It's deliberately NOT a 7th entry in SCENARIOS below or
 in any other figure: it has no industry heat/DSM/TES sector at all, so
 capacity/utilization figures (1b, 2a, 2b, 3a's capacity term, 3b, 4's
 capacity panel) would show a misleading 0 for it rather than a meaningful
@@ -42,7 +42,7 @@ CAUTION on fig0a/0b's headline numbers (found while building fig0b): the
 across the horizon or across cost components — see fig0b_cost_composition's
 docstring for the full breakdown. In short: (1) ~half the cost delta is
 concentrated in the single final year 2070, which behaves very differently
-between the base run (a smooth declining tail) and every v6_0 scenario (a
+between the base run (a smooth declining tail) and every v6_1 scenario (a
 sharp late-horizon spike) — a likely end-of-horizon/terminal-value artifact,
 not a flexibility-extension cost; (2) of the remaining delta, the majority is
 `cost_carbon_emissions_total`, not CAPEX/OPEX — and that variable itself is
@@ -118,12 +118,12 @@ YEAR = 2050  # single-year snapshot used throughout; horizon totals used where n
 # is reserved for "Crystal Ball (base)" — see the module docstring for why it
 # isn't a 7th entry here.
 SCENARIOS = [
-    ("Crystal_Ball_HG_v6_0_no_flexibility_2025_10a_5a_interval_10ts", "No flexibility"),
-    ("Crystal_Ball_HG_v6_0_2025_10a_5a_interval_10ts", "Full flexibility"),
-    ("Crystal_Ball_HG_v6_0_DSM_pessimistic_2025_10a_5a_interval_10ts", "DSM pessimistic"),
-    ("Crystal_Ball_HG_v6_0_DSM_only_2025_10a_5a_interval_10ts", "DSM only"),
-    ("Crystal_Ball_HG_v6_0_TES_only_2025_10a_5a_interval_10ts", "TES only"),
-    ("Crystal_Ball_HG_v6_0_single_temp_2025_10a_5a_interval_10ts", "Single temperature level"),
+    ("Crystal_Ball_HG_v6_1_no_flexibility_2025_10a_5a_interval_10ts", "No flexibility"),
+    ("Crystal_Ball_HG_v6_1_2025_10a_5a_interval_10ts", "Full flexibility"),
+    ("Crystal_Ball_HG_v6_1_DSM_pessimistic_2025_10a_5a_interval_10ts", "DSM pessimistic"),
+    ("Crystal_Ball_HG_v6_1_DSM_only_2025_10a_5a_interval_10ts", "DSM only"),
+    ("Crystal_Ball_HG_v6_1_TES_only_2025_10a_5a_interval_10ts", "TES only"),
+    ("Crystal_Ball_HG_v6_1_single_temp_2025_10a_5a_interval_10ts", "Single temperature level"),
 ]
 
 # fig0 only. Uses SCENARIO_PALETTE slot 6 (grey) — see the comment there.
@@ -194,10 +194,10 @@ def compute_headline_metrics(runs: list[Run]) -> pd.DataFrame:
     return pd.DataFrame(rows).T
 
 
-# ── 0a: v6_0 scenarios vs unmodified Crystal Ball base ──────────────────────
+# ── 0a: v6_1 scenarios vs unmodified Crystal Ball base ──────────────────────
 
 def fig0a_benchmark_comparison(metrics_with_base: pd.DataFrame) -> None:
-    """Cost & emissions of each v6_0 scenario relative to the unmodified
+    """Cost & emissions of each v6_1 scenario relative to the unmodified
     Crystal Ball base (Table~SIScenarios) — makes the case that resolving
     industry heat and flexibility is worth the added cost/complexity, by
     showing what it actually changes relative to Mannhardt's original model.
@@ -277,11 +277,11 @@ def fig0b_cost_composition(components_with_base: pd.DataFrame) -> None:
     it's overwhelmingly `cost_carbon_emissions_total` (~60% of the total
     delta), which is why that component is excluded from this plot rather
     than swamping it. That variable itself is ~0 in every year except 2050
-    and 2070: at 2050 both the base and every v6_0 scenario pay a matching
+    and 2070: at 2050 both the base and every v6_1 scenario pay a matching
     ~6712 EUR/ton shadow price for exceeding the shared
     carbon_emissions_annual_limit.csv (limit=0 in 2050, identical file in
     both datasets); at 2070 there is no explicit limit in that file at all,
-    yet every v6_0 scenario pays a large cost there (base pays ~0) despite
+    yet every v6_1 scenario pays a large cost there (base pays ~0) despite
     NEGATIVE (net-removal) emissions that year — consistent with a
     cumulative/horizon-level carbon-budget cost being attributed entirely to
     the final period, not a real 2070 emissions price. Treat fig0a's

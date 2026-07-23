@@ -17,10 +17,10 @@ HOURS_PER_YEAR = 8760
 
 # ── Euler scenario metadata ────────────────────────────────────────────────────
 # 6 of the 7 case-study scenarios (MT_report_HG/Sections/03_SI.tex, Table
-# SIScenarios) are the same model version (Crystal_Ball_HG_v6_0), differing
+# SIScenarios) are the same model version (Crystal_Ball_HG_v6_1), differing
 # only in which flexibility technologies / DSM categorization are included
 # (see parameters.csv). The 7th, the unmodified "Crystal Ball (base)" dataset
-# (data/Crystal_Ball, run as bare "Crystal_Ball" with no Crystal_Ball_HG_v6_0
+# (data/Crystal_Ball, run as bare "Crystal_Ball" with no Crystal_Ball_HG_v6_1
 # prefix — see run_model.py), is the pre-industry-heat-extension reference
 # point and is intentionally NOT in this list: it has no industry heat/DSM/TES
 # sector, doesn't match this prefix scheme, and its euler run hadn't completed
@@ -30,20 +30,20 @@ HOURS_PER_YEAR = 8760
 # Order matches Table SIScenarios (excluding "Crystal Ball (base)", the row
 # before "No flexibility" there — see the module docstring above).
 EULER_SCENARIO_ORDER = [
-    "Crystal_Ball_HG_v6_0_no_flexibility",
-    "Crystal_Ball_HG_v6_0",
-    "Crystal_Ball_HG_v6_0_DSM_pessimistic",
-    "Crystal_Ball_HG_v6_0_DSM_only",
-    "Crystal_Ball_HG_v6_0_TES_only",
-    "Crystal_Ball_HG_v6_0_single_temp",
+    "Crystal_Ball_HG_v6_1_no_flexibility",
+    "Crystal_Ball_HG_v6_1",
+    "Crystal_Ball_HG_v6_1_DSM_pessimistic",
+    "Crystal_Ball_HG_v6_1_DSM_only",
+    "Crystal_Ball_HG_v6_1_TES_only",
+    "Crystal_Ball_HG_v6_1_single_temp",
 ]
 EULER_SCENARIO_LABELS = {
-    "Crystal_Ball_HG_v6_0_no_flexibility": "No Flexibility",
-    "Crystal_Ball_HG_v6_0": "Baseline",
-    "Crystal_Ball_HG_v6_0_DSM_pessimistic": "DSM Pessimistic",
-    "Crystal_Ball_HG_v6_0_DSM_only": "DSM Only",
-    "Crystal_Ball_HG_v6_0_TES_only": "TES Only",
-    "Crystal_Ball_HG_v6_0_single_temp": "Single-Temp",
+    "Crystal_Ball_HG_v6_1_no_flexibility": "No Flexibility",
+    "Crystal_Ball_HG_v6_1": "Baseline",
+    "Crystal_Ball_HG_v6_1_DSM_pessimistic": "DSM Pessimistic",
+    "Crystal_Ball_HG_v6_1_DSM_only": "DSM Only",
+    "Crystal_Ball_HG_v6_1_TES_only": "TES Only",
+    "Crystal_Ball_HG_v6_1_single_temp": "Single-Temp",
 }
 # Positional per-run colors (run slot -> color), independent of the
 # technology-keyed COLOR_MAP below. Used for run-identity lines/swatches only
@@ -364,9 +364,9 @@ def get_available_models(root: Path, max_depth: int = 3) -> list[str]:
 
 def _match_scenario_base(name: str) -> str | None:
     """Match a discovered folder name (which may carry a run-comment suffix,
-    e.g. "Crystal_Ball_HG_v6_0_no_flexibility_2025_10a_5a_interval_10ts") to
+    e.g. "Crystal_Ball_HG_v6_1_no_flexibility_2025_10a_5a_interval_10ts") to
     its EULER_SCENARIO_ORDER base name. Longest matching prefix wins, since
-    "Crystal_Ball_HG_v6_0" is itself a prefix of the other 5 scenario names."""
+    "Crystal_Ball_HG_v6_1" is itself a prefix of the other 5 scenario names."""
     matches = [b for b in EULER_SCENARIO_ORDER if name == b or name.startswith(b + "_")]
     return max(matches, key=len) if matches else None
 
