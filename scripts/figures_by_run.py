@@ -56,6 +56,7 @@ INDUSTRY_HEAT_TECHS_BOILERS_HP = [
     "biomass_boiler_industry",
     "electrode_boiler_industry",
     "natural_gas_boiler_industry",
+    "oil_boiler_industry",  # new in v7_0
     # Very old models (v1_0): "industrial_" prefix naming
     "industrial_biomass_boiler",
     "industrial_coal_boiler",
@@ -79,7 +80,7 @@ INDUSTRY_HEAT_TECHS_PRODUCTION = [
 INDUSTRY_TES_TECHS = [
     "industry_TES_water_0_100",
     "industry_TES_water_100_150",
-    "industry_TES_steam_100_150",
+    "industry_TES_steam_100_150",  # dropped in v7_0 (no medium-temp steam TES); kept for older runs
     "industry_TES_steam_150_200",
 ]
 

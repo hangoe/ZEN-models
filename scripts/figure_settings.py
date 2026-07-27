@@ -17,10 +17,10 @@ HOURS_PER_YEAR = 8760
 
 # ── Euler scenario metadata ────────────────────────────────────────────────────
 # 6 of the 7 case-study scenarios (MT_report_HG/Sections/03_SI.tex, Table
-# SIScenarios) are the same model version (Crystal_Ball_HG_v6_1), differing
+# SIScenarios) are the same model version (Crystal_Ball_HG_v7_0), differing
 # only in which flexibility technologies / DSM categorization are included
 # (see parameters.csv). The 7th, the unmodified "Crystal Ball (base)" dataset
-# (data/Crystal_Ball, run as bare "Crystal_Ball" with no Crystal_Ball_HG_v6_1
+# (data/Crystal_Ball, run as bare "Crystal_Ball" with no Crystal_Ball_HG_v7_0
 # prefix — see run_model.py), is the pre-industry-heat-extension reference
 # point and is intentionally NOT in this list: it has no industry heat/DSM/TES
 # sector, doesn't match this prefix scheme, and its euler run hadn't completed
@@ -30,20 +30,20 @@ HOURS_PER_YEAR = 8760
 # Order matches Table SIScenarios (excluding "Crystal Ball (base)", the row
 # before "No flexibility" there — see the module docstring above).
 EULER_SCENARIO_ORDER = [
-    "Crystal_Ball_HG_v6_1_no_flexibility",
-    "Crystal_Ball_HG_v6_1",
-    "Crystal_Ball_HG_v6_1_DSM_pessimistic",
-    "Crystal_Ball_HG_v6_1_DSM_only",
-    "Crystal_Ball_HG_v6_1_TES_only",
-    "Crystal_Ball_HG_v6_1_single_temp",
+    "Crystal_Ball_HG_v7_0_no_flexibility",
+    "Crystal_Ball_HG_v7_0",
+    "Crystal_Ball_HG_v7_0_DSM_pessimistic",
+    "Crystal_Ball_HG_v7_0_DSM_only",
+    "Crystal_Ball_HG_v7_0_TES_only",
+    "Crystal_Ball_HG_v7_0_single_temp",
 ]
 EULER_SCENARIO_LABELS = {
-    "Crystal_Ball_HG_v6_1_no_flexibility": "No Flexibility",
-    "Crystal_Ball_HG_v6_1": "Baseline",
-    "Crystal_Ball_HG_v6_1_DSM_pessimistic": "DSM Pessimistic",
-    "Crystal_Ball_HG_v6_1_DSM_only": "DSM Only",
-    "Crystal_Ball_HG_v6_1_TES_only": "TES Only",
-    "Crystal_Ball_HG_v6_1_single_temp": "Single-Temp",
+    "Crystal_Ball_HG_v7_0_no_flexibility": "No Flexibility",
+    "Crystal_Ball_HG_v7_0": "Baseline",
+    "Crystal_Ball_HG_v7_0_DSM_pessimistic": "DSM Pessimistic",
+    "Crystal_Ball_HG_v7_0_DSM_only": "DSM Only",
+    "Crystal_Ball_HG_v7_0_TES_only": "TES Only",
+    "Crystal_Ball_HG_v7_0_single_temp": "Single-Temp",
 }
 # Positional per-run colors (run slot -> color), independent of the
 # technology-keyed COLOR_MAP below. Used for run-identity lines/swatches only
@@ -115,6 +115,7 @@ COLOR_MAP = {
     "lng_terminal": "#e8a838",
     "oil_boiler": "#b8956e",
     "oil_boiler_DH": "#c4a07a",
+    "oil_boiler_industry": "#8d6a42",
     "oil_plant": "#3e2723",
     "oil_pipeline": "#b08a6e",
     "oil_storage": "#c0a080",
@@ -230,6 +231,7 @@ COLOR_MAP = {
 HATCH_MAP: dict[str, str] = {
     "natural_gas_boiler_industry": "//",
     "biomass_boiler_industry": "//",
+    "oil_boiler_industry": "//",
     "electrode_boiler_industry": "**",
     "heat_pump_industry_0_100_waste_heat": "\\\\",
     "heat_pump_industry_0_100_water": "//",
@@ -308,7 +310,7 @@ def _text_color_for_bg(bg_color) -> str:
 # OUTPUT_DIR itself), each searched independently so neither root directory is
 # ever mistaken for a model name.
 
-_NON_MODEL_DIRS = {"figures", "solver_files"}
+_NON_MODEL_DIRS = {"figures", "solver_files", "archive"}
 
 
 def _search_var_dict(path: Path, max_depth: int = 2) -> Path | None:
@@ -364,9 +366,9 @@ def get_available_models(root: Path, max_depth: int = 3) -> list[str]:
 
 def _match_scenario_base(name: str) -> str | None:
     """Match a discovered folder name (which may carry a run-comment suffix,
-    e.g. "Crystal_Ball_HG_v6_1_no_flexibility_2025_10a_5a_interval_10ts") to
+    e.g. "Crystal_Ball_HG_v7_0_no_flexibility_2025_10a_5a_interval_10ts") to
     its EULER_SCENARIO_ORDER base name. Longest matching prefix wins, since
-    "Crystal_Ball_HG_v6_1" is itself a prefix of the other 5 scenario names."""
+    "Crystal_Ball_HG_v7_0" is itself a prefix of the other 5 scenario names."""
     matches = [b for b in EULER_SCENARIO_ORDER if name == b or name.startswith(b + "_")]
     return max(matches, key=len) if matches else None
 

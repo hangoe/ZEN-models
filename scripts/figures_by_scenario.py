@@ -19,7 +19,7 @@ from figure_settings import SCENARIO_PALETTE, Run, get_available_years, plot_sta
 INDUSTRY_TES_TECHS = [
     "industry_TES_water_0_100",
     "industry_TES_water_100_150",
-    "industry_TES_steam_100_150",
+    "industry_TES_steam_100_150",  # dropped in v7_0 (no medium-temp steam TES); kept for older runs
     "industry_TES_steam_150_200",
 ]
 
@@ -46,6 +46,7 @@ INDUSTRY_PROCESS_TECHS = [
 INDUSTRY_HEATING_TECHS = [
     # Boilers (consistent across models)
     "natural_gas_boiler_industry", "electrode_boiler_industry", "biomass_boiler_industry",
+    "oil_boiler_industry",  # new in v7_0
     # New models (v4_6+): split by temperature + source
     "heat_pump_industry_0_100_waste_heat", "heat_pump_industry_0_100_water",
     "heat_pump_industry_100_150_waste_heat", "heat_pump_industry_100_150_water",

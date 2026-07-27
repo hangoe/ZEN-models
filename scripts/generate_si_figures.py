@@ -3,13 +3,13 @@
 Covers the SI Results subsections in `MT_report_HG/Sections/03_SI.tex`
 (`\\label{sec:si-results}`) plus one additional figure, across the 7
 case-study scenarios in that section's Table~SIScenarios — 6
-Crystal_Ball_HG_v6_1 euler runs (Full flexibility, No flexibility, DSM only,
+Crystal_Ball_HG_v7_0 euler runs (Full flexibility, No flexibility, DSM only,
 TES only, Single temperature level, DSM pessimistic) plus the unmodified
 "Crystal Ball (base)" reference case (dataset `Crystal_Ball`, plain — no
-`Crystal_Ball_HG_v6_1` prefix, staged from data/Crystal_Ball, see
+`Crystal_Ball_HG_v7_0` prefix, staged from data/Crystal_Ball, see
 run_model.py):
 
-  0a. fig0a_benchmark_comparison       — cost & emissions increase of each v6_1 scenario vs Crystal Ball base
+  0a. fig0a_benchmark_comparison       — cost & emissions increase of each v7_0 scenario vs Crystal Ball base
   0b. fig0b_cost_composition           — CAPEX/OPEX/carrier/carbon-cost breakdown of that increase
   1a. fig1a_cost_delta                — discounted system cost delta vs Full flexibility
   1b. fig1b_industry_capacity         — industry heat-supply & production capacity, 2050
@@ -20,16 +20,16 @@ run_model.py):
   4.  fig4_flexibility_equivalence    — DSM-only == Full flex, TES-only == No flex, DSM-pessimistic breaks it
 
 The planned "Emissions" subsection (fig3a/3b) is intentionally NOT built as a
-standalone comparison across the 6 v6_1 scenarios: their horizon-total
+standalone comparison across the 6 v7_0 scenarios: their horizon-total
 emissions only span ~2.3% of each other (headline_metrics.csv), so an
 absolute-scale trajectory or decomposition just shows six overlapping lines/
-bars. fig0 carries this finding instead — the 6 v6_1 scenarios cluster
+bars. fig0 carries this finding instead — the 6 v7_0 scenarios cluster
 tightly relative to each other there, in visible contrast to the much larger
 gap vs "Crystal Ball (base)" — without a dedicated, mostly-flat 3a/3b pair.
 
 "Crystal Ball (base)" only feeds fig0a/0b. `load_base_scenario()` still skips
 them gracefully (with a printed note) if Crystal_Ball_2025_10a_5a_interval_10ts/
-isn't present under EULER_ROOT, but as of v6_1 it has converged and is loaded
+isn't present under EULER_ROOT, but as of v7_0 it has converged and is loaded
 normally. It's deliberately NOT a 7th entry in SCENARIOS below or
 in any other figure: it has no industry heat/DSM/TES sector at all, so
 capacity/utilization figures (1b, 2a, 2b, 3a's capacity term, 3b, 4's
@@ -42,7 +42,7 @@ CAUTION on fig0a/0b's headline numbers (found while building fig0b): the
 across the horizon or across cost components — see fig0b_cost_composition's
 docstring for the full breakdown. In short: (1) ~half the cost delta is
 concentrated in the single final year 2070, which behaves very differently
-between the base run (a smooth declining tail) and every v6_1 scenario (a
+between the base run (a smooth declining tail) and every v7_0 scenario (a
 sharp late-horizon spike) — a likely end-of-horizon/terminal-value artifact,
 not a flexibility-extension cost; (2) of the remaining delta, the majority is
 `cost_carbon_emissions_total`, not CAPEX/OPEX — and that variable itself is
@@ -118,12 +118,12 @@ YEAR = 2050  # single-year snapshot used throughout; horizon totals used where n
 # is reserved for "Crystal Ball (base)" — see the module docstring for why it
 # isn't a 7th entry here.
 SCENARIOS = [
-    ("Crystal_Ball_HG_v6_1_no_flexibility_2025_10a_5a_interval_10ts", "No flexibility"),
-    ("Crystal_Ball_HG_v6_1_2025_10a_5a_interval_10ts", "Full flexibility"),
-    ("Crystal_Ball_HG_v6_1_DSM_pessimistic_2025_10a_5a_interval_10ts", "DSM pessimistic"),
-    ("Crystal_Ball_HG_v6_1_DSM_only_2025_10a_5a_interval_10ts", "DSM only"),
-    ("Crystal_Ball_HG_v6_1_TES_only_2025_10a_5a_interval_10ts", "TES only"),
-    ("Crystal_Ball_HG_v6_1_single_temp_2025_10a_5a_interval_10ts", "Single temperature level"),
+    ("Crystal_Ball_HG_v7_0_no_flexibility_2025_10a_5a_interval_10ts", "No flexibility"),
+    ("Crystal_Ball_HG_v7_0_2025_10a_5a_interval_10ts", "Full flexibility"),
+    ("Crystal_Ball_HG_v7_0_DSM_pessimistic_2025_10a_5a_interval_10ts", "DSM pessimistic"),
+    ("Crystal_Ball_HG_v7_0_DSM_only_2025_10a_5a_interval_10ts", "DSM only"),
+    ("Crystal_Ball_HG_v7_0_TES_only_2025_10a_5a_interval_10ts", "TES only"),
+    ("Crystal_Ball_HG_v7_0_single_temp_2025_10a_5a_interval_10ts", "Single temperature level"),
 ]
 
 # fig0 only. Uses SCENARIO_PALETTE slot 6 (grey) — see the comment there.
@@ -194,10 +194,10 @@ def compute_headline_metrics(runs: list[Run]) -> pd.DataFrame:
     return pd.DataFrame(rows).T
 
 
-# ── 0a: v6_1 scenarios vs unmodified Crystal Ball base ──────────────────────
+# ── 0a: v7_0 scenarios vs unmodified Crystal Ball base ──────────────────────
 
 def fig0a_benchmark_comparison(metrics_with_base: pd.DataFrame) -> None:
-    """Cost & emissions of each v6_1 scenario relative to the unmodified
+    """Cost & emissions of each v7_0 scenario relative to the unmodified
     Crystal Ball base (Table~SIScenarios) — makes the case that resolving
     industry heat and flexibility is worth the added cost/complexity, by
     showing what it actually changes relative to Mannhardt's original model.
@@ -277,11 +277,11 @@ def fig0b_cost_composition(components_with_base: pd.DataFrame) -> None:
     it's overwhelmingly `cost_carbon_emissions_total` (~60% of the total
     delta), which is why that component is excluded from this plot rather
     than swamping it. That variable itself is ~0 in every year except 2050
-    and 2070: at 2050 both the base and every v6_1 scenario pay a matching
+    and 2070: at 2050 both the base and every v7_0 scenario pay a matching
     ~6712 EUR/ton shadow price for exceeding the shared
     carbon_emissions_annual_limit.csv (limit=0 in 2050, identical file in
     both datasets); at 2070 there is no explicit limit in that file at all,
-    yet every v6_1 scenario pays a large cost there (base pays ~0) despite
+    yet every v7_0 scenario pays a large cost there (base pays ~0) despite
     NEGATIVE (net-removal) emissions that year — consistent with a
     cumulative/horizon-level carbon-budget cost being attributed entirely to
     the final period, not a real 2070 emissions price. Treat fig0a's
@@ -375,15 +375,35 @@ HEAT_SUPPLY_COLOR_MAP = {
     "heat_pump_industry_150_200_waste_heat": _ETH_TURQUOISE,
     "heat_pump_industry_100_150_waste_heat": _eth_tint(_ETH_TURQUOISE, 0.3),
     "heat_pump_industry_0_100_waste_heat": _eth_tint(_ETH_TURQUOISE, 0.55),
-    # boilers: electrode = green, others keep their ETH-red-family shades
+    # boilers: electrode = green, others keep their ETH-red-family shades —
+    # oil sits at a tint halfway between natural_gas (0%) and biomass (55%),
+    # so its color reads as physically "between" the two.
     "electrode_boiler_industry": _ETH_GREEN,
     "natural_gas_boiler_industry": _ETH_RED,
+    "oil_boiler_industry": _eth_tint(_ETH_RED, 0.28),
     "biomass_boiler_industry": _eth_tint(_ETH_RED, 0.55),
 }
 HEAT_SUPPLY_HATCH_MAP = {tech: _HP_HATCH for tech in [
     "heat_pump_industry_150_200_water", "heat_pump_industry_100_150_water", "heat_pump_industry_0_100_water",
     "heat_pump_industry_150_200_waste_heat", "heat_pump_industry_100_150_waste_heat", "heat_pump_industry_0_100_waste_heat",
 ]}
+# Explicit stack order (bottom → top): all boilers first (darkest→lightest
+# red family, electrode-green anchoring the bottom), then heat pumps ordered
+# low→high temperature band, water source before waste-heat source within
+# each band. Any tech not listed here (future additions) is appended at the
+# end in whatever order build_comparison_df produced, so nothing is dropped.
+HEAT_SUPPLY_STACK_ORDER = [
+    "electrode_boiler_industry",
+    "natural_gas_boiler_industry",
+    "oil_boiler_industry",
+    "biomass_boiler_industry",
+    "heat_pump_industry_0_100_water",
+    "heat_pump_industry_0_100_waste_heat",
+    "heat_pump_industry_100_150_water",
+    "heat_pump_industry_100_150_waste_heat",
+    "heat_pump_industry_150_200_water",
+    "heat_pump_industry_150_200_waste_heat",
+]
 # Production techs: solid ETH colors only, no hatching (hatch_map={} below).
 PRODUCTION_COLOR_MAP = {
     "glass_production": "#215CAF",    # ETH blue
@@ -402,9 +422,11 @@ def fig1b_industry_capacity(runs: list[Run]) -> None:
                     .get(YEAR, pd.Series(dtype=float))) for r in runs]
 
     heat_df = build_comparison_df(heat_series)
-    # electrode_boiler_industry drawn first -> bottom of the stack, below all heat pumps.
+    # See HEAT_SUPPLY_STACK_ORDER: all boilers drawn first -> bottom of the
+    # stack, below all heat pumps, which are then ordered low->high temperature.
     heat_df = heat_df.reindex(
-        ["electrode_boiler_industry"] + [t for t in heat_df.index if t != "electrode_boiler_industry"])
+        [t for t in HEAT_SUPPLY_STACK_ORDER if t in heat_df.index]
+        + [t for t in heat_df.index if t not in HEAT_SUPPLY_STACK_ORDER])
 
     fig, axes = plt.subplots(1, 2, figsize=(15, 7))
     fig.suptitle(f"Industry Technology Capacity - Year {YEAR}", fontsize=13, fontweight="bold")
