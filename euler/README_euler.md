@@ -81,7 +81,7 @@ python run_model.py --task_id 0 --run_on local   # quick smoke test (small setti
 sbatch --array=0     submit_euler.sh             # one row first, to size resources
 myjobs -j <jobID>                                # read actual CPU/RAM/time
 # ...edit --time / --cpus-per-task / --mem-per-cpu in submit_euler.sh...
-sbatch --array=1-4   submit_euler.sh             # launch the rest (match task_ids)
+sbatch --array=1-5   submit_euler.sh             # launch the rest (match task_ids)
 
 # MONITOR / COLLECT
 squeue                                            # PD = pending, R = running
