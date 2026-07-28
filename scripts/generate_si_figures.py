@@ -1,7 +1,7 @@
 """Generate print-ready figures for the MT_report SI Results section.
 
 Covers the SI Results subsections in `MT_report_HG/Sections/03_SI.tex`
-(`\\label{sec:si-results}`) plus one additional figure, across the 7
+(`\\label{sec:si-results}`), across the 7
 case-study scenarios in that section's Table~SIScenarios — 6
 Crystal_Ball_HG_v7_0 euler runs (Full flexibility, No flexibility, DSM only,
 TES only, Single temperature level, DSM pessimistic) plus the unmodified
@@ -17,7 +17,6 @@ run_model.py):
   2b. fig2b_dsm_cycles_by_product     — DSM utilization (cycles/yr) by product: optimistic vs pessimistic
   3a. fig3a_temp_sensitivity_summary  — Full flex vs Single-temp: cost/emissions/capacity delta
   3b. fig3b_heat_pathway              — direct vs temp-conversion heat production, 2050
-  4.  fig4_flexibility_equivalence    — DSM-only == Full flex, TES-only == No flex, DSM-pessimistic breaks it
 
 The planned "Emissions" subsection (fig3a/3b) is intentionally NOT built as a
 standalone comparison across the 6 v7_0 scenarios: their horizon-total
@@ -32,8 +31,8 @@ them gracefully (with a printed note) if Crystal_Ball_2025_10a_5a_interval_10ts/
 isn't present under EULER_ROOT, but as of v7_0 it has converged and is loaded
 normally. It's deliberately NOT a 7th entry in SCENARIOS below or
 in any other figure: it has no industry heat/DSM/TES sector at all, so
-capacity/utilization figures (1b, 2a, 2b, 3a's capacity term, 3b, 4's
-capacity panel) would show a misleading 0 for it rather than a meaningful
+capacity/utilization figures (1b, 2a, 2b, 3a's capacity term, 3b)
+would show a misleading 0 for it rather than a meaningful
 absence. Cost and emissions totals, by contrast, are well-defined for any
 run regardless of sector structure, which is what makes it fig0a/0b material.
 
@@ -118,12 +117,12 @@ YEAR = 2050  # single-year snapshot used throughout; horizon totals used where n
 # is reserved for "Crystal Ball (base)" — see the module docstring for why it
 # isn't a 7th entry here.
 SCENARIOS = [
-    ("Crystal_Ball_HG_v7_0_no_flexibility_2025_10a_5a_interval_10ts", "No flexibility"),
-    ("Crystal_Ball_HG_v7_0_2025_10a_5a_interval_10ts", "Full flexibility"),
-    ("Crystal_Ball_HG_v7_0_DSM_pessimistic_2025_10a_5a_interval_10ts", "DSM pessimistic"),
-    ("Crystal_Ball_HG_v7_0_DSM_only_2025_10a_5a_interval_10ts", "DSM only"),
-    ("Crystal_Ball_HG_v7_0_TES_only_2025_10a_5a_interval_10ts", "TES only"),
-    ("Crystal_Ball_HG_v7_0_single_temp_2025_10a_5a_interval_10ts", "Single temperature level"),
+    ("Crystal_Ball_ind_heat_v7_1_no_flexibility_2025_10a_5a_interval_10ts", "No flexibility"),
+    ("Crystal_Ball_ind_heat_v7_1_2025_10a_5a_interval_10ts", "Full flexibility"),
+    ("Crystal_Ball_ind_heat_v7_1_DSM_pessimistic_2025_10a_5a_interval_10ts", "DSM pessimistic"),
+    ("Crystal_Ball_ind_heat_v7_1_DSM_only_2025_10a_5a_interval_10ts", "DSM only"),
+    ("Crystal_Ball_ind_heat_v7_1_TES_only_2025_10a_5a_interval_10ts", "TES only"),
+    ("Crystal_Ball_ind_heat_v7_1_single_temp_2025_10a_5a_interval_10ts", "Single temperature level"),
 ]
 
 # fig0 only. Uses SCENARIO_PALETTE slot 6 (grey) — see the comment there.
@@ -647,41 +646,6 @@ def fig3b_heat_pathway(runs: list[Run]) -> None:
     savefig(fig, "fig3b_heat_pathway")
 
 
-# ── 4: Flexibility-mechanism equivalence ─────────────────────────────────────
-
-def fig4_flexibility_equivalence(metrics: pd.DataFrame) -> None:
-    # Order matches Table SIScenarios (see SCENARIOS above): neither
-    # equivalent pair this figure is named for ("Full flexibility" ==
-    # "DSM only", "No flexibility" == "TES only") is adjacent under table
-    # order — the equivalence is still readable from the matching bar heights
-    # regardless of x-position. "DSM pessimistic" sits right after "Full
-    # flexibility", matching the table: it reruns "Full flexibility" (DSM+TES
-    # both active) with the pessimistic instead of optimistic
-    # demand-shiftability categorization, testing whether the DSM-only ==
-    # Full-flexibility equivalence survives, or is an artifact of the
-    # optimistic categorization making DSM cheap enough to fully substitute
-    # for TES.
-    order = [label for _, label in SCENARIOS]
-    m = metrics.loc[order]
-    panels = [
-        ("npc_total_meur", "Discounted system cost [MEUR]"),
-        ("emissions_total_mton", "System emissions, horizon total [Mton]"),
-        ("industry_heat_capacity_gw", f"Industry heat capacity, {YEAR} [GW]"),
-    ]
-    fig, axes = plt.subplots(1, 3, figsize=(16, 5.5))
-    for ax, (col, ylabel) in zip(axes, panels):
-        colors = [SCENARIO_PALETTE[[l for _, l in SCENARIOS].index(lbl)] for lbl in order]
-        ax.bar(order, m[col].values, color=colors, edgecolor="white")
-        ax.set_ylabel(ylabel, fontsize=9)
-        plt.setp(ax.get_xticklabels(), rotation=30, ha="right", fontsize=8)
-        ax.grid(axis="y", alpha=0.3)
-    fig.suptitle("DSM Alone Reproduces Full Flexibility - TES Alone Reproduces No Flexibility\n"
-                 "(...Under the Optimistic DSM Assumption)",
-                 fontsize=12, fontweight="bold")
-    fig.tight_layout(rect=[0, 0, 1, 0.93])
-    savefig(fig, "fig4_flexibility_equivalence")
-
-
 # ── Main ──────────────────────────────────────────────────────────────────
 
 def main() -> None:
@@ -710,7 +674,6 @@ def main() -> None:
     fig2b_dsm_cycles_by_product(runs)
     fig3a_temp_sensitivity_summary(metrics)
     fig3b_heat_pathway(runs)
-    fig4_flexibility_equivalence(metrics)
     print(f"Done. Figures in {FIGURES_DIR.relative_to(REPO_ROOT)}/")
 
 
