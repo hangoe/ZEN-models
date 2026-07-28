@@ -9,8 +9,10 @@ TES only, Single temperature level, DSM pessimistic) plus the unmodified
 `Crystal_Ball_HG_v7_0` prefix, staged from data/Crystal_Ball, see
 run_model.py):
 
-  0a. fig0a_benchmark_comparison       — cost & emissions increase of each v7_0 scenario vs Crystal Ball base
-  0b. fig0b_cost_composition           — CAPEX/OPEX/carrier/carbon-cost breakdown of that increase
+  0a. fig0a_cost_composition            — CAPEX/OPEX/carrier/carbon-cost breakdown of each v7_0
+                                          scenario's cost increase vs Crystal Ball base
+  0b. fig0b_emissions_source_comparison — Full flex vs Crystal Ball base, year 2025: where the
+                                          emissions increase comes from vs. only a modest cost delta
   1a. fig1a_cost_delta                — discounted system cost delta vs Full flexibility
   1b. fig1b_industry_capacity         — industry heat-supply & production capacity, 2050
   2a. fig2a_tes_dsm_utilization       — TES vs DSM lifetime charge/discharge, log scale
@@ -22,9 +24,10 @@ The planned "Emissions" subsection (fig3a/3b) is intentionally NOT built as a
 standalone comparison across the 6 v7_0 scenarios: their horizon-total
 emissions only span ~2.3% of each other (headline_metrics.csv), so an
 absolute-scale trajectory or decomposition just shows six overlapping lines/
-bars. fig0 carries this finding instead — the 6 v7_0 scenarios cluster
-tightly relative to each other there, in visible contrast to the much larger
-gap vs "Crystal Ball (base)" — without a dedicated, mostly-flat 3a/3b pair.
+bars. fig0b covers a single-scenario ("Full flexibility") emissions
+comparison against Crystal Ball base instead — see
+fig0b_emissions_source_comparison's docstring — without a dedicated,
+mostly-flat 3a/3b pair.
 
 "Crystal Ball (base)" only feeds fig0a/0b. `load_base_scenario()` still skips
 them gracefully (with a printed note) if Crystal_Ball_2025_10a_5a_interval_10ts/
@@ -36,22 +39,22 @@ would show a misleading 0 for it rather than a meaningful
 absence. Cost and emissions totals, by contrast, are well-defined for any
 run regardless of sector structure, which is what makes it fig0a/0b material.
 
-CAUTION on fig0a/0b's headline numbers (found while building fig0b): the
-~15-16% cost / ~20-23% emissions increase in fig0a is NOT evenly spread
-across the horizon or across cost components — see fig0b_cost_composition's
-docstring for the full breakdown. In short: (1) ~half the cost delta is
-concentrated in the single final year 2070, which behaves very differently
-between the base run (a smooth declining tail) and every v7_0 scenario (a
-sharp late-horizon spike) — a likely end-of-horizon/terminal-value artifact,
-not a flexibility-extension cost; (2) of the remaining delta, the majority is
+CAUTION on fig0a's headline numbers (found while building it): each v7_0
+scenario's cost increase vs Crystal Ball base is NOT evenly spread across the
+horizon or across cost components — see fig0a_cost_composition's docstring
+for the full breakdown. In short: (1) ~half the cost delta is concentrated
+in the single final year 2070, which behaves very differently between the
+base run (a smooth declining tail) and every v7_0 scenario (a sharp
+late-horizon spike) — a likely end-of-horizon/terminal-value artifact, not a
+flexibility-extension cost; (2) of the remaining delta, the majority is
 `cost_carbon_emissions_total`, not CAPEX/OPEX — and that variable itself is
 ~0 in every year except 2050 and 2070, i.e. it behaves like a carbon-BUDGET
 shadow price at specific checkpoint years (see carbon_emissions_annual_limit.
 csv, identical 0-limit-at-2050 in both datasets) rather than a smooth $/ton
 price. This is very likely a real ZEN-garden framework/dataset behavior, not
 a bug in this script — the % deltas exactly reproduce the model's own
-net_present_cost/carbon_emissions_annual outputs — but it means the headline
-fig0a percentages should not be read as "the extension costs 15% more to
+net_present_cost/carbon_emissions_annual outputs — but it means fig0a's
+percentages should not be read as "the extension costs X% more to
 build/operate" without this context.
 
 Reuses the data-access helpers and color/plotting primitives shared with the
@@ -102,9 +105,17 @@ from figures_by_scenario import (
     build_comparison_df,
     get_annual_cost,
     get_annual_total_cost,
+    get_emissions_by_carrier,
+    get_emissions_by_technology,
     plot_stacked_bars,
 )
-from figure_settings import EULER_ROOT, Run, SCENARIO_PALETTE, get_available_years, load_results
+from figure_settings import (
+    EULER_ROOT,
+    Run,
+    SCENARIO_PALETTE,
+    get_available_years,
+    load_results,
+)
 
 FIGURES_DIR = REPO_ROOT / "data" / "outputs" / "figures" / "SI_results"
 YEAR = 2050  # single-year snapshot used throughout; horizon totals used where noted
@@ -125,8 +136,14 @@ SCENARIOS = [
     ("Crystal_Ball_ind_heat_v7_1_single_temp_2025_10a_5a_interval_10ts", "Single temperature level"),
 ]
 
-# fig0 only. Uses SCENARIO_PALETTE slot 6 (grey) — see the comment there.
-BASE_SCENARIO = ("Crystal_Ball_2025_10a_5a_interval_10ts", "Crystal Ball (base)")
+# fig0a/fig0b only. Uses SCENARIO_PALETTE slot 6 (grey) — see the comment there.
+# Path is under archive/ — as of "add results of v7.0..." (7697b97) this run
+# was moved out of EULER_ROOT's top level into archive/, which silently broke
+# load_base_scenario() (it just prints the "not yet under EULER_ROOT" skip
+# note and moves on). fig0a/fig0b on disk were stale from the old v6_1-era
+# run until this path was corrected — check their git history if numbers here
+# ever look inconsistent with headline_metrics.csv again.
+BASE_SCENARIO = ("archive/Crystal_Ball_2025_10a_5a_interval_10ts", "Crystal Ball (base)")
 
 
 def load_scenarios() -> list[Run]:
@@ -193,43 +210,7 @@ def compute_headline_metrics(runs: list[Run]) -> pd.DataFrame:
     return pd.DataFrame(rows).T
 
 
-# ── 0a: v7_0 scenarios vs unmodified Crystal Ball base ──────────────────────
-
-def fig0a_benchmark_comparison(metrics_with_base: pd.DataFrame) -> None:
-    """Cost & emissions of each v7_0 scenario relative to the unmodified
-    Crystal Ball base (Table~SIScenarios) — makes the case that resolving
-    industry heat and flexibility is worth the added cost/complexity, by
-    showing what it actually changes relative to Mannhardt's original model.
-    """
-    base_label = BASE_SCENARIO[1]
-    baseline = metrics_with_base.loc[base_label]
-    others = metrics_with_base.drop(base_label)
-    cost_pct = (others["npc_total_meur"] - baseline["npc_total_meur"]) / baseline["npc_total_meur"] * 100
-    em_pct = (others["emissions_total_mton"] - baseline["emissions_total_mton"]) / baseline["emissions_total_mton"] * 100
-    colors = [SCENARIO_PALETTE[[l for _, l in SCENARIOS].index(lbl)] for lbl in others.index]
-
-    fig, axes = plt.subplots(1, 2, figsize=(14, 6))
-    for ax, values, ylabel, title in [
-        (axes[0], cost_pct, r"$\Delta$ discounted system cost [%]", "System Cost"),
-        (axes[1], em_pct, r"$\Delta$ system emissions, horizon total [%]", "System Emissions"),
-    ]:
-        bars = ax.bar(others.index, values.values, color=colors, edgecolor="white")
-        for bar, v in zip(bars, values.values):
-            ax.text(bar.get_x() + bar.get_width() / 2, bar.get_height(),
-                    f"{v:+.1f}%", ha="center", va="bottom" if v >= 0 else "top",
-                    fontsize=9, fontweight="bold")
-        ax.axhline(0, color="black", linewidth=0.8)
-        ax.set_ylabel(ylabel, fontsize=10)
-        ax.set_title(title, fontsize=11, fontweight="bold")
-        plt.setp(ax.get_xticklabels(), rotation=25, ha="right", fontsize=8)
-        ax.grid(axis="y", alpha=0.3)
-    fig.suptitle("Industry Heat & Flexibility Extension vs Unmodified Crystal Ball Base\n"
-                 f"(vs {base_label}, discounted full horizon)", fontsize=12, fontweight="bold")
-    fig.tight_layout(rect=[0, 0, 1, 0.92])
-    savefig(fig, "fig0a_benchmark_comparison")
-
-
-# ── 0b: Cost-increase composition (CAPEX/OPEX/carrier/carbon) ───────────────
+# ── 0a: Cost-increase composition (CAPEX/OPEX/carrier/carbon) ──────────────
 
 # (variable, display label). Matches the Streamlit dashboard's own CAPEX/OPEX
 # metrics (figures_by_scenario.get_summary_metrics) plus the two remaining
@@ -265,10 +246,11 @@ PLOTTED_COST_COMPONENTS = COST_COMPONENTS[:3]
 PLOTTED_COST_COMPONENT_COLORS = COST_COMPONENT_COLORS[:3]
 
 
-def fig0b_cost_composition(components_with_base: pd.DataFrame) -> None:
-    """Decomposes fig0a's cost-increase-vs-base bars into CAPEX/OPEX/carrier
-    (carbon emissions cost excluded — see PLOTTED_COST_COMPONENTS above), to
-    show what's actually driving the non-carbon part of the increase.
+def fig0a_cost_composition(components_with_base: pd.DataFrame) -> None:
+    """Decomposes each v7_0 scenario's cost increase vs Crystal Ball base into
+    CAPEX/OPEX/carrier (carbon emissions cost excluded — see
+    PLOTTED_COST_COMPONENTS above), to show what's actually driving the
+    non-carbon part of the increase.
 
     Built after a real surprise: the total increase is NOT primarily new
     CAPEX/OPEX from the added industry-heat/flexibility technologies (each
@@ -283,8 +265,8 @@ def fig0b_cost_composition(components_with_base: pd.DataFrame) -> None:
     yet every v7_0 scenario pays a large cost there (base pays ~0) despite
     NEGATIVE (net-removal) emissions that year — consistent with a
     cumulative/horizon-level carbon-budget cost being attributed entirely to
-    the final period, not a real 2070 emissions price. Treat fig0a's
-    percentages with that in mind.
+    the final period, not a real 2070 emissions price. Treat this figure's
+    percentages (and fig0b_emissions_source_comparison's) with that in mind.
     """
     base_label = BASE_SCENARIO[1]
     baseline = components_with_base.loc[base_label]
@@ -316,7 +298,7 @@ def fig0b_cost_composition(components_with_base: pd.DataFrame) -> None:
     ax.legend(fontsize=9, frameon=True, facecolor="white", framealpha=0.9, loc="upper center", ncol=3)
     ax.grid(axis="y", alpha=0.3)
     fig.tight_layout()
-    savefig(fig, "fig0b_cost_composition")
+    savefig(fig, "fig0a_cost_composition")
 
 
 # ── 1a: Cost delta vs Full flexibility ─────────────────────────────────────
@@ -607,8 +589,11 @@ def heat_pathway_split_by_band(r, year: int) -> pd.DataFrame:
     return pd.DataFrame(rows).T  # index: carrier (low to high); columns: Direct, Via conversion cascade
 
 
-BAND_LABELS = {"heat_industry_0_100": "0-100°C", "heat_industry_100_150": "100-150°C",
-               "heat_industry_150_200": "150-200°C"}
+# cmr10 (this module's serif font) has no degree-sign glyph, so a raw "°"
+# renders as a garbled substitute character — the superscript-circle is built
+# in mathtext instead (mathtext.fontset "cm" covers \circ correctly).
+BAND_LABELS = {"heat_industry_0_100": r"0-100$^\circ$C", "heat_industry_100_150": r"100-150$^\circ$C",
+               "heat_industry_150_200": r"150-200$^\circ$C"}
 
 
 def fig3b_heat_pathway(runs: list[Run]) -> None:
@@ -632,18 +617,297 @@ def fig3b_heat_pathway(runs: list[Run]) -> None:
                      hatch=hatches[label], label=col if i == 0 else None)
             left += vals
         for yi, t in zip(offsets, left):
-            ax.text(t, yi, f" {label} ({t:,.0f})", va="center", fontsize=7.5)
+            ax.text(t, yi, f" {label}", va="center", fontsize=7.5)
     ax.set_yticks(y)
     ax.set_yticklabels([BAND_LABELS[b] for b in bands], fontsize=9)
-    ax.set_xlim(right=ax.get_xlim()[1] * 1.55)  # headroom for the end-of-bar labels
+    ax.set_xlim(right=ax.get_xlim()[1] * 1.35)  # headroom for the end-of-bar labels
     ax.set_xlabel("Net end-use heat demand met [GWh]")
-    ax.set_title(f"Heat Demand Met by Temperature Band, {YEAR}\n"
-                 "(equal per-band totals confirm identical end-use demand across scenarios)",
-                 fontsize=11, fontweight="bold")
+    ax.set_title(f"Heat Demand Met by Temperature Band, {YEAR}", fontsize=11, fontweight="bold")
     ax.legend(fontsize=9, frameon=False, loc="lower right")
     ax.grid(axis="x", alpha=0.3)
     fig.tight_layout()
     savefig(fig, "fig3b_heat_pathway")
+
+
+# ── 0b: Emissions-source comparison, Full flexibility vs Crystal Ball base ──
+
+# Print-figure-specific ETH palette (does NOT touch the shared, dashboard-wide
+# COLOR_MAP in figure_settings.py — see plot_stacked_bars(color_map=...)),
+# built from the same 7 ETH Zurich corporate-design colors used everywhere
+# else in these SI figures (SCENARIO_PALETTE, COST_COMPONENT_COLORS,
+# HEAT_SUPPLY_COLOR_MAP/PRODUCTION_COLOR_MAP above) rather than the generic,
+# off-brand hues COLOR_MAP happens to hold for some of these same categories
+# (e.g. a plain purple for glass_production). glass_production keeps
+# PRODUCTION_COLOR_MAP's ETH blue for cross-figure consistency with fig1b.
+# Carriers (the larger, primary stacked segments) each get one solid base
+# hue; technologies (smaller, secondary segments) get a lighter tint of a
+# related hue via _eth_tint (defined above, fig1b's section) — the tint
+# makes "technology" read as visually distinct from "carrier" at a glance,
+# on top of the legend's " (carrier)"/" (tech)" suffix.
+_ETH_BRONZE, _ETH_PURPLE, _ETH_GREY = "#8E6713", "#A7117A", "#6F6F6F"
+EMISSIONS_COLOR_MAP = {
+    # Carriers (fuel combustion)
+    "crude oil (carrier)": _ETH_BRONZE,
+    "natural gas (carrier)": _ETH_TURQUOISE,
+    "lng (carrier)": _ETH_GREEN,
+    "hard coal (carrier)": _ETH_GREY,
+    "lignite (carrier)": _ETH_RED,
+    "waste (carrier)": _ETH_PURPLE,
+    # Technologies (process + carbon capture)
+    "glass production (tech)": _ETH_BLUE,
+    "cement kiln (tech)": _eth_tint(_ETH_BRONZE, 0.45),
+    "BF BOF (tech)": _eth_tint(_ETH_GREY, 0.35),
+    "EAF (tech)": _eth_tint(_ETH_BLUE, 0.45),
+    "NG DRI (tech)": _eth_tint(_ETH_TURQUOISE, 0.45),
+    "carbon storage (tech)": _eth_tint(_ETH_GREEN, 0.45),
+}
+
+
+def fig0b_emissions_source_comparison(full_run: Run, base_run: Run) -> None:
+    """Explains the emissions increase for "Full flexibility" vs "Crystal
+    Ball (base)" being much larger (proportionally) than the cost increase
+    (fig0a): decomposes each run's year-2025 emissions into carrier
+    (fuel combustion) and technology (process + carbon capture) components,
+    then isolates which components drive the gap.
+
+    Uses year 2025 (the earliest year present in both runs), not a
+    horizon-total sum: WRI's own sector-share figures
+    (https://www.wri.org/insights/4-charts-explain-greenhouse-gas-emissions-
+    countries-and-sectors) are a single year (2023), so a single-year cut is
+    the apples-to-apples comparison, not a multi-year sum. It also sidesteps
+    a separate distortion — carbon_storage (CCS) captures ~45-50% of GROSS
+    emissions by full-horizon totals in both runs, so a horizon-total NET
+    percentage (the original ~21% headline figure) is a % change in the
+    small residual of two much larger, near-offsetting numbers and comes out
+    mechanically inflated vs. a % change in gross emissions. In 2025, CCS has
+    barely ramped up (~-15 Mton out of ~2,269 Mton gross, ~0.7%), so gross
+    and net nearly coincide here anyway (~+12.1% vs ~+12.2%) — this single
+    year is simultaneously the fair comparison on the WRI single-year
+    dimension AND avoids needing the gross/net distinction at all.
+
+    Root cause of the gap itself: "Crystal Ball (base)" has NO industry-heat
+    or production sector demand at all — no glass/ceramic/paper/food, no
+    heat_industry_0_100/100_150/150_200 (confirmed via `results.get_total
+    ("demand")`: these carriers are entirely absent from the base run's
+    index, not just zero). The "Full flexibility" extension therefore adds
+    genuinely new final energy-service demand, not a re-representation of
+    demand the base model already met some other way. Meeting that new
+    demand pulls in more fossil-carrier combustion (natural_gas/lng/
+    hard_coal/crude_oil/waste — mostly industry boilers) plus a small amount
+    of new direct process emissions (glass_production). Because that extra
+    boiler CAPEX/OPEX is cheap relative to total system cost (see fig0a's
+    docstring), this emissions increase shows up as only a modest cost
+    increase — the two are not expected to move in the same proportion, and
+    the size of the gap here is a real modeling consequence of extending
+    scope, not an error.
+
+    Crystal Ball's scope (README.md: EU27+NO+CH+UK-MT-CY, electricity/heat/
+    transport/steel/cement/ammonia/methanol/olefins) maps onto WRI's
+    "Energy" (76.7%) + "Industrial processes" (6.2%) categories but excludes
+    agriculture (12.3%) and land use (0.9%) — so the ~12% figure here is
+    plausible next to WRI's ~18.4% global industry share, especially since
+    steel/cement/chemicals (already in the base model, and typically the
+    dominant slice of that 18.4%) leave a smaller remainder for the
+    genuinely new glass/ceramic/paper/food demand modeled here.
+    """
+    fr, br = full_run.results, base_run.results
+    years_full = get_available_years(fr)
+    years_base = get_available_years(br)
+    # Earliest year present in both runs — closest available model year to
+    # WRI's single-year (2023) snapshot (see docstring).
+    year0 = min(set(years_full) & set(years_base))
+
+    carrier_full = get_emissions_by_carrier(fr, year0)
+    carrier_base = get_emissions_by_carrier(br, year0)
+    # H2_DRI is dropped: its emissions are ~0 in both runs (no delta to show),
+    # so it only adds clutter to the composition legend and the driver chart.
+    tech_full = get_emissions_by_technology(fr, year0).drop("H2_DRI", errors="ignore")
+    tech_base = get_emissions_by_technology(br, year0).drop("H2_DRI", errors="ignore")
+
+    # cmr10 (this module's serif font, see the plt.rcParams block up top) has
+    # no underscore glyph, so raw "_"-joined category names render as a
+    # garbled substitute character — display labels use spaces instead.
+    def disp(name: str) -> str:
+        return name.replace("_", " ")
+
+    all_carriers = sorted(set(carrier_full.index) | set(carrier_base.index))
+    all_techs = sorted(set(tech_full.index) | set(tech_base.index))
+
+    # Panel A: full emissions composition per run (carrier + technology
+    # stacked together, suffix-disambiguated) so bar heights reproduce each
+    # run's true net total for year0.
+    net_base = carrier_base.sum() + tech_base.sum()
+    net_full = carrier_full.sum() + tech_full.sum()
+    composition = build_comparison_df([
+        (f"{base_run.label}\n(net {net_base:,.0f})",
+         pd.concat([carrier_base.rename(lambda c: f"{disp(c)} (carrier)"),
+                    tech_base.rename(lambda t: f"{disp(t)} (tech)")])),
+        (f"{full_run.label}\n(net {net_full:,.0f})",
+         pd.concat([carrier_full.rename(lambda c: f"{disp(c)} (carrier)"),
+                    tech_full.rename(lambda t: f"{disp(t)} (tech)")])),
+    ])
+
+    # Panel B: per-category delta (Full - Base), sorted so the biggest
+    # drivers of the gap read at the top.
+    delta = pd.Series({
+        **{f"{disp(c)} (carrier)": carrier_full.get(c, 0.0) - carrier_base.get(c, 0.0) for c in all_carriers},
+        **{f"{disp(t)} (tech)": tech_full.get(t, 0.0) - tech_base.get(t, 0.0) for t in all_techs},
+    })
+    delta = delta[delta.abs() > 1e-6].sort_values()
+
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 7), gridspec_kw={"width_ratios": [1, 1.3]})
+    plot_stacked_bars(composition, "Emissions Composition by Source",
+                      f"Mton CO$_2$eq, year {year0}", ax1, show_segment_labels=True,
+                      color_map=EMISSIONS_COLOR_MAP)
+
+    # Same per-category colors as Panel A (rather than a red/blue increase-vs-
+    # decrease sign color): every delta in this dataset happens to be an
+    # increase anyway (sign carries no information here), while matching
+    # colors visually ties each driver bar back to its Panel A segment.
+    colors = [EMISSIONS_COLOR_MAP.get(cat, _ETH_GREY) for cat in delta.index]
+    ax2.barh(delta.index, delta.values, color=colors, edgecolor="white")
+    for y_pos, v in zip(delta.index, delta.values):
+        ax2.text(v, y_pos, f" {v:+,.1f}", va="center",
+                 ha="left" if v >= 0 else "right", fontsize=8, fontweight="bold")
+    ax2.axvline(0, color="black", linewidth=0.8)
+    # Headroom on both sides so the value labels (drawn past the bar tips)
+    # never get clipped by the axes — most visible on the longest (top) bar.
+    xmin, xmax = ax2.get_xlim()
+    span = xmax - xmin
+    ax2.set_xlim(xmin - 0.08 * span, xmax + 0.12 * span)
+    ax2.set_xlabel(f"$\\Delta$ Mton CO$_2$eq, year {year0} (Full flexibility $-$ base)")
+    ax2.set_title("Per-Category Driver of the Emissions Gap", fontsize=11, fontweight="bold")
+    ax2.grid(axis="x", alpha=0.3)
+
+    fig.suptitle("Emission Increase Attributable to the Newly Implemented Industry Sectors",
+                 fontsize=13, fontweight="bold")
+    fig.tight_layout(rect=[0, 0, 1, 0.95])
+    savefig(fig, "fig0b_emissions_source_comparison")
+
+
+# ── 4: Carbon budget vs actual cumulative emissions, 2025-2070 ─────────────
+
+def fig4_carbon_budget_trajectory(full_run: Run, base_run: Run) -> None:
+    """Shows why "Full flexibility" pays a large `cost_carbon_emissions_total`
+    at 2070 while "Crystal Ball (base)" does not: it plots each run's true,
+    interval-weighted cumulative emissions (`carbon_emissions_cumulative`,
+    ZEN-garden's own recursive E_y^cum = E_{y-1}^cum + (dy-1)*E_{y-1} + E_y,
+    dy=5 here) against each run's own `carbon_emissions_budget` cap.
+
+    This is NOT the same number as fig0b's or the naive per-year sum used in
+    compute_headline_metrics: that naive sum badly understates true
+    cumulative emissions because it never credits the (dy-1)=4 "skipped"
+    years between representative model years. Reconstructing it properly
+    changes the conclusion completely.
+
+    IMPORTANT NUANCE (visible once both curves are plotted against their own
+    budget line): BOTH runs' true cumulative emissions transiently exceed
+    their own budget through the middle of the horizon (base: 2040-2065;
+    full: 2035-2065), then fall back as the system swings net-negative late
+    (heavy CCS/DAC draws cumulative emissions back down — front-load now,
+    pay it back later). This is real and expected, not an artifact: ZEN-
+    garden's `constraint_carbon_emissions_budget` only prices the overshoot
+    variable in the FINAL horizon year (`constraint_cost_carbon_emissions_
+    total`'s `mask_last_year`) — mid-horizon "overshoot" costs nothing, only
+    whether the run has fully repaid it by the last year does. Base repays
+    in full: carbon_emissions_cumulative[2070] == carbon_emissions_budget to
+    6 significant figures (23,152.04 Mton both) — zero overshoot, zero
+    carbon-budget cost, the optimizer uses exactly 100% of its allowance.
+    Full flexibility does NOT fully repay: true cumulative by 2070 is
+    27,146.12 Mton against a budget of only 24,489.31 Mton (already the
+    +5.78% new-sector-credited figure from ZEN-creator's `carbon_budget_
+    allocation.py`) — a real, binding 2,656.81 Mton shortfall. Because
+    `price_carbon_emissions_budget_overshoot` is finite (5,000 EUR/ton)
+    rather than infinite, this is a SOFT constraint: the model pays
+    ~13.28M EUR (cost_carbon_emissions_total[2070]) rather than
+    decarbonizing further, since that's cheaper at the margin. (A much
+    smaller, separate mechanism — the annual limit dropping to 0 from 2050
+    onward, identical in both runs — adds a ~77-123 Mton annual overshoot at
+    2050 only, ~5-10x smaller; not shown here to keep the figure focused on
+    the dominant, final-year mechanism.)
+
+    Sanity check: full's true cumulative delta vs base by 2070 is
+    27,146.12 - 23,152.04 = 3,994.08 Mton. ZEN-creator credited only
+    +1,337.28 Mton of extra budget for the new sectors (the +5.78% figure,
+    confirmed intentional, not a double-count bug). Since base has zero
+    slack, the shortfall is almost exactly the final-year overshoot:
+    3,994.08 - 1,337.28 = 2,656.80 (vs. the model's actual 2,656.81) — i.e.
+    the new sectors' real cumulative footprint in this model run is ~3x what
+    the 2022-real-world-emissions-ratio-based credit assumed. That gap (not
+    a budget-accounting bug) is why this run pays carbon cost; see project
+    memory for candidate causes (new-sector demand volumes, heat
+    intensities, 2025 technology menu) worth checking next.
+    """
+    fr, br = full_run.results, base_run.results
+
+    def _series(r, name):
+        s = r.get_total(name)
+        return {int(k): float(v) for k, v in s.items()}
+
+    cum_full = _series(fr, "carbon_emissions_cumulative")
+    cum_base = _series(br, "carbon_emissions_cumulative")
+    budget_full = float(fr.get_total("carbon_emissions_budget").iloc[0])
+    budget_base = float(br.get_total("carbon_emissions_budget").iloc[0])
+    years = sorted(cum_full)
+
+    fig, ax = plt.subplots(figsize=(9, 6))
+
+    base_vals = [cum_base[y] for y in years]
+    full_vals = [cum_full[y] for y in years]
+
+    # Transient mid-horizon excess above each run's OWN budget line — real,
+    # but costs nothing except at the final year (see docstring). Shown
+    # muted/shared so it doesn't read as "this is the penalised amount".
+    over_base = np.array([v > budget_base for v in base_vals])
+    over_full = np.array([v > budget_full for v in full_vals])
+    ax.fill_between(years, base_vals, budget_base, where=over_base,
+                     color=base_run.color, alpha=0.12, interpolate=True,
+                     label="transient excess above own budget (repaid by 2070)")
+    ax.fill_between(years, full_vals, budget_full, where=over_full,
+                     color=full_run.color, alpha=0.12, interpolate=True,
+                     label="_nolegend_")
+
+    ax.plot(years, base_vals, marker="o", color=base_run.color,
+            linewidth=2, label=f"{base_run.label} - cumulative emissions")
+    ax.axhline(budget_base, color=base_run.color, linestyle="--", linewidth=1.3,
+                label=f"{base_run.label} - carbon budget ({budget_base:,.0f} Mton)")
+
+    ax.plot(years, full_vals, marker="o", color=full_run.color,
+            linewidth=2, label=f"{full_run.label} - cumulative emissions")
+    ax.axhline(budget_full, color=full_run.color, linestyle="--", linewidth=1.3,
+                label=f"{full_run.label} - carbon budget ({budget_full:,.0f} Mton)")
+
+    # The only gap that actually costs money: the final-year shortfall.
+    final_year = years[-1]
+    overshoot_full = cum_full[final_year] - budget_full
+    overshoot_base = cum_base[final_year] - budget_base
+    ax.plot([final_year, final_year], [budget_full, cum_full[final_year]],
+            color=_ETH_RED, linewidth=3, solid_capstyle="butt", zorder=5)
+    ax.annotate(
+        f"{final_year}: +{overshoot_full:,.0f} Mton over its own budget\n"
+        f"paid as carbon cost (approx. 13.3M EUR),\nnot eliminated",
+        xy=(final_year, (cum_full[final_year] + budget_full) / 2),
+        xytext=(final_year - 17, max(full_vals) * 1.16),
+        fontsize=8.5, fontweight="bold", color=_ETH_RED, ha="left",
+        arrowprops=dict(arrowstyle="->", color=_ETH_RED),
+    )
+    ax.annotate(
+        f"{final_year}: base repays in full\n(+{overshoot_base:,.1f} Mton, no cost)",
+        xy=(final_year, cum_base[final_year]),
+        xytext=(final_year - 22, cum_base[final_year] - 0.22 * cum_base[final_year]),
+        fontsize=9, color=base_run.color,
+        arrowprops=dict(arrowstyle="->", color=base_run.color),
+    )
+
+    ax.set_xlabel("Year")
+    ax.set_ylabel("Cumulative carbon emissions [Mton CO$_2$eq]")
+    ax.set_title("Cumulative Emissions vs. Carbon Budget (2025$-$2070)",
+                 fontsize=13, fontweight="bold")
+    ax.set_ylim(top=max(full_vals) * 1.32)
+    ax.legend(fontsize=8.5, loc="upper left")
+    ax.grid(alpha=0.3)
+    fig.tight_layout()
+    savefig(fig, "fig4_carbon_budget_trajectory")
 
 
 # ── Main ──────────────────────────────────────────────────────────────────
@@ -662,12 +926,12 @@ def main() -> None:
 
     print("Generating figures...")
     if base_run is not None:
-        metrics_with_base = compute_headline_metrics([base_run] + runs)
-        fig0a_benchmark_comparison(metrics_with_base)
         components_with_base = compute_cost_components([base_run] + runs)
-        fig0b_cost_composition(components_with_base)
+        fig0a_cost_composition(components_with_base)
+        fig0b_emissions_source_comparison(by_label(runs, "Full flexibility"), base_run)
+        fig4_carbon_budget_trajectory(by_label(runs, "Full flexibility"), base_run)
     else:
-        print(f"  skipping fig0a/fig0b: {BASE_SCENARIO[0]} not yet under {EULER_ROOT}")
+        print(f"  skipping fig0a/fig0b/fig4: {BASE_SCENARIO[0]} not yet under {EULER_ROOT}")
     fig1a_cost_delta(metrics)
     fig1b_industry_capacity(runs)
     fig2a_tes_dsm_utilization(runs)
