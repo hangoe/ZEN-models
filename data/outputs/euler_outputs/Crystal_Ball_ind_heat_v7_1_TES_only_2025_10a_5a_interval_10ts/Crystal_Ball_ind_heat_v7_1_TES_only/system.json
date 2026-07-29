@@ -483,7 +483,7 @@
   "unaggregated_time_steps_per_year": 8760,
   "aggregated_time_steps_per_year": 10,
   "conduct_time_series_aggregation": true,
-  "optimized_years": 10,
+  "optimized_years": 6,
   "interval_between_years": 5,
   "use_rolling_horizon": false,
   "years_in_rolling_horizon": 1,

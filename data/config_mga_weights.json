@@ -1,0 +1,37 @@
+{
+  "analysis": {
+    "dataset": "snapshot"
+  },
+  "solver": {
+    "name": "gurobi",
+    "solver_options": {
+      "Method": 2,
+      "NodeMethod": 2,
+      "BarHomogeneous": 1,
+      "DualReductions": 0,
+      "Threads": 10,
+      "Crossover": 0,
+      "ScaleFlag": 2,
+      "BarOrder": 0,
+      "BarIterLimit": 3000
+    },
+    "save_duals": true,
+    "use_scaling": false,
+    "run_diagnostics": true,
+    "scaling_include_rhs": true
+  },
+  "plugins": {
+    "mga": {
+      "mode": "weights",
+      "epsilon": 0.1,
+      "iterations": [
+        { "weights": { "photovoltaics": 1.0 } },
+        { "weights": { "photovoltaics": -1.0 } },
+        { "weights": { "wind_onshore": 1.0, "wind_offshore": 1.0 } },
+        { "weights": { "wind_onshore": -1.0, "wind_offshore": -1.0 } },
+        { "weights": { "nuclear": 1.0 } },
+        { "weights": { "nuclear": -1.0 } }
+      ]
+    }
+  }
+}

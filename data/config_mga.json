@@ -1,37 +1,56 @@
 {
-  "analysis": { "dataset": "snapshot" },
+  "analysis": {
+    "dataset": "snapshot"
+  },
   "solver": {
     "name": "gurobi",
-    "solver_options": { 
-      "Method": 2, 
-      "NodeMethod": 2, 
+    "solver_options": {
+      "Method": 2,
+      "NodeMethod": 2,
       "BarHomogeneous": 1,
-      "DualReductions": 0, 
-      "Threads": 16, 
-      "Crossover": 0, 
-      "ScaleFlag": 2, 
-      "BarOrder": 0 },
-    "save_duals": false, 
+      "DualReductions": 0,
+      "Threads": 10,
+      "Crossover": 0,
+      "ScaleFlag": 2,
+      "BarOrder": 0,
+      "BarIterLimit": 3000
+    },
+    "save_duals": true,
     "use_scaling": false,
-    "run_diagnostics": true, 
+    "run_diagnostics": true,
     "scaling_include_rhs": true
-  },
+  }, 
   "plugins": {
     "mga": {
-      "epsilon": 0.1,
       "mode": "oracle",
-      "include_techs": [
-        "photovoltaics",
-        { "wind": ["wind_onshore", "wind_offshore"] },
-        "hard_coal_plant",
-        "natural_gas_turbine"
-      ],
+      "epsilon": 0.1,
+      "axes": {
+        "technologies": [
+          "nuclear",
+          "photovoltaics",
+          "wind_offshore",
+          "wind_onshore"
+        ],
+        "carrier_imports": [
+          "biomass"
+        ],
+        "include_cost": true
+      },
       "oracle": {
-        "tolerance": 0.01,
-        "max_iterations": 200,
-        "formulation": "kkt_milp",
-        "use_bigM": false,
-        "include_cost": false
+        "tolerance": 0.1,
+        "max_iterations": 700,
+        "max_min": {
+          "formulation": "kkt_milp",
+          "t_max": 1.0,
+          "solver_options": {
+            "OutputFlag": 1,
+            "MIPGap": 0.02,
+            "MIPGapAbs": 0.01,
+            "TimeLimit": 120,
+            "Threads": 10
+          },
+          "certificate_time_limit": 43200
+        }
       }
     }
   }
