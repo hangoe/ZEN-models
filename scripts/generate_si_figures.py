@@ -159,13 +159,24 @@ SCENARIOS = [
 ]
 
 # fig0a/fig0b only. Uses SCENARIO_PALETTE slot 6 (grey) — see the comment there.
-# Path is under archive/ — as of "add results of v7.0..." (7697b97) this run
-# was moved out of EULER_ROOT's top level into archive/, which silently broke
-# load_base_scenario() (it just prints the "not yet under EULER_ROOT" skip
-# note and moves on). fig0a/fig0b on disk were stale from the old v6_1-era
-# run until this path was corrected — check their git history if numbers here
-# ever look inconsistent with headline_metrics.csv again.
-BASE_SCENARIO = ("archive/Crystal_Ball_2025_10a_5a_interval_10ts", "Crystal Ball (base)")
+# Path is under EULER_ROOT's top level, NOT archive/. History of this path
+# getting stale twice now: (1) as of "add results of v7.0..." (7697b97) this
+# run was moved out of EULER_ROOT's top level into archive/, which silently
+# broke load_base_scenario() (it just prints the "not yet under EULER_ROOT"
+# skip note and moves on) — fig0a/fig0b on disk were stale from the old
+# v6_1-era run for months until that was corrected. (2) As of the
+# 2026-07-29 "run model until 2050 only" re-sync (all v7_1 scenarios AND the
+# base case re-run with optimized_years=6, i.e. 2025-2050, replacing the
+# previous optimized_years=10 / 2025-2070 runs), a FRESH base run landed at
+# this top-level path while BASE_SCENARIO still pointed at the archived,
+# now-superseded 10-year run — fig0a was silently comparing the v7_1
+# scenarios' 6-year (2025-2050) horizon totals against the base run's 10-year
+# (2025-2070) horizon totals, an apples-to-oranges sum that produced
+# nonsensical deltas. Verify BASE_SCENARIO's optimized_years matches the
+# SCENARIOS list's (system.json's "optimized_years") if fig0a/fig0b numbers
+# ever look inconsistent with headline_metrics.csv again — this path tends to
+# drift whenever the base case gets independently re-run.
+BASE_SCENARIO = ("Crystal_Ball_2025_10a_5a_interval_10ts", "Crystal Ball (base)")
 
 
 def load_scenarios() -> list[Run]:
@@ -695,41 +706,47 @@ def fig0b_emissions_source_comparison(full_run: Run, base_run: Run) -> None:
     Panel A's or the naive per-year sum used in compute_headline_metrics:
     that naive sum badly understates true cumulative emissions because it
     never credits the (dy-1)=4 "skipped" years between representative model
-    years. Reconstructing it properly shows that BOTH runs' true cumulative
-    emissions transiently exceed their own budget through the middle of the
-    horizon (base: 2040-2065; full: 2035-2065), then fall back as the system
-    swings net-negative late (heavy CCS/DAC draws cumulative emissions back
-    down — front-load now, pay it back later). This is real and expected,
-    not an artifact: ZEN-garden's `constraint_carbon_emissions_budget` only
-    prices the overshoot variable in the FINAL horizon year
-    (`constraint_cost_carbon_emissions_total`'s `mask_last_year`) —
-    mid-horizon "overshoot" costs nothing, only whether the run has fully
-    repaid it by the last year does. Base repays in full:
-    carbon_emissions_cumulative[2070] == carbon_emissions_budget to 6
-    significant figures (23,152.04 Mton both) — zero overshoot, zero
-    carbon-budget cost, the optimizer uses exactly 100% of its allowance.
-    Full flexibility does NOT fully repay: true cumulative by 2070 is
-    27,146.12 Mton against a budget of only 24,489.31 Mton (already the
-    +5.78% new-sector-credited figure from ZEN-creator's `carbon_budget_
-    allocation.py`) — a real, binding 2,656.81 Mton shortfall. Because
-    `price_carbon_emissions_budget_overshoot` is finite (5,000 EUR/ton)
-    rather than infinite, this is a SOFT constraint: the model pays
-    ~13.28M EUR (cost_carbon_emissions_total[2070]) rather than
-    decarbonizing further, since that's cheaper at the margin.
+    years.
 
-    Sanity check: full's true cumulative delta vs base by 2070 is
-    27,146.12 - 23,152.04 = 3,994.08 Mton. ZEN-creator credited only
-    +1,337.28 Mton of extra budget for the new sectors (the +5.78% figure,
-    confirmed intentional, not a double-count bug). Since base has zero
-    slack, the shortfall is almost exactly the final-year overshoot:
-    3,994.08 - 1,337.28 = 2,656.80 (vs. the model's actual 2,656.81) — i.e.
-    the new sectors' real cumulative footprint in this model run is ~3x what
-    the 2022-real-world-emissions-ratio-based credit assumed. That gap (not
-    a budget-accounting bug) is why this run pays carbon cost; see project
-    memory for candidate causes (traced to Mannhardt (2026)'s deployment-
-    barrier mechanism: the new sectors' clean heat-supply alternative starts
-    from zero real-world existing capacity, while their fossil alternative
-    does not).
+    As of the 2026-07-29 re-sync, ALL scenarios (base included) were re-run
+    with a shortened horizon (`optimized_years=6`, i.e. 2025-2050, down from
+    the previous 2025-2070 / optimized_years=10). This changes Panel B's
+    story: BOTH runs' true cumulative emissions are still transiently above
+    their own budget line at the final modeled year (2050) — base is not
+    exempt anymore. Under the old 2025-2070 horizon, base fully repaid its
+    budget by 2070 (cumulative == budget to 6 sig figs) via a late-horizon
+    swing to net-negative annual emissions (heavy CCS/DAC ramping up from
+    ~2055 on) that this shorter horizon simply doesn't reach yet: at 2050
+    both runs' `carbon_emissions_annual` are still positive (base +72.5,
+    full +119.3 Mton), i.e. neither has started its late-horizon repayment
+    swing. So the "front-load now, repay later" pattern from the 2070-run is
+    still the underlying mechanism, but the repayment leg now falls outside
+    the modeled window — both overshoots shown here are a horizon-truncation
+    artifact of stopping at 2050, not evidence that base has stopped fully
+    decarbonizing. `constraint_carbon_emissions_budget`'s overshoot variable
+    is only priced in the FINAL horizon year (`constraint_cost_carbon_
+    emissions_total`'s `mask_last_year`) — with 2050 now being that final
+    year for every scenario, both runs incur a real (if small, since
+    `price_carbon_emissions_budget_overshoot`=5,000 EUR/ton is finite, a SOFT
+    constraint) carbon cost at 2050 that a 2070-horizon run would not have
+    shown for base. Verified directly: base overshoot 2,525.7 Mton -> carbon
+    cost 12.99M EUR; full overshoot 3,889.7 Mton -> carbon cost 20.05M EUR
+    (`cost_carbon_emissions_total[2050]`, matches
+    `budget_overshoot*5,000 + annual_overshoot*5,000` exactly, the latter
+    from the separate `carbon_emissions_annual_limit=0` constraint at 2050
+    only, identical in both runs).
+
+    Full's overshoot is still larger than base's in both absolute (+1,364.0
+    Mton) and relative terms, consistent with the pre-existing finding that
+    the new industry sectors' real cumulative footprint outgrows the
+    ZEN-creator-credited budget top-up (see project memory, traced to
+    Mannhardt (2026)'s deployment-barrier mechanism: the new sectors' clean
+    heat-supply alternative starts from zero real-world existing capacity,
+    while their fossil alternative does not) — that mechanism is unaffected
+    by the horizon change and still holds. What's new is only that base
+    itself is no longer a clean/zero-cost reference point at this horizon;
+    any reading of this figure should treat both overshoot numbers as
+    "not yet repaid by 2050", not "failed to decarbonize".
     """
     fr, br = full_run.results, base_run.results
     years_full = get_available_years(fr)
@@ -790,7 +807,7 @@ def fig0b_emissions_source_comparison(full_run: Run, base_run: Run) -> None:
     over_full = np.array([v > budget_full for v in full_vals])
     ax2.fill_between(years, base_vals, budget_base, where=over_base,
                       color=base_run.color, alpha=0.12, interpolate=True,
-                      label="transient excess above own budget (repaid by 2070)")
+                      label="excess above own budget, not yet repaid")
     ax2.fill_between(years, full_vals, budget_full, where=over_full,
                       color=full_run.color, alpha=0.12, interpolate=True,
                       label="_nolegend_")
@@ -806,31 +823,41 @@ def fig0b_emissions_source_comparison(full_run: Run, base_run: Run) -> None:
                 label=f"{full_run.label} - carbon budget ({budget_full:,.0f} Mton)")
 
     # The only gap that actually costs money: the final-year shortfall.
+    # As of the shortened (2025-2050) horizon, BOTH runs land mid-overshoot at
+    # the final modeled year — neither has reached its late-horizon
+    # net-negative repayment swing yet (see docstring). Carbon cost is pulled
+    # directly from the solved model rather than hardcoded, since it depends
+    # on which year happens to be "final" for a given horizon.
     final_year = years[-1]
     overshoot_full = cum_full[final_year] - budget_full
     overshoot_base = cum_base[final_year] - budget_base
+    cost_full = float(fr.get_total("cost_carbon_emissions_total")[final_year])
+    cost_base = float(br.get_total("cost_carbon_emissions_total")[final_year])
     ax2.plot([final_year, final_year], [budget_full, cum_full[final_year]],
              color=_ETH_RED, linewidth=3, solid_capstyle="butt", zorder=5)
-    ax2.annotate(
-        f"{final_year}: +{overshoot_full:,.0f} Mton over its own budget\n"
-        f"paid as carbon cost (approx. 13.3M EUR),\nnot eliminated",
-        xy=(final_year, (cum_full[final_year] + budget_full) / 2),
-        xytext=(final_year - 17, max(full_vals) * 1.16),
-        fontsize=8, fontweight="bold", color=_ETH_RED, ha="left",
-        arrowprops=dict(arrowstyle="->", color=_ETH_RED),
-    )
-    ax2.annotate(
-        f"{final_year}: base repays in full\n(+{overshoot_base:,.1f} Mton, no cost)",
-        xy=(final_year, cum_base[final_year]),
-        xytext=(final_year - 22, cum_base[final_year] - 0.22 * cum_base[final_year]),
-        fontsize=8.5, color=base_run.color,
-        arrowprops=dict(arrowstyle="->", color=base_run.color),
-    )
+    ax2.plot([final_year, final_year], [budget_base, cum_base[final_year]],
+             color=_ETH_RED, linewidth=3, solid_capstyle="butt", zorder=5)
+    # Short, numbers-only labels placed to the RIGHT of the final data point
+    # (off the plotted lines/legend entirely — a longer prose version placed
+    # near the top-left previously landed behind the legend and the lines
+    # themselves, per user feedback) — set_xlim below opens up the margin
+    # these sit in.
+    year_step = years[-1] - years[-2]
+    label_x = final_year + 0.15 * year_step
+    ax2.annotate(f"+{overshoot_full:,.0f} Mt\n{cost_full / 1e6:.1f}M EUR",
+        xy=(final_year, cum_full[final_year]), xytext=(label_x, cum_full[final_year]),
+        fontsize=8, fontweight="bold", color=_ETH_RED, ha="left", va="center",
+        arrowprops=dict(arrowstyle="->", color=_ETH_RED))
+    ax2.annotate(f"+{overshoot_base:,.0f} Mt\n{cost_base / 1e6:.1f}M EUR",
+        xy=(final_year, cum_base[final_year]), xytext=(label_x, cum_base[final_year]),
+        fontsize=8, fontweight="bold", color=base_run.color, ha="left", va="center",
+        arrowprops=dict(arrowstyle="->", color=base_run.color))
 
     ax2.set_xlabel("Year")
     ax2.set_ylabel("Cumulative carbon emissions [Mton CO$_2$eq]")
     ax2.set_title("Cumulative Emissions vs. Carbon Budget", fontsize=11, fontweight="bold")
-    ax2.set_ylim(top=max(full_vals) * 1.32)
+    ax2.set_xlim(right=final_year + 0.6 * year_step)  # headroom for the RHS labels
+    ax2.set_ylim(top=max(full_vals) * 1.1)
     ax2.legend(fontsize=7.5, loc="upper left")
     ax2.grid(alpha=0.3)
 
