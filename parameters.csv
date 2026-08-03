@@ -1,9 +1,9 @@
 task_id,my_dataset,my_comment,conduct_time_series_aggregation,aggregated_time_steps_per_year,reference_year,optimized_years,interval_between_years,use_rolling_horizon
-0,Crystal_Ball_ind_heat_v7_2,2025_10a_5a_interval_10ts,True,10,2020,15,2,False
-1,Crystal_Ball_ind_heat_v7_2_no_flexibility,2025_10a_5a_interval_10ts,True,10,2020,15,2,False
-2,Crystal_Ball_ind_heat_v7_2_DSM_only,2025_10a_5a_interval_10ts,True,10,2020,15,2,False
-3,Crystal_Ball_ind_heat_v7_2_DSM_pessimistic,2025_10a_5a_interval_10ts,True,10,2020,15,2,False
-4,Crystal_Ball_ind_heat_v7_2_TES_only,2025_10a_5a_interval_10ts,True,10,2020,15,2,False
-5,Crystal_Ball_ind_heat_v7_2_single_temp,2025_10a_5a_interval_10ts,True,10,2020,15,2,False
-6,Crystal_Ball_ind_heat_v7_2,2025_10a_5a_interval_10ts,True,10,2020,15,2,False
-7,Crystal_Ball_ind_heat_v7_2_nodiffusion,2025_10a_5a_interval_10ts,True,10,2020,15,2,False
+0,Crystal_Ball_ind_heat_v7_3,2020_15a_2a_interval_10ts,True,10,2020,15,2,False
+1,Crystal_Ball_ind_heat_v7_3_no_flexibility,2020_15a_2a_interval_10ts,True,10,2020,15,2,False
+2,Crystal_Ball_ind_heat_v7_3_DSM_only,2020_15a_2a_interval_10ts,True,10,2020,15,2,False
+3,Crystal_Ball_ind_heat_v7_3_DSM_pessimistic,2020_15a_2a_interval_10ts,True,10,2020,15,2,False
+4,Crystal_Ball_ind_heat_v7_3_TES_only,2020_15a_2a_interval_10ts,True,10,2020,15,2,False
+5,Crystal_Ball_ind_heat_v7_3_single_temp,2020_15a_2a_interval_10ts,True,10,2020,15,2,False
+6,Crystal_Ball_ind_heat_v7_3,2020_15a_2a_interval_10ts,True,10,2020,15,2,False
+7,Crystal_Ball_ind_heat_v7_3_nodiffusion,2020_15a_2a_interval_10ts,True,10,2020,15,2,False
