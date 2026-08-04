@@ -9,7 +9,8 @@
     "fuel_by_carrier": {
       "hard_coal": 1.258888615996896,
       "natural_gas": 5.941826879812682
-    }
+    },
+    "electricity": 1.9427230839086975
   },
   "ceramic": {
     "demand_ton_hr": 7779.234819289934,
@@ -19,10 +20,12 @@
       "150_200": 1.2039555031509968
     },
     "fuel_by_carrier": {
-      "hard_coal": 1.8388799516891834,
-      "natural_gas": 7.79773755536201,
-      "biomass": 3.8629245672482893
-    }
+      "hard_coal": 1.5429585798232832,
+      "natural_gas": 6.542888269135737,
+      "oil": 2.172410986654427,
+      "biomass": 3.2412842386860374
+    },
+    "electricity": 3.307015757029035
   },
   "paper": {
     "demand_ton_hr": 19835.118324710846,
@@ -34,7 +37,8 @@
     "fuel_by_carrier": {
       "natural_gas": 0.45566606368148327,
       "biomass": 0.6557222611686925
-    }
+    },
+    "electricity": 9.308960003646673
   },
   "food": {
     "demand_ton_hr": 26227.5,
@@ -45,6 +49,7 @@
     },
     "fuel_by_carrier": {
       "natural_gas": 1.133780962964948
-    }
+    },
+    "electricity": 6.639097222222222
   }
 }

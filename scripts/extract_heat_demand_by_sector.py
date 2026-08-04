@@ -9,7 +9,7 @@ the two envs are disjoint, so this step and the plotting step in
 generate_si_figures.py run in separate environments, bridged by the JSON file
 this script writes.
 
-Two pieces per sector, both from ProcessParametrizationDataset (the exact
+Three pieces per sector, all from ProcessParametrizationDataset (the exact
 class that builds each production tech's real conversion_factor/input_carrier,
 i.e. this is not a re-derivation, it calls the same code the model build uses):
 
@@ -21,9 +21,19 @@ i.e. this is not a re-derivation, it calls the same code the model build uses):
     FUEL COMBUSTION rather than any heat_industry_* carrier at all — a
     different supply pathway, not a 4th heat band — split by the sector's
     actual fuel mix (self._fuel_shares[sector], e.g. natural_gas/hard_coal/
-    biomass) via SectorParams.cf_fuel. Included (per user decision) to show
-    each sector's full process-energy intensity for scale/context, NOT as
-    another heat-demand band.
+    biomass/oil) via SectorParams.cf_fuel. Included (per user decision) to
+    show each sector's full process-energy intensity for scale/context, NOT
+    as another heat-demand band. As of ZEN-creator commit 1f3f708 ("adding
+    oil as fuel input for ceramic process"), MODEL_CARRIER_MAP maps
+    JRC-IDEES's "Other liquids" row to the model's "oil" carrier, so ceramic
+    (whose "Other liquids" share is 15.2% of its 2023 thermal FEC — previously
+    dropped entirely, silently redistributed to natural_gas/hard_coal/biomass
+    via renormalized_fuel_shares(), since nothing in MODEL_CARRIER_MAP matched
+    it) now gets a 4th, real "oil" entry in self._fuel_shares["ceramic"].
+  - "electricity": self._sector_params[sector].cf_elec × demand_volume — every
+    X_production technology also has a fixed electricity input (drives,
+    auxiliaries, sometimes electric melting/heating), separate from both the
+    heat_industry_* carriers and the >200°C fuel mix. Not temperature-banded.
 
 Both are demand_volume[sector].sum() (tonproduct/hour, SUMMED ACROSS ALL
 MODEL_NODES — this is an EU27(-MT,-CY)+CH+NO+UK AGGREGATE, not a per-country
@@ -101,10 +111,12 @@ def main() -> None:
         heat = {level: dv * ds._heat_cfs[sector][level] for level in HEAT_TEMP_LEVELS}
         fuel_total = dv * ds._sector_params[sector].cf_fuel
         fuel_by_carrier = {carrier: fuel_total * share for carrier, share in ds._fuel_shares[sector].items()}
+        electricity = dv * ds._sector_params[sector].cf_elec
         result[sector] = {
             "demand_ton_hr": dv,
             "heat": heat,
             "fuel_by_carrier": fuel_by_carrier,
+            "electricity": electricity,
         }
 
     OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)
@@ -113,7 +125,8 @@ def main() -> None:
     for sector, d in result.items():
         heat_str = ", ".join(f"{lvl}={gw:.3f} GW" for lvl, gw in d["heat"].items())
         fuel_str = ", ".join(f"{c}={gw:.3f} GW" for c, gw in d["fuel_by_carrier"].items())
-        print(f"  {sector}: demand={d['demand_ton_hr']:.1f} ton/hr | heat: {heat_str} | fuel: {fuel_str}")
+        print(f"  {sector}: demand={d['demand_ton_hr']:.1f} ton/hr | heat: {heat_str} | fuel: {fuel_str} "
+              f"| electricity={d['electricity']:.3f} GW")
 
 
 if __name__ == "__main__":
