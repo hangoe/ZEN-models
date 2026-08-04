@@ -17,6 +17,29 @@ run_model.py):
   1b. fig1b_industry_capacity         — industry heat-supply & production capacity, 2050
   2.  fig2_dsm_cycles_by_product      — DSM utilization (cycles/yr) by product: optimistic vs pessimistic
   3b. fig3b_heat_pathway              — direct vs temp-conversion heat production, 2050
+  4.  fig4_heat_demand_by_sector      — low-temp input heat demand by sector/band, +high-temp fuel by carrier (2023)
+
+fig4 is the odd one out: unlike every other figure here, it does NOT come from
+a solved model run. It plots the exogenous low-temperature heat-demand
+ASSUMPTION that ZEN-creator computes for glass/ceramic/paper/food
+(ProcessParametrizationDataset._heat_cfs × each sector's own demand volume,
+FEC_YEAR=2023) — i.e. what goes INTO the model as `demand` on
+heat_industry_0_100/100_150/150_200, not what the solved model does with it
+(that's fig3b's territory) — plus, stacked on top in grey and split by
+carrier, each sector's high-temperature (>200°C) fuel demand (direct
+combustion, no heat_industry_* carrier involved — a different supply pathway,
+shown only for scale against the colored low-temperature bands). Values are
+aggregated across all MODEL_NODES (EU27+CH+NO+UK), not per-country. Since
+ZEN-creator needs openpyxl/xlrd (zen-creator-env) and this script needs
+matplotlib (zen-garden-env) — the two conda envs are disjoint — the
+extraction is a separate script (scripts/extract_heat_demand_by_sector.py,
+run under zen-creator-env) that writes heat_demand_by_sector_input.json into
+this same FIGURES_DIR; fig4_heat_demand_by_sector() here just reads and
+plots it, and is skipped gracefully (like fig0a/fig0b vs. Crystal Ball base)
+if that JSON hasn't been generated yet. See extract_heat_demand_by_sector.
+py's docstring for the full provenance/validation chain (Rehfeldt2017.csv ->
+compute_sector_params(), cross-checked against a materialized dataset's own
+demand.csv and attributes.json).
 
 fig2 used to be a pair (fig2a_tes_dsm_utilization, fig2b_dsm_cycles_by_product).
 fig2a summed flow_storage_charge/discharge across all INDUSTRY_DSM_TECHS, but
@@ -135,6 +158,7 @@ from figure_settings import (
     EULER_ROOT,
     Run,
     SCENARIO_PALETTE,
+    _text_color_for_bg,
     get_available_years,
     load_results,
 )
@@ -616,6 +640,138 @@ def fig3b_heat_pathway(runs: list[Run]) -> None:
     savefig(fig, "fig3b_heat_pathway")
 
 
+# ── 4: Low-temperature input heat demand by sector and temperature band ────
+
+HEAT_DEMAND_INPUT_JSON = FIGURES_DIR / "heat_demand_by_sector_input.json"
+
+# Same 4 sectors/hues as PRODUCTION_COLOR_MAP above, reused here so a sector
+# reads as the same color across every SI figure it appears in. Within each
+# sector's bar, temperature band sets the tint (darker = higher band), the
+# same hue-for-identity / tint-for-temperature convention HEAT_SUPPLY_COLOR_
+# MAP uses (source sets hue, band sets tint) — 0.55/0.3/0 tints mirror that
+# map's own 0_100/100_150/150_200 tint values exactly.
+HEAT_DEMAND_SECTOR_LABELS = {"glass": "Glass", "ceramic": "Ceramic", "paper": "Paper", "food": "Food"}
+HEAT_DEMAND_BAND_TINTS = {"0_100": 0.55, "100_150": 0.3, "150_200": 0.0}
+HEAT_DEMAND_BAND_LABELS = {"0_100": r"0-100$^\circ$C", "100_150": r"100-150$^\circ$C", "150_200": r"150-200$^\circ$C"}
+
+# High-temperature fuel demand, stacked on top — a DIFFERENT supply pathway
+# (direct combustion, no heat_industry_* carrier involved), not a 4th heat-
+# demand band, hence one flat grey (not a sector/band hue) rather than a tint
+# scale. Carrier sets the HATCH pattern instead (fixed per carrier, so e.g.
+# natural_gas has the same pattern in every sector's bar) — hue/tint is
+# reserved for "which sector, which temperature band" (the actual question
+# this figure answers); hatch alone is enough to tell carriers apart within
+# the single "how much fuel, for scale" grey.
+_ETH_GREY = "#6F6F6F"
+FUEL_CARRIER_HATCHES = {"natural_gas": ".", "hard_coal": "x", "biomass": "/"}
+# Denser than FUEL_CARRIER_HATCHES: a legend swatch is a small fraction of a
+# bar segment's area, so the same single-character hatch that reads fine on a
+# bar all but disappears at swatch size — legend patches get their own,
+# denser pattern (plus a thicker hatch linewidth, applied via rc_context
+# where the legend is built) purely so the pattern itself stays visible;
+# bars keep the lighter version so labels drawn on top stay readable.
+FUEL_CARRIER_LEGEND_HATCHES = {"natural_gas": "...", "hard_coal": "xxx", "biomass": "///"}
+FUEL_CARRIER_LABELS = {"natural_gas": "Natural gas", "hard_coal": "Hard coal", "biomass": "Biomass"}
+# Single-character hatches (sparser than the "xx"/".." used elsewhere in this
+# module) plus a white label backing (below) — a dense hatch under white text
+# was illegible; a light hatch + opaque label background reads cleanly at both
+# small and large segment sizes.
+_FUEL_LABEL_BBOX = dict(facecolor="white", edgecolor="none", alpha=0.75, pad=1.5)
+
+
+def fig4_heat_demand_by_sector() -> None:
+    """Low-temperature industry heat-demand assumption by sector and temperature
+    band (FEC_YEAR=2023), i.e. the `demand` ZEN-creator writes onto
+    heat_industry_0_100/100_150/150_200 for glass/ceramic/paper/food — NOT a
+    solved-model result (contrast fig3b, which shows how the model then meets
+    this demand). Grey segments on top add each sector's high-temperature
+    (>200°C) fuel demand, split by carrier, for scale: that demand is met by
+    DIRECT FUEL COMBUSTION, not any heat_industry_* carrier, so it is a
+    different supply pathway rather than a 4th heat-demand band — shown here
+    only so the colored low-temperature bands can be read against each
+    sector's full process-energy intensity, not in isolation.
+
+    Both pieces are demand_volume[sector].sum() (tonproduct/hour) times a
+    GW/(tonproduct/hour) conversion factor, from ProcessParametrizationDataset
+    itself (self._heat_cfs, self._sector_params[s].cf_fuel, self._fuel_shares)
+    — the exact same object/attributes that build each production tech's real
+    conversion_factor, not a re-derivation. See extract_heat_demand_by_sector.
+    py's docstring for the full provenance chain (Rehfeldt2017.csv per-sub-
+    process temperature distributions -> compute_sector_params(), JRC-IDEES
+    thermal FEC -> fuel_shares) and for the cross-check against a materialized
+    dataset (Crystal_Ball_ind_heat_v7_3): this script's numbers match that
+    dataset's demand.csv sums and glass_production's attributes.json
+    conversion factors exactly.
+
+    Values are AGGREGATED (summed) ACROSS ALL MODEL_NODES — EU27 (minus MT,
+    CY) + CH + NO + UK — not a per-country breakdown. In GW, the same unit as
+    each heat_industry_* carrier's own `demand` attribute (energy carrier,
+    unit "GW"), so bar heights are directly comparable to fig1b's
+    heat-supply-capacity panel.
+    """
+    if not HEAT_DEMAND_INPUT_JSON.exists():
+        print(f"  skipping fig4_heat_demand_by_sector: {HEAT_DEMAND_INPUT_JSON.relative_to(REPO_ROOT)} "
+              "not found — run scripts/extract_heat_demand_by_sector.py under zen-creator-env first")
+        return
+    import json
+    data = json.loads(HEAT_DEMAND_INPUT_JSON.read_text())
+    sectors = list(HEAT_DEMAND_SECTOR_LABELS)
+    bands = list(HEAT_DEMAND_BAND_TINTS)
+    fuel_carriers = [c for c in FUEL_CARRIER_HATCHES if any(c in data[s]["fuel_by_carrier"] for s in sectors)]
+
+    fig, ax = plt.subplots(figsize=(9, 6.5))
+    x = np.arange(len(sectors))
+    heat_vals = {band: np.array([data[s]["heat"][band] for s in sectors]) for band in bands}
+    fuel_vals = {c: np.array([data[s]["fuel_by_carrier"].get(c, 0.0) for s in sectors]) for c in fuel_carriers}
+    totals = sum(heat_vals.values()) + sum(fuel_vals.values())
+    label_threshold = 0.025 * totals.max()  # segments smaller than this would overlap their own text
+
+    bottom = np.zeros(len(sectors))
+    for band in bands:
+        vals = heat_vals[band]
+        colors = [_eth_tint(PRODUCTION_COLOR_MAP[f"{s}_production"], HEAT_DEMAND_BAND_TINTS[band]) for s in sectors]
+        for xi, bi, vi, ci in zip(x, bottom, vals, colors):
+            ax.bar(xi, vi, 0.6, bottom=bi, color=ci, edgecolor="white", linewidth=0.5)
+            if vi > label_threshold:
+                ax.text(xi, bi + vi / 2, f"{vi:.2f}", ha="center", va="center", fontsize=8,
+                        color=_text_color_for_bg(ci))
+        bottom += vals
+    heat_top = bottom.copy()
+    with plt.rc_context({"hatch.linewidth": 0.5}):
+        for carrier in fuel_carriers:
+            vals = fuel_vals[carrier]
+            hatch = FUEL_CARRIER_HATCHES[carrier]
+            for xi, bi, vi in zip(x, bottom, vals):
+                ax.bar(xi, vi, 0.6, bottom=bi, color=_ETH_GREY, edgecolor="white", linewidth=0.5, hatch=hatch)
+                if vi > label_threshold:
+                    ax.text(xi, bi + vi / 2, f"{vi:.2f}", ha="center", va="center", fontsize=8,
+                            color="black", bbox=_FUEL_LABEL_BBOX)
+            bottom += vals
+    for xi, hi in zip(x, heat_top):
+        if hi > 0:
+            ax.plot([xi - 0.3, xi + 0.3], [hi, hi], color="black", linewidth=1.0, linestyle=":")
+    for xi, total in zip(x, bottom):
+        ax.text(xi, total, f"{total:.2f}", ha="center", va="bottom", fontsize=9, fontweight="bold")
+
+    ax.set_xticks(x)
+    ax.set_xticklabels([HEAT_DEMAND_SECTOR_LABELS[s] for s in sectors], fontsize=10)
+    ax.set_ylabel("Heat / fuel demand [GW]")
+    ax.set_title("Low-Temperature Industry Heat Demand by Sector and Temperature Band\n"
+                  "(input assumption, ZEN-creator base year 2023, aggregated across all nodes)",
+                  fontsize=12, fontweight="bold")
+    band_handles = [Patch(facecolor=_eth_tint(_ETH_GREY, HEAT_DEMAND_BAND_TINTS[b]),
+                           edgecolor="white", label=f"Heat carrier: {HEAT_DEMAND_BAND_LABELS[b]}") for b in bands]
+    fuel_handles = [Patch(facecolor=_ETH_GREY, edgecolor="white", linewidth=0.4,
+                           hatch=FUEL_CARRIER_LEGEND_HATCHES[c],
+                           label=f"Fuel: {FUEL_CARRIER_LABELS[c]}") for c in fuel_carriers]
+    with plt.rc_context({"hatch.linewidth": 1.3}):
+        ax.legend(handles=band_handles + fuel_handles, fontsize=8.5, frameon=False, loc="upper left",
+                  bbox_to_anchor=(1.02, 1.0), handlelength=3.2, handleheight=2.0)
+    ax.grid(axis="y", alpha=0.3)
+    fig.tight_layout()
+    savefig(fig, "fig4_heat_demand_by_sector")
+
+
 # ── 0b: Emissions-source comparison, Full flexibility vs Crystal Ball base ──
 
 # Print-figure-specific ETH palette (does NOT touch the shared, dashboard-wide
@@ -892,6 +1048,7 @@ def main() -> None:
     fig1b_industry_capacity(runs)
     fig2_dsm_cycles_by_product(runs)
     fig3b_heat_pathway(runs)
+    fig4_heat_demand_by_sector()
     print(f"Done. Figures in {FIGURES_DIR.relative_to(REPO_ROOT)}/")
 
 
