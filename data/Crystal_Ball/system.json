@@ -121,10 +121,10 @@
     "SK",
     "UK"
   ],
-  "reference_year": 2022,
-  "optimized_years": 1,
+  "reference_year": 2020,
+  "optimized_years": 15,
   "interval_between_years": 2,
   "use_rolling_horizon": false,
-  "aggregated_time_steps_per_year": 1,
+  "aggregated_time_steps_per_year": 10,
   "conduct_time_series_aggregation": true
 }
