@@ -83,7 +83,7 @@ _ETH_BLUE, _ETH_RED, _ETH_PETROL = "#215CAF", "#B7352D", "#007894"
 # wind_onshore and wind_offshore are weighted together in weights mode but
 # plotted as separate bars here since their capacities can respond
 # differently. The oracle-mode run additionally explores a "biomass" carrier
-# -import axis (see data/config_mga.json) and a total-cost axis; those are
+# -import axis (see data/config_mga_oracle.json) and a total-cost axis; those are
 # not tech-capacity axes, aren't driven by any weights-mode iteration, and
 # are covered by the polytope-based figures below (fig1-4) instead.
 MGA_AXES = [
