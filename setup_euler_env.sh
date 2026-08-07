@@ -44,10 +44,34 @@ python -m pip install -e "$HOME/ZEN-garden"
 # OPTION D: it's published on PyPI:
 # python -m pip install zen-garden
 
+# --- MGA plugin support -- only needed if you'll run an MGA sweep --------------
+# (submit_euler_mga.sh / parameters_mga.csv). Skip this block if you only use
+# the normal (non-MGA) sweep. Neither package is on PyPI; both are pip-editable
+# git repos, same pattern as the zen_garden install above.
+if [[ ! -d "$HOME/ZEN-garden-plugins" ]]; then
+    git clone https://github.com/hangoe/ZEN-garden-plugins.git "$HOME/ZEN-garden-plugins"
+fi
+python -m pip install -e "$HOME/ZEN-garden-plugins"
+
+if [[ ! -d "$HOME/near_optimal_tools" ]]; then
+    git clone https://github.com/evrenmturan/near_optimal_tools.git "$HOME/near_optimal_tools"
+fi
+python -m pip install -e "$HOME/near_optimal_tools"
+
 # --- Sanity check ---------------------------------------------------------------
 echo "Verifying imports..."
 python -c "import pandas, numpy; print('base imports OK')"
 python -c "from zen_garden import run, Results; print('zen_garden OK')" || \
     echo "zen_garden not importable yet — pick the correct OPTION above and re-run."
 
-echo "Done. submit_euler.sh will 'source $HOME/ZEN-models/.venv/bin/activate'."
+echo "Verifying MGA plugin wiring..."
+python -c "
+from importlib.metadata import entry_points
+names = [e.name for e in entry_points(group='zen_garden.plugins')]
+print('registered plugins:', names)
+assert 'mga' in names, 'mga entry point not registered - check the zen_garden version installed above'
+" || echo "mga plugin not registered — your zen_garden may not be entry-point-aware, see euler/README_euler.md."
+python -c "import pyoNearOpt; print('pyoNearOpt OK')" || \
+    echo "pyoNearOpt not importable yet — check the near_optimal_tools install above."
+
+echo "Done. submit_euler.sh / submit_euler_mga.sh will 'source $HOME/ZEN-models/.venv/bin/activate'."

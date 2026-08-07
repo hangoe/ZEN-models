@@ -11,9 +11,14 @@ CHANGES:
     copy, and runs on it. Your pristine dataset (in ZEN-creator/outputs or
     data/) is never modified.
   * On Euler, the staged dataset and the results go to $SCRATCH.
+  * `--params` selects which CSV to sweep over (default parameters.csv). Each
+    row may also set a `config` column (e.g. config_mga_weights.json) to pick
+    which data/*.json config to run with; rows without it use config.json, so
+    the original parameters.csv/submit_euler.sh path is unaffected.
 
 Run one row by hand (local test):   python run_model.py --task_id 0 --run_on local
-On Euler it is launched by submit_euler.sh via the SLURM array.
+On Euler it is launched by submit_euler.sh (or submit_euler_mga.sh) via the
+SLURM array.
 """
 
 import argparse
@@ -40,7 +45,11 @@ DATASET_SEARCH_DIRS = [
 
 # Columns in parameters.csv that are NOT system.json overrides.
 # Everything else in a row is applied as a system_overrides key.
-META_COLUMNS = {"my_dataset", "my_comment"}
+META_COLUMNS = {"my_dataset", "my_comment", "config"}
+
+# config.json used when a row/CSV has no "config" column (or leaves it
+# blank) -- keeps the original non-MGA parameters.csv working unchanged.
+DEFAULT_CONFIG = "config.json"
 
 
 def resolve_dataset_dir(name: str) -> Path:
@@ -89,10 +98,13 @@ def main() -> None:
     parser.add_argument("--run_on", type=str, default="euler",
                         choices=["local", "euler"],
                         help="Controls where staged data + results are written.")
+    parser.add_argument("--params", type=str, default="parameters.csv",
+                        help="CSV file (relative to this repo) to read the sweep "
+                             "from, e.g. parameters_mga.csv for an MGA sweep.")
     args = parser.parse_args()
 
     # --- 1. Read this task's configuration from the CSV --------------------------
-    params_path = REPO_DIR / "parameters.csv"
+    params_path = REPO_DIR / args.params
     table = pd.read_csv(params_path, index_col="task_id")
     if args.task_id not in table.index:
         raise SystemExit(f"task_id {args.task_id} not in {params_path} "
@@ -101,10 +113,14 @@ def main() -> None:
 
     my_dataset = str(row["my_dataset"])
     my_comment = str(row["my_comment"])
+    config_name = DEFAULT_CONFIG
+    if "config" in table.columns and pd.notna(row["config"]) and str(row["config"]).strip():
+        config_name = str(row["config"]).strip()
     system_overrides = {col: to_native(row[col])
                         for col in table.columns if col not in META_COLUMNS}
 
     print(f"[run_model] task_id={args.task_id}  dataset={my_dataset}  comment={my_comment}")
+    print(f"[run_model] config={config_name}")
     print(f"[run_model] system_overrides={system_overrides}")
 
     # --- 2. Stage a PRIVATE copy of the dataset (safe for parallel array tasks) --
@@ -132,7 +148,7 @@ def main() -> None:
 
     # --- 5. Run the model --------------------------------------------------------
     run(
-        config=str(DATA_DIR_CONFIG / "config.json"),
+        config=str(DATA_DIR_CONFIG / config_name),
         dataset=str(staged_dataset),
         folder_output=str(out_dir),
     )

@@ -4,10 +4,12 @@ These files lie into the `ZEN-models` repo.
 
 | File | Role |
 |---|---|
-| `run_model.py` | Run, adapted so `my_dataset`, `my_comment` and all `system_overrides` come from **one row** of `parameters.csv` (chosen by `--task_id`). |
-| `parameters.csv` | Sweep table — **one row per run**. Columns = `my_dataset`, `my_comment`, and one column per `system.json` override. |
-| `submit_euler.sh` | The SLURM **array** job: one job per row of `parameters.csv`. |
-| `setup_euler_env.sh` | One-time environment build (venv + `zen_garden`). Run once on a login node. |
+| `run_model.py` | Run, adapted so `my_dataset`, `my_comment`, `config` and all `system_overrides` come from **one row** of a sweep CSV (chosen by `--task_id`; the CSV itself by `--params`, default `parameters.csv`). |
+| `parameters.csv` | Normal (non-MGA) sweep table — **one row per run**. Columns = `my_dataset`, `my_comment`, and one column per `system.json` override. No `config` column, so every row runs `data/config.json`. |
+| `submit_euler.sh` | The SLURM **array** job for the normal sweep: one job per row of `parameters.csv`. |
+| `parameters_mga.csv` | MGA sweep table — same shape as `parameters.csv` plus a `config` column picking which `data/config_mga*.json` to run (weights / oracle / probabilistic). |
+| `submit_euler_mga.sh` | The SLURM **array** job for the MGA sweep: one job per row of `parameters_mga.csv`. |
+| `setup_euler_env.sh` | One-time environment build (venv + `zen_garden`, plus the MGA plugin + `pyoNearOpt` if you'll run MGA sweeps). Run once on a login node. |
 
 ## Directory layout it assumes (same as your original script)
 
@@ -88,6 +90,47 @@ squeue                                            # PD = pending, R = running
 scancel <jobID>                                   # cancel if needed
 ```
 
+
+## MGA sweep on Euler (next steps, one-time setup)
+
+The normal sweep above doesn't need the MGA plugin. To also run the MGA
+sweep (`parameters_mga.csv` / `submit_euler_mga.sh`), do this once:
+
+```bash
+# 1. Pull the new files onto Euler, then rebuild the env — setup_euler_env.sh
+#    now also clones + installs the MGA plugin and pyoNearOpt as sibling
+#    repos under $HOME (same pattern as $HOME/ZEN-garden):
+cd /cluster/home/<user>/ZEN-models
+git pull
+bash setup_euler_env.sh
+# Check the output ends with:
+#   registered plugins: [..., 'mga', ...]
+#   pyoNearOpt OK
+# If 'mga' is missing, your Euler $HOME/ZEN-garden checkout isn't the
+# entry-point-aware version -- update it (match your local $HOME/ZEN-garden
+# checkout) before continuing.
+
+# 2. Smoke-test the cheapest mode (weights) on a login node first:
+source .venv/bin/activate
+python run_model.py --task_id 0 --run_on local --params parameters_mga.csv
+
+# 3. Calibrate on the cluster, one row at a time, before trusting the
+#    24h walltime in submit_euler_mga.sh -- oracle and probabilistic can
+#    run much longer than weights:
+sbatch --array=0 submit_euler_mga.sh   # weights        (task_id 0, cheapest)
+myjobs -j <jobID>                      # check actual time/CPU/RAM used
+sbatch --array=1 submit_euler_mga.sh   # oracle         (task_id 1, can be slow)
+sbatch --array=2 submit_euler_mga.sh   # probabilistic  (task_id 2)
+
+# 4. Once you trust the resources, submit them together:
+sbatch --array=0-2 submit_euler_mga.sh
+```
+
+Results land in the same place as the normal sweep:
+```
+$SCRATCH/zen_runs/outputs/Crystal_Ball_ind_heat_v8_0_no_flexibility_2050_1a_5a_interval_5ts_MGA_<mode>/
+```
+Download before scratch is purged (~2 weeks) — see "Results go to scratch" above.
 
 For the full Euler setup (SSH keys, VS Code Remote-SSH, VPN, storage, modules,
 resource tuning), see `Euler_setup_and_run_guide.md`.

@@ -1,0 +1,4 @@
+task_id,my_dataset,my_comment,config,conduct_time_series_aggregation,aggregated_time_steps_per_year,reference_year,optimized_years,interval_between_years,use_rolling_horizon
+0,Crystal_Ball_ind_heat_v8_0_no_flexibility,2050_1a_5a_interval_5ts_MGA_weights,config_mga_weights.json,True,5,2050,1,5,False
+1,Crystal_Ball_ind_heat_v8_0_no_flexibility,2050_1a_5a_interval_5ts_MGA_oracle,config_mga_oracle.json,True,5,2050,1,5,False
+2,Crystal_Ball_ind_heat_v8_0_no_flexibility,2050_1a_5a_interval_5ts_MGA_probabilistic,config_mga_probabilistic.json,True,5,2050,1,5,False

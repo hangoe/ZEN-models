@@ -3,8 +3,15 @@ import tempfile
 from pathlib import Path
 from zen_garden import run, Results
 
-my_dataset = str("Crystal_Ball_HG_v5_2_no_flexibility")
-my_comment = "2025_10a_5a_interval_10ts"
+# Which data/*.json config to run with. Available:
+#   config.json                    - normal (non-MGA) run
+#   config_mga_weights.json        - MGA, weights mode
+#   config_mga_oracle.json         - MGA, oracle mode
+#   config_mga_probabilistic.json  - MGA, probabilistic mode
+config = "config_mga_weights.json"
+
+my_dataset = str("Crystal_Ball_ind_heat_v8_0_no_flexibility")
+my_comment = "2050_1a_5a_interval_5ts_MGA_weights"
 
 DATA_DIR_CONFIG = Path(__file__).parent / "data"
 DATA_DIR = Path(__file__).parent.parent / "ZEN-creator" / "outputs"
@@ -12,9 +19,9 @@ DATA_DIR = Path(__file__).parent.parent / "ZEN-creator" / "outputs"
 # System config overrides — edit these to change run behavior
 system_overrides = {
     "conduct_time_series_aggregation": True,
-    "aggregated_time_steps_per_year": 10,
-    "reference_year": 2025,
-    "optimized_years": 10,
+    "aggregated_time_steps_per_year": 5,
+    "reference_year": 2050,
+    "optimized_years": 1,
     "interval_between_years": 5,
     "use_rolling_horizon": False,
 }
@@ -31,7 +38,7 @@ if __name__ == "__main__":
 
     try:
         run(
-            config=str(DATA_DIR_CONFIG / "config.json"),
+            config=str(DATA_DIR_CONFIG / config),
             dataset=str(DATA_DIR / my_dataset),
             folder_output=str(DATA_DIR_CONFIG / "outputs" / "local_outputs" / f"{my_dataset}_{my_comment}"),
         )
