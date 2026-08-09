@@ -57,6 +57,8 @@ INDUSTRY_HEAT_TECHS_BOILERS_HP = [
     "electrode_boiler_industry",
     "natural_gas_boiler_industry",
     "oil_boiler_industry",  # new in v7_0
+    "coal_boiler_industry",  # new in v8_0
+    "waste_boiler_industry",  # new in v8_0
     # Very old models (v1_0): "industrial_" prefix naming
     "industrial_biomass_boiler",
     "industrial_coal_boiler",

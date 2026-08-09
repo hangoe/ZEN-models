@@ -30,20 +30,28 @@ HOURS_PER_YEAR = 8760
 # Order matches Table SIScenarios (excluding "Crystal Ball (base)", the row
 # before "No flexibility" there — see the module docstring above).
 EULER_SCENARIO_ORDER = [
-    "Crystal_Ball_HG_v7_0_no_flexibility",
-    "Crystal_Ball_HG_v7_0",
-    "Crystal_Ball_HG_v7_0_DSM_pessimistic",
-    "Crystal_Ball_HG_v7_0_DSM_only",
-    "Crystal_Ball_HG_v7_0_TES_only",
-    "Crystal_Ball_HG_v7_0_single_temp",
+    "Crystal_Ball_ind_heat_v8_0_no_flexibility",
+    "Crystal_Ball_ind_heat_v8_0",
+    "Crystal_Ball_ind_heat_v8_0_DSM_pessimistic",
+    "Crystal_Ball_ind_heat_v8_0_DSM_only",
+    "Crystal_Ball_ind_heat_v8_0_TES_only",
+    "Crystal_Ball_ind_heat_v8_0_single_temp",
+    # Not one of the 6 Table~SIScenarios entries — a side investigation run
+    # (technology diffusion-rate constraint disabled entirely). Listed here,
+    # even though generate_si_figures.py's SCENARIOS doesn't include it,
+    # purely so _match_scenario_base's longest-prefix-wins logic doesn't
+    # mis-sort/mislabel it as "Baseline" (it otherwise shares the
+    # "Crystal_Ball_ind_heat_v8_0_" prefix with the base run).
+    "Crystal_Ball_ind_heat_v8_0_nodiffusion",
 ]
 EULER_SCENARIO_LABELS = {
-    "Crystal_Ball_HG_v7_0_no_flexibility": "No Flexibility",
-    "Crystal_Ball_HG_v7_0": "Baseline",
-    "Crystal_Ball_HG_v7_0_DSM_pessimistic": "DSM Pessimistic",
-    "Crystal_Ball_HG_v7_0_DSM_only": "DSM Only",
-    "Crystal_Ball_HG_v7_0_TES_only": "TES Only",
-    "Crystal_Ball_HG_v7_0_single_temp": "Single-Temp",
+    "Crystal_Ball_ind_heat_v8_0_no_flexibility": "No Flexibility",
+    "Crystal_Ball_ind_heat_v8_0": "Baseline",
+    "Crystal_Ball_ind_heat_v8_0_DSM_pessimistic": "DSM Pessimistic",
+    "Crystal_Ball_ind_heat_v8_0_DSM_only": "DSM Only",
+    "Crystal_Ball_ind_heat_v8_0_TES_only": "TES Only",
+    "Crystal_Ball_ind_heat_v8_0_single_temp": "Single-Temp",
+    "Crystal_Ball_ind_heat_v8_0_nodiffusion": "No Diffusion Limit",
 }
 # Positional per-run colors (run slot -> color), independent of the
 # technology-keyed COLOR_MAP below. Used for run-identity lines/swatches only

@@ -41,12 +41,14 @@ INDUSTRY_PROCESS_TECHS = [
     "coal_to_cement_fuel", "hydrogen_to_cement_fuel", "waste_to_cement_fuel",
     "BF_BOF", "BF_BOF_CCS", "EAF", "NG_DRI", "NG_DRI_CCS", "H2_DRI",
     "glass_production", "ceramic_production", "paper_production", "food_production",
+    "ceramic_post_comb", "glass_post_comb",  # new in v8_0
 ]
 
 INDUSTRY_HEATING_TECHS = [
     # Boilers (consistent across models)
     "natural_gas_boiler_industry", "electrode_boiler_industry", "biomass_boiler_industry",
     "oil_boiler_industry",  # new in v7_0
+    "coal_boiler_industry", "waste_boiler_industry",  # new in v8_0
     # New models (v4_6+): split by temperature + source
     "heat_pump_industry_0_100_waste_heat", "heat_pump_industry_0_100_water",
     "heat_pump_industry_100_150_waste_heat", "heat_pump_industry_100_150_water",
