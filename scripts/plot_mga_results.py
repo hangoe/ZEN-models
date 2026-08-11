@@ -117,13 +117,22 @@ Figures (data/outputs/figures/mga_results/):
                                  1e-14), so this is on physical units purely
                                  for readability -- normalising would not
                                  change a single value.
-  fig4_query_time_comparison     max_separation and fraction_well_explored
-                                 vs number of model queries and vs cumulative
-                                 real ZEN-garden solving time (log), matching
-                                 near_optimal_tools' own
-                                 docs/examples/method_comparison.ipynb. Also
-                                 this file's only per-mode convergence trace
-                                 now (an earlier fig1_convergence and
+  fig4a/b_query/time_comparison  Two figures, matching near_optimal_tools' own
+                                 docs/examples/method_comparison.ipynb layout
+                                 exactly (its method_comparison.png/_time.png):
+                                 columns are max_separation and
+                                 fraction_well_explored's ci_lower; fig4a's
+                                 x-axis is number of model queries, fig4b's is
+                                 cumulative real ZEN-garden solving time (log).
+                                 Each has 2 rows: frozen initial box (all
+                                 available modes, this project's own choice for
+                                 a shared comparison) and each probabilistic
+                                 run's own evolving, cut-refined outer
+                                 approximation (reference-equivalent, only the
+                                 two modes whose cut history survives -- see
+                                 load_native_outer_at). This file's only
+                                 per-mode convergence trace now (an earlier
+                                 fig1_convergence and
                                  fig2_axis_range_comparison were dropped:
                                  the former didn't add much beyond this
                                  figure's own max-separation/query panel, and
@@ -726,8 +735,15 @@ def _gurobi_maxsep_solver(time_limit: float = 30.0):
 
 
 def query_time_scores(poly: Polytope, X_norm: np.ndarray, solve_seconds: list[float],
-                       eval_every: int) -> pd.DataFrame:
-    A0, b0 = poly.A[: poly.n_initial_rows], poly.b[: poly.n_initial_rows]
+                       eval_every: int, outer_at=None) -> pd.DataFrame:
+    """outer_at(k) -> (A_k, b_k), the outer approximation to score checkpoint k
+    against. Defaults to poly's frozen initial box for every k (see the module
+    docstring's "Convergence metric" section); pass native_outer_at's result
+    instead to score against each run's own evolving, cut-refined outer
+    approximation, as the reference notebook's own score_run does."""
+    if outer_at is None:
+        A0, b0 = poly.A[: poly.n_initial_rows], poly.b[: poly.n_initial_rows]
+        outer_at = lambda k: (A0, b0)
     # NaN entries are points with no logged solve (e.g. the shared frame's z*
     # borrowed for oracle, or a missing benchmarking.json): treated as 0s so
     # one NaN doesn't poison every later cumulative value, at the cost of a
@@ -739,7 +755,8 @@ def query_time_scores(poly: Polytope, X_norm: np.ndarray, solve_seconds: list[fl
     solver = _gurobi_maxsep_solver()
     for k in checkpoints:
         X_k = X_norm[: k + 1]
-        approx = approximation(A=A0, b=b0, X=X_k, name_list=poly.names, print_lv=0)
+        A_k, b_k = outer_at(k)
+        approx = approximation(A=A_k, b=b_k, X=X_k, name_list=poly.names, print_lv=0)
         cov = fraction_well_explored(approx, threshold=0.1, n_samples=500, alpha=0.05,
                                      method="jeffreys", seed_rng=0, print_lv=0)
         try:
@@ -755,7 +772,63 @@ def query_time_scores(poly: Polytope, X_norm: np.ndarray, solve_seconds: list[fl
     return pd.DataFrame(rows)
 
 
-def fig4_query_time_comparison(poly: Polytope, points: dict[str, list[tuple[str, np.ndarray, float]]]) -> None:
+# ── Native (own evolving) outer approximation, probabilistic modes only ──
+#
+# The reference notebook's own score_run scores each method against ITS OWN
+# stored approximation state at each checkpoint (oracle_states/direction_
+# states keep a full A/b/X snapshot per iteration) -- not a shared frozen
+# box. query_time_scores above deliberately does NOT do that (see its
+# docstring and the module docstring's "Convergence metric" section): oracle's
+# own cut history was lost with its oracle_summary/, and weights never builds
+# an outer approximation at all, so a fair *shared* comparison across all four
+# modes needs everyone evaluated against the same fixed initial box.
+#
+# But for the two probabilistic runs specifically, the cut history was NOT
+# lost: supf_explore.explore calls poly_approx.add_point(new_point) and
+# poly_approx.add_cut(direction, support_value) exactly once per iteration
+# (near_optimal_tools/src/pyoNearOpt/exploration_methods/supf_explore.py),
+# and diagnostics.csv logs precisely those two raw arguments every iteration.
+# Replaying them in order therefore reconstructs each iteration's own live
+# A_k/b_k exactly -- verified directly: reconstructing probabilistic-short's
+# full cut history this way and comparing against its own saved final A/b
+# gives an identical feasible region (same shape, and every one of 20,000
+# random test points agrees on which polytope contains it). So this project
+# CAN add a faithful, reference-notebook-equivalent "own approximation" row
+# for probabilistic-short/-long; it still cannot for oracle (no surviving cut
+# data at all) or weights (no such object exists for that mode).
+def _parse_diagnostics_vector(s: str) -> np.ndarray:
+    """Parses one diagnostics.csv cut_direction cell -- numpy's default
+    array repr (e.g. '[ 0.36 -0.62 ... ]', occasionally wrapped over several
+    lines for wide vectors), not JSON/literal-eval-able."""
+    return np.array([float(x) for x in s.strip().lstrip("[").rstrip("]").split()])
+
+
+def load_native_outer_at(run_dir: Path, run_poly: Polytope):
+    """outer_at(k) callable (see query_time_scores) that reconstructs
+    run_dir's own evolving outer approximation at checkpoint k from its
+    diagnostics.csv cut history, falling back to the frozen initial box for
+    any k before the first iterate (the initial VMM/baseline points)."""
+    summary = run_dir / f"{MODEL}_probabilistic_summary"
+    diagnostics = pd.read_csv(summary / "diagnostics.csv")
+    cuts_m = np.vstack([_parse_diagnostics_vector(s) for s in diagnostics["cut_direction"]])
+    cuts_b = diagnostics["cut_support_value"].to_numpy(dtype=float)
+
+    A0, b0 = run_poly.A[: run_poly.n_initial_rows], run_poly.b[: run_poly.n_initial_rows]
+    n_initial_points = sum(1 for origin in run_poly.point_origin if origin != "iterate")
+
+    def outer_at(k: int) -> tuple[np.ndarray, np.ndarray]:
+        n_cuts = max(0, min(len(cuts_b), (k + 1) - n_initial_points))
+        if n_cuts == 0:
+            return A0, b0
+        return np.vstack([A0, cuts_m[:n_cuts]]), np.concatenate([b0, cuts_b[:n_cuts]])
+
+    return outer_at
+
+
+def _compute_fig4_scores(poly: Polytope, points: dict[str, list[tuple[str, np.ndarray, float]]]):
+    """Frozen-box scores for every available mode, plus native (own evolving
+    approximation) scores for the two probabilistic modes. Shared by both
+    fig4a (vs queries) and fig4b (vs time) so the MILP solves only run once."""
     modes = [m for m in MODES if m in points]
     # probabilistic_long has ~7x more points than probabilistic_short (140 vs
     # 20), so it gets a coarser checkpoint stride to keep the number of
@@ -766,40 +839,121 @@ def fig4_query_time_comparison(poly: Polytope, points: dict[str, list[tuple[str,
         labels, phys, secs = zip(*points[mode])
         X_norm = poly.to_norm(np.vstack(phys))
         print(f"  fig4: scoring {mode} ({len(X_norm)} points, "
-              f"every {eval_every.get(mode, 5)}th checkpoint)...")
+              f"every {eval_every.get(mode, 5)}th checkpoint, frozen box)...")
         scores[mode] = query_time_scores(poly, X_norm, list(secs), eval_every.get(mode, 5))
+
+    # Native row: each probabilistic run scored against its OWN evolving,
+    # cut-refined outer approximation instead of the frozen box -- i.e. the
+    # reference notebook's own score_run methodology exactly (see
+    # load_native_outer_at's docstring). Only possible for probabilistic_short
+    # and probabilistic_long: oracle's cut history is gone (data-loss note)
+    # and weights never builds an outer approximation at all.
+    native_scores = {}
+    tolerance_prob = {}
+    for mode, run_dir in (("probabilistic_short", PROBABILISTIC_SHORT_DIR),
+                          ("probabilistic_long", PROBABILISTIC_LONG_DIR)):
+        if mode not in points:
+            continue
+        run_poly = poly if run_dir == PROBABILISTIC_LONG_DIR else load_polytope(
+            sorted((run_dir / f"{MODEL}_probabilistic_summary").glob("polytope*.npz"))[0])
+        tolerance_prob[mode] = float(run_poly.convergence_threshold)
+        outer_at = load_native_outer_at(run_dir, run_poly)
+        labels, phys, secs = zip(*points[mode])
+        X_norm = poly.to_norm(np.vstack(phys))
+        print(f"  fig4: scoring {mode} ({len(X_norm)} points, "
+              f"every {eval_every.get(mode, 5)}th checkpoint, own evolving approximation)...")
+        native_scores[mode] = query_time_scores(poly, X_norm, list(secs), eval_every.get(mode, 5),
+                                                 outer_at=outer_at)
+    return scores, native_scores, tolerance_prob
+
+
+def _comparison_figure(x_column: str, x_label: str, name: str, title: str,
+                       scores: dict, native_scores: dict, tolerance_prob: dict, log_x: bool) -> None:
+    """One query-time comparison figure, columns/rows matching the reference
+    notebook's own comparison_figure exactly (near_optimal_tools/docs/examples/
+    method_comparison.ipynb): columns are the two metrics (max_separation |
+    fraction_well_explored's ci_lower), not the two x-axis choices -- an
+    earlier version of this project's fig4 put the x-axis choice in the
+    columns instead (metric in rows), which showed the same four combinations
+    but did not read side by side against the reference's own figures the way
+    this layout does. The reference itself makes one row per test-problem
+    dimensionality (its "case"); this project has only one real problem (the
+    6-D MGA space), so the row grouping is repurposed for "which outer
+    approximation was scored against" instead: frozen initial box (row 1, all
+    available modes, comparable but not each mode's own criterion -- see the
+    module docstring's "Convergence metric" section) vs. each probabilistic
+    run's own live, cut-refined approximation (row 2, reference-equivalent,
+    restricted to the two modes whose cut history survives)."""
+    has_native = bool(native_scores)
+    n_rows = 2 if has_native else 1
+    fig, axes = plt.subplots(n_rows, 2, figsize=(11, 4.2 * n_rows), squeeze=False, constrained_layout=True)
+    ax_sep, ax_ci = axes[0]
+
+    for mode, df in scores.items():
+        color = MODE_COLOR[mode]
+        group = df[df[x_column] > 0] if log_x else df  # "the initial state sits at zero"
+        ax_sep.plot(group[x_column], group["max_separation"], marker="o", markersize=4,
+                   color=color, label=MODE_LABEL[mode])
+        ax_ci.plot(group[x_column], group["ci_lower"], marker="o", markersize=4, color=color)
+    ax_sep.set_yscale("log")
+    ax_sep.set_title("max separation (frozen initial box)")
+    ax_sep.set_ylabel("max $L_\\infty$ separation")
+    ax_ci.set_title("directions with gap $\\leq$ 0.1, 95% CI lower bound (frozen initial box)")
+    ax_ci.set_ylabel("fraction of well-explored directions")
+    ax_ci.set_ylim(-0.03, 1.03)
+
+    if has_native:
+        ax_sep_n, ax_ci_n = axes[1]
+        for mode, df in native_scores.items():
+            color = MODE_COLOR[mode]
+            group = df[df[x_column] > 0] if log_x else df
+            ax_sep_n.plot(group[x_column], group["max_separation"], marker="o", markersize=4, color=color)
+            ax_ci_n.plot(group[x_column], group["ci_lower"], marker="o", markersize=4, color=color)
+            # Each run's own real convergence target for THIS metric: its own
+            # tolerance_prob (0.05 short / 0.95 long -- see README), colour-
+            # matched, exactly like the reference's cfg["tolerance_prob"]
+            # axhline. No target line on the max_separation panel: unlike
+            # ORACLE's own "tol" in the reference notebook, probabilistic mode
+            # never targets an exact worst-case max_separation bound at all.
+            ax_ci_n.axhline(tolerance_prob[mode], color=color, ls="--", lw=1)
+        ax_sep_n.set_yscale("log")
+        ax_sep_n.set_title("max separation (own evolving approximation)")
+        ax_sep_n.set_ylabel("max $L_\\infty$ separation")
+        ax_ci_n.set_title("directions with gap $\\leq$ 0.1, 95% CI lower bound (own evolving approximation)")
+        ax_ci_n.set_ylabel("fraction of well-explored directions")
+        ax_ci_n.set_ylim(-0.03, 1.03)
+        ax_sep_n.text(
+            0.02, 0.03, "oracle/weights not shown here: oracle's cut history\nwas lost; weights never builds one.",
+            transform=ax_sep_n.transAxes, fontsize=7.5, color="#555555", va="bottom",
+        )
+
+    for ax in axes.flat:
+        ax.set_xlabel(x_label)
+        if log_x:
+            ax.set_xscale("log")
+        ax.grid(alpha=0.3)
+    ax_sep.legend(fontsize=8, frameon=False)
+    fig.suptitle(title, fontsize=12, fontweight="bold")
+    savefig(fig, name)
+
+
+def fig4_query_time_comparison(poly: Polytope, points: dict[str, list[tuple[str, np.ndarray, float]]]) -> None:
+    scores, native_scores, tolerance_prob = _compute_fig4_scores(poly, points)
     if not scores:
         print("  skipping fig4_query_time_comparison: no scored modes")
         return
-
-    # Only max_separation is plotted -- fraction_well_explored's ci_lower
-    # (still computed above, cheap relative to the max_separation MILP) sat
-    # near 0 for every mode on this shared frozen box (see fig1/fig2/fig3)
-    # and added a second row that didn't distinguish the methods.
-    fig, axes = plt.subplots(1, 2, figsize=(11, 4.2), constrained_layout=True)
-    for mode, df in scores.items():
-        color = MODE_COLOR[mode]
-        axes[0].plot(df["n_queries"], df["max_separation"], marker="o", markersize=4,
-                     color=color, label=MODE_LABEL[mode])
-        axes[1].plot(df["seconds"], df["max_separation"], marker="o", markersize=4, color=color)
-
-    axes[0].set_yscale("log")
-    axes[1].set_yscale("log")
-    axes[1].set_xscale("log")
-    axes[0].set_title("max $L_\\infty$ separation vs queries")
-    axes[1].set_title("max $L_\\infty$ separation vs cumulative solving time")
-    axes[0].set_ylabel("max separation (log)")
-    axes[0].set_xlabel("number of model queries")
-    axes[1].set_xlabel("cumulative ZEN-garden solving time [s] (log)")
-    for ax in axes:
-        ax.grid(alpha=0.3)
-    axes[0].legend(fontsize=9, frameon=False)
-    fig.suptitle(
-        "MGA Method Comparison: Model Queries and Solving Time\n"
-        "(cf. near_optimal_tools docs/examples/method_comparison.ipynb; shared frozen initial box, see module docstring)",
-        fontsize=12, fontweight="bold",
+    _comparison_figure(
+        "n_queries", "number of model queries", "fig4a_query_comparison",
+        "MGA Method Comparison vs. Model Queries\n"
+        "(cf. near_optimal_tools docs/examples/method_comparison.ipynb, method_comparison.png)",
+        scores, native_scores, tolerance_prob, log_x=False,
     )
-    savefig(fig, "fig4_query_time_comparison")
+    _comparison_figure(
+        "seconds", "cumulative ZEN-garden solving time [s]", "fig4b_time_comparison",
+        "MGA Method Comparison vs. Cumulative Solving Time\n"
+        "(cf. near_optimal_tools docs/examples/method_comparison.ipynb, method_comparison_time.png)",
+        scores, native_scores, tolerance_prob, log_x=True,
+    )
 
 
 # ── Main ──────────────────────────────────────────────────────────────────

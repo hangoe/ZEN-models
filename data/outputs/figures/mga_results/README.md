@@ -450,38 +450,92 @@ convergence bar is cheap, but conclusions drawn from its hull about the
 be treated with real caution.
 
 
-## fig4 — model queries and cumulative solving time
+## fig4a/fig4b — model queries and cumulative solving time
 
-**What it shows.** Mirrors `near_optimal_tools`'s own
-`docs/examples/method_comparison.ipynb` structure: `max_separation` (the
-oracle-style worst-case L∞ distance between the inner and outer
-approximation — lower is better, log scale) plotted against both the number
-of model queries and the cumulative *real* ZEN-garden solving time (summed
-from each solve's own `benchmarking.json`, log scale). All four panels use
-the same frozen initial box as every other cross-mode metric in this project
-(see the top of this document) so oracle's lost native diagnostics don't
-bias the comparison in its own favour or against it, and neither
-probabilistic run's own (different) native stopping criterion is what's
-being plotted here.
+**What these show, and a layout correction.** Two figures, matching
+`near_optimal_tools`'s own `docs/examples/method_comparison.ipynb` layout
+**exactly**, column for column: `fig4a_query_comparison` corresponds to the
+reference's `method_comparison.png` (x = number of model queries),
+`fig4b_time_comparison` to `method_comparison_time.png` (x = cumulative
+solving time, log). In both, the **left column is `max_separation`** (the
+oracle-style worst-case L∞ distance between inner and outer approximation,
+log scale, lower is better) and the **right column is
+`fraction_well_explored`'s `ci_lower`** (the 95%-CI lower bound on the share
+of sampled directions already within `tolerance_explore` of the outer
+approximation, higher is better) — same as the reference. An earlier version
+of this figure put the x-axis choice (queries vs. seconds) in the columns
+instead, with the metric in rows. That showed the same four numbers but
+could not be read side by side against the reference's own two PNGs the way
+this layout can; it has been corrected to match column-for-column.
 
-An earlier version of this figure also plotted `fraction_well_explored`'s
-CI-lower metric alongside `max_separation`, matching the reference
-notebook's full 2×2 layout. It's dropped here: on this frozen box the CI
-metric stayed low for weights/oracle/probabilistic-short throughout (though
-probabilistic-long's own climbs meaningfully, as the table above shows) and
-didn't add a distinguishing second row for those three. If that comparison
-is wanted again, `query_time_scores` in the script still computes
-`ci_lower`/`ci_upper`; only the plotting was removed.
+The reference makes one *row* per test-problem dimensionality (its "case":
+3-D, 6-D, 9-D toy problems). This project has only one real problem — the
+6-D MGA space — so that row grouping is repurposed for **which outer
+approximation each mode is scored against** instead:
 
-**What the data says.** (endpoint values; see the figure for the full
-trajectories)
+- **Row 1 (frozen initial box).** Every available mode (weights,
+  probabilistic-short, probabilistic-long, oracle), scored against the
+  shared, un-cut initial VMM box the whole time (`poly.A/b` up to
+  `n_initial_rows`) — this project's own choice, needed because oracle's own
+  cut history was lost (data-loss note above) and weights never builds an
+  outer approximation at all, so this is the only evaluation all four modes
+  can be scored on equally. This is **not** what the reference notebook
+  does, and not the same quantity as each run's own native `ci_lower` in the
+  tolerance-comparison table further up this document.
+- **Row 2 (own evolving approximation) — the actual reference methodology.**
+  Only probabilistic-short and probabilistic-long, each scored against
+  *its own* live, cut-refined outer approximation at each checkpoint — i.e.
+  exactly what the reference notebook's `score_run` does for every method
+  (it keeps a full A/b/X snapshot per iteration and re-scores it after the
+  fact with one shared evaluation config). Oracle and weights cannot appear
+  in this row: oracle's own cut-by-cut history is gone with its lost
+  `oracle_summary/`, and weights never builds an outer approximation at all
+  — see the text box drawn directly on the figure.
 
-| mode | queries | cumulative solving time | max separation: start → end |
-|---|---|---|---|
-| weights | 7 | 596 s (~10 min) | 1.000 → **0.953** |
-| probabilistic (short, τ=0.05) | 20 | 2,212 s (~37 min) | 1.000 → **0.621** |
-| oracle | 96 | 34,297 s (~9.5 h) | 1.000 → **0.647** |
-| probabilistic (long, τ=0.95) | 140 | 24,762 s (~6.9 h) | 1.000 → **0.604** |
+**How row 2 was reconstructed, and why it can be trusted.**
+`supf_explore.explore` (the probabilistic driver's inner loop) calls
+`poly_approx.add_point(new_point)` and
+`poly_approx.add_cut(direction, support_value)` exactly once per iteration,
+and each run's own `diagnostics.csv` logs precisely those two raw arguments
+every row. Replaying them in order — starting from the same initial VMM box
+used for row 1 — reconstructs each iteration's own live outer approximation
+exactly. This was verified directly, not just argued: replaying
+probabilistic-short's full cut history this way and comparing the result
+against its own saved *final* `polytope.npz` gives bit-for-bit the same
+feasible region (same row count, and 20,000 random test points agree on
+which polytope contains them, every time). Row 2's dashed lines are each
+mode's own real `tolerance_prob` target (0.05 short / 0.95 long, colour-
+matched) on the `ci_lower` panel only — there is no equivalent target line on
+the `max_separation` panel, unlike the reference's ORACLE-specific `tol`
+line: probabilistic mode never targets an exact worst-case separation bound,
+only the sampled-direction confidence interval.
+
+**A read note specific to fig4b (vs. solving time):** oracle's line does not
+start at 1.0 there like every other mode's does — it starts at its first
+real solve, ~684 s in (max_separation ≈ 0.688, its value at query 11). That
+is not a bug; oracle's own baseline point (the one that *is* at
+max_separation = 1.0) is the shared frame's z\*, borrowed because oracle's
+own baseline result folder was lost (see the data-loss note above) — no real
+ZEN-garden solve backs it, so it has no logged solving time and cannot be
+placed on a log time axis at all. It still appears correctly at query 1 in
+fig4a, where x=1 is a perfectly good linear-axis value. (An earlier version
+of this figure did not filter zero/NaN-time points before plotting fig4b,
+which let matplotlib silently drop just that one point — same net visual
+effect, but for the wrong reason: it looked like oracle's *second* point had
+been dropped too, when only the untimed first one had. The reference
+notebook filters this explicitly for exactly this reason; this script now
+does too.)
+
+### Row 1 (frozen box): what the data says
+
+(endpoint values; see the figures for the full trajectories)
+
+| mode | queries | cumulative solving time | max separation: start → end | frozen-box ci_lower: start → end |
+|---|---|---|---|---|
+| weights | 7 | 596 s (~10 min) | 1.000 → **0.953** | ~0 → **0.022** |
+| probabilistic (short, τ=0.05) | 20 | 2,212 s (~37 min) | 1.000 → **0.621** | ~0 → **0.024** |
+| oracle | 96 | 34,297 s (~9.5 h) | 1.000 → **0.647** | ~0 → **0.032** |
+| probabilistic (long, τ=0.95) | 140 | 24,762 s (~6.9 h) | 1.000 → **0.604** | ~0 → **0.156** |
 
 - **Weights barely moves the metric at all** — 6 directional solves shrink
   the worst-case gap by less than 5%. It was never designed to close this
@@ -489,39 +543,66 @@ trajectories)
   boundary designs cheaply, which it does (fig0), just not to characterise
   the space's coverage.
 - **Oracle and both probabilistic runs start identically** (all reach 0.688
-  at query 11, right after their shared VMM points — expected, since all
-  three ran VMM on the same underlying model) **and then diverge sharply.**
-  Oracle is already down to 0.647 by its next checkpoint (query 21) and then
-  **does not move again**: every checkpoint from query 21 through query 96
-  changes the metric by less than 0.001, i.e. its 10 iterations between
-  checkpoints — and per the exact-duplicate check above, most of the 85
-  individual iterations behind them — did essentially nothing. Both
-  probabilistic runs, by contrast, keep improving checkpoint over
-  checkpoint: the short run reaches 0.621 by its last checkpoint (query 20),
-  and the long run is at a closely comparable 0.618 one checkpoint later
-  (query 21) before continuing on its own for another 119 queries: 0.607
-  (query 51) → 0.604 (query 91) → 0.604 (query 140), with visibly
-  diminishing returns after roughly query 60 — consistent with the
-  `ci_lower` trajectory in the table above, which shows the same slowdown
-  from the opposite (confidence) angle.
-- **The short-vs-long comparison is the new finding this run adds.**
-  Tightening `tolerance_prob` from 0.05 to 0.95 bought a further improvement
-  of only 0.621 → 0.604 (about 3% relative) for roughly 7× the queries and
-  11× the solving time (37 min → 6.9 h). Most of that gain was already
-  banked by query ~60 (≈9,000 s); the remaining ~80 iterations of the long
-  run mostly re-confirmed what was already known on this metric, even
-  though — per the table above — the run's own native `ci_lower` statistic
-  kept climbing toward its stricter bar the whole time. The two metrics
-  disagree about how much progress the tail end of the long run made,
-  because they're measuring different things: `ci_lower` tracks confidence
-  that *sampled directions* are well-approximated (which keeps improving as
-  long as new directions get certified), while `max_separation` tracks the
-  *single worst* direction in the frozen box (which stops moving once
-  nothing new the run finds is worse than what's already been found).
-- Practically: oracle spent **~40% more solving time than probabilistic-long**
-  (9.5 h vs. 6.9 h) and ended up at a **worse** final value (0.647 vs.
-  0.604), for a fundamentally different reason than the short-run comparison
-  showed — not because oracle wasted time on a metric that had already
-  plateaued, but because it got stuck re-certifying one vertex 73 times in a
-  row and so never got the chance to keep improving the way both
-  probabilistic runs did with their own comparable query budgets.
+  at query 11, right after their shared VMM points) **and then diverge
+  sharply.** Oracle is already down to 0.647 by its next checkpoint (query
+  21) and then **does not move again**: every checkpoint from query 21
+  through query 96 changes the metric by less than 0.001 — its 10 iterations
+  between checkpoints, and per the exact-duplicate check above most of the
+  85 individual iterations behind them, did essentially nothing. Both
+  probabilistic runs keep improving checkpoint over checkpoint instead: the
+  short run reaches 0.621 by query 20; the long run is at a closely
+  comparable 0.618 one checkpoint later (query 21) before continuing for
+  another 119 queries: 0.607 (query 51) → 0.604 (query 140), with visibly
+  diminishing returns after roughly query 60.
+- **On this frozen, deliberately-hard box, even the long run's `ci_lower`
+  stays low (0.156) and looks nowhere near converging.** That is expected
+  given how the box was chosen (see the paragraph above), *not* a sign that
+  anything is wrong with the run or its inputs — row 2 below is the fair
+  question to ask about that, and answers it very differently.
+
+### Row 2 (own evolving approximation): what the data says
+
+| mode | max separation: start → end | own `ci_lower`: start → end | own `tolerance_prob` target |
+|---|---|---|---|
+| probabilistic (short, τ=0.05) | 1.000 → **0.482** | ~0 → **0.052** | 0.05 (cleared) |
+| probabilistic (long, τ=0.95) | 1.000 → **0.105** | ~0 → **0.926** | 0.95 (not yet cleared, but close) |
+
+This is the row that actually answers **"why does the long run's
+`ci_lower` stay so low — is something wrong?"** On its own evolving,
+cut-refined approximation — the correct, reference-equivalent question, and
+the one the run's own stopping rule actually asks — probabilistic-long's
+`ci_lower` climbs to **0.926** by query 140, a hair under its own 0.95
+target (and closely matching the 0.940 already reported from its own native
+`diagnostics.csv` in the tolerance table above — the small gap is just
+because this recomputation uses a fixed, shared evaluation config —
+500 samples, seed 0 — for comparability with row 1, rather than the run's
+own 2,000-sample setting). Nothing is wrong with the inputs or the run: the
+frozen-box version in row 1 was always going to look far less converged,
+because it is evaluated against a box that never shrinks, no matter how much
+real refinement the run has done.
+
+The same swap also resolves how much of row 1's short-vs-long conclusion
+survives the correct comparison. On their own approximations, `max_separation`
+drops far further for both runs than on the frozen box: short reaches 0.482
+(vs. 0.621 frozen) and long reaches **0.105** (vs. 0.604 frozen) — an order-
+of-magnitude-scale difference for the long run in particular, since its own
+outer approximation has been cut down substantially over 129 iterations
+while the frozen box never moves. Tightening `tolerance_prob` from 0.05 to
+0.95 now clearly earns its cost on both metrics, not just `ci_lower`: 0.482
+→ 0.105 in max separation (long ends up **more than 4× tighter**), for the
+same 7×-queries / 11×-time premium already noted above. Read together, rows
+1 and 2 tell complementary stories: row 1 is the fair *cross-mode* picture
+(all four methods judged by the same fixed yardstick, at the cost of
+understating every mode's true progress against its own approximation), and
+row 2 is the fair *per-run* picture (each run judged on its own terms,
+matching what the reference notebook itself measures, at the cost of only
+covering the two modes whose cut history survives).
+
+- Practically, oracle still spent **~40% more solving time than
+  probabilistic-long** (9.5 h vs. 6.9 h, row 1's only fair cross-mode
+  time comparison, since oracle has no row-2 equivalent) and ended up at a
+  **worse** frozen-box value (0.647 vs. 0.604) — not because oracle wasted
+  time on a metric that had already plateaued, but because it got stuck
+  re-certifying one vertex 73 times in a row and so never got the chance to
+  keep improving the way both probabilistic runs did with their own
+  comparable query budgets.
