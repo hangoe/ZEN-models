@@ -37,10 +37,10 @@
         "include_cost": true
       },
       "probabilistic": {
-        "tolerance_prob": 0.05,
-        "max_iterations": 200,
+        "tolerance_prob": 0.95,
+        "max_iterations": 500,
         "tolerance_explore": 0.1,
-        "n_samples": 1000,
+        "n_samples": 2000,
         "alpha": 0.05,
         "method": "jeffreys",
         "use_bounding_box": false
