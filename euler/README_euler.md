@@ -115,20 +115,21 @@ source .venv/bin/activate
 python run_model.py --task_id 0 --run_on local --params parameters_mga.csv
 
 # 3. Calibrate on the cluster, one row at a time, before trusting the
-#    24h walltime in submit_euler_mga.sh -- oracle and probabilistic can
-#    run much longer than weights:
-sbatch --array=0 submit_euler_mga.sh   # weights        (task_id 0, cheapest)
+#    24h walltime in submit_euler_mga.sh -- oracle can run much longer
+#    than weights/sampling/bbo. sampling, bbo and oracle are run first
+#    this round (weights stays task_id 0, run later if needed):
+sbatch --array=1 submit_euler_mga.sh   # sampling  (task_id 1)
 myjobs -j <jobID>                      # check actual time/CPU/RAM used
-sbatch --array=1 submit_euler_mga.sh   # oracle         (task_id 1, can be slow)
-sbatch --array=2 submit_euler_mga.sh   # probabilistic  (task_id 2)
+sbatch --array=2 submit_euler_mga.sh   # bbo       (task_id 2)
+sbatch --array=3 submit_euler_mga.sh   # oracle    (task_id 3, can be slow)
 
 # 4. Once you trust the resources, submit them together:
-sbatch --array=0-2 submit_euler_mga.sh
+sbatch --array=1-3 submit_euler_mga.sh
 ```
 
 Results land in the same place as the normal sweep:
 ```
-$SCRATCH/zen_runs/outputs/Crystal_Ball_ind_heat_v8_0_no_flexibility_2050_1a_5a_interval_5ts_MGA_<mode>/
+$SCRATCH/zen_runs/outputs/Crystal_Ball_ind_heat_v8_0_no_flexibility_nodiffusion_2050_1a_5a_interval_5ts_MGA_<mode>/
 ```
 Download before scratch is purged (~2 weeks) — see "Results go to scratch" above.
 
