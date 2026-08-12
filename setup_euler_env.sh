@@ -56,7 +56,10 @@ python -m pip install -e "$HOME/ZEN-garden-plugins"
 if [[ ! -d "$HOME/near_optimal_tools" ]]; then
     git clone https://github.com/evrenmturan/near_optimal_tools.git "$HOME/near_optimal_tools"
 fi
-python -m pip install -e "$HOME/near_optimal_tools"
+# "[bbo]" pulls in pypop7, needed for MGA's bbo mode (black-box direction
+# search); sampling/oracle/weights modes work without it too, so it's safe
+# to always install.
+python -m pip install -e "$HOME/near_optimal_tools[bbo]"
 
 # --- Sanity check ---------------------------------------------------------------
 echo "Verifying imports..."
@@ -73,5 +76,7 @@ assert 'mga' in names, 'mga entry point not registered - check the zen_garden ve
 " || echo "mga plugin not registered — your zen_garden may not be entry-point-aware, see euler/README_euler.md."
 python -c "import pyoNearOpt; print('pyoNearOpt OK')" || \
     echo "pyoNearOpt not importable yet — check the near_optimal_tools install above."
+python -c "import pypop7; print('pypop7 (bbo mode) OK')" || \
+    echo "pypop7 not importable yet — bbo mode needs the '[bbo]' extra on the near_optimal_tools install above."
 
 echo "Done. submit_euler.sh / submit_euler_mga.sh will 'source $HOME/ZEN-models/.venv/bin/activate'."

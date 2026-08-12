@@ -1,0 +1,50 @@
+{
+  "analysis": {
+    "dataset": "snapshot"
+  },
+  "solver": {
+    "name": "gurobi",
+    "solver_options": {
+      "Method": 2,
+      "NodeMethod": 2,
+      "BarHomogeneous": 1,
+      "DualReductions": 0,
+      "Threads": 10,
+      "Crossover": 0,
+      "ScaleFlag": 2,
+      "BarOrder": 0,
+      "BarIterLimit": 3000
+    },
+    "save_duals": true,
+    "use_scaling": false,
+    "run_diagnostics": true,
+    "scaling_include_rhs": true
+  },
+  "plugins": {
+    "mga": {
+      "mode": "sampling",
+      "epsilon": 0.1,
+      "axes": {
+        "technologies": [
+          "nuclear",
+          "photovoltaics",
+          "wind_offshore",
+          "wind_onshore"
+        ],
+        "carrier_imports": [
+          "biomass"
+        ],
+        "include_cost": true
+      },
+      "sampling": {
+        "tolerance_prob": 0.95,
+        "max_iterations": 500,
+        "tolerance_explore": 0.1,
+        "n_samples": 2000,
+        "alpha": 0.05,
+        "method": "jeffreys",
+        "use_bounding_box": false
+      }
+    }
+  }
+}

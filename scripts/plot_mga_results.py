@@ -1,59 +1,43 @@
-"""Compare the four MGA exploration modes (weights, probabilistic-short,
-probabilistic-long, oracle) run against Crystal_Ball_ind_heat_v8_0_nodiffusion
-on Euler.
+"""Compare the three MGA exploration modes (weights, probabilistic, oracle)
+run against Crystal_Ball_ind_heat_v8_0_nodiffusion on Euler.
 
-All four modes explore the same near-optimal space: 6 axes (nuclear,
+All three modes explore the same near-optimal space: 6 axes (nuclear,
 photovoltaics, wind_offshore, wind_onshore capacity additions, biomass
 carrier import, total cost), epsilon = 0.1, same baseline solve -- so their
 results live in one shared coordinate system and can be overlaid directly.
 That shared frame (names/scale/offset/z_star/bounds, and the initial outer
-box A0/b0) is taken from the probabilistic-long run's own saved
-polytope.npz (data/outputs/euler_outputs_mga/..._MGA_probabilistic/
-..._probabilistic_summary/) -- verified bit-for-bit identical to
-probabilistic-short's own independently-solved VMM frame (same z*, bounds,
-A0/b0 to full float precision), so either run's frame would do; the long run
-is picked because it is also this script's basis for the inner-hull
-rejection sampling in fig2/fig3, where its much larger certified point set
-(140 vs. 20) gives a materially better hull. The "sanity checks" section of
-this file's dev history (not reproduced here) confirmed weights' own
-baseline solve reproduces that same z* bit-for-bit, and its explored points
-all fall inside the VMM-derived box.
+box A0/b0) is taken from the probabilistic run's own saved polytope.npz
+(data/outputs/euler_outputs_mga/..._MGA_probabilistic/
+..._probabilistic_summary/). The "sanity checks" section of this file's dev
+history (not reproduced here) confirmed weights' own baseline solve
+reproduces that same z* bit-for-bit, and its explored points all fall
+inside the VMM-derived box.
 
-Two probabilistic runs, same axes/epsilon/tolerance_explore, different
-`tolerance_prob` (the CI-lower-bound convergence bar in
-`pyoNearOpt.metrics.ci_convergence_metric` -- see probabilistic_driver.py):
+The probabilistic run uses pyoNearOpt's support-function sampling method
+with `tolerance_prob` (the CI-lower-bound convergence bar in
+`pyoNearOpt.metrics.ci_convergence_metric` -- see probabilistic_driver.py)
+set to 0.95, n_samples=2000, max_iterations=500 -- a near-complete-coverage
+bar (need 95% of sampled directions well-approximated). It ran 129
+iterations (of its 500-iteration budget) and had NOT converged
+(converged=False) when the run was stopped; final_gap = 0.140, and
+diagnostics.csv shows ci_lower climbing steadily to 0.94 by the last
+iteration, just short of the 0.95 bar. Note `tolerance_prob` is a
+*confidence* target, not an error tolerance: higher means stricter (more of
+the space must be certified), not looser -- the opposite sense of `epsilon`
+or `tolerance_explore`.
 
-  probabilistic_short  tolerance_prob=0.05 (data/config_mga_probabilistic.json
-                        as currently checked in), n_samples=1000,
-                        max_iterations=200. A deliberately loose bar -- only
-                        need to be confident 5% of sampled directions are
-                        already well-approximated -- so it converged
-                        (converged=True) after just 9 refinement iterations,
-                        final_gap (max sampled gap) = 0.673.
-  probabilistic_long   tolerance_prob=0.95, n_samples=2000,
-                        max_iterations=500. A near-complete-coverage bar --
-                        need 95% of sampled directions well-approximated --
-                        so it ran 129 iterations (of its 500-iteration
-                        budget) and still had NOT converged
-                        (converged=False) when the run was stopped;
-                        final_gap = 0.140, and diagnostics.csv shows
-                        ci_lower climbing steadily to 0.94 by the last
-                        iteration, just short of the 0.95 bar. Note
-                        `tolerance_prob` is a *confidence* target, not an
-                        error tolerance: higher means stricter (more of the
-                        space must be certified), not looser -- the
-                        opposite sense of `epsilon` or `tolerance_explore`.
+(An earlier, more loosely converged probabilistic run at tolerance_prob=0.05
+was dropped from this script and its Euler output folder deleted once the
+0.95 run above was available -- it is no longer referenced anywhere below.)
 
 Mode status as of writing:
   weights              every result folder intact. No polytope: each
                        iteration is a single min/max-weighted-capacity
                        solve, not a refinement step.
-  probabilistic_short  fully intact, including its own polytope.npz +
+  probabilistic         fully intact, including its own polytope.npz +
                        diagnostics.csv (native ci_lower/ci_upper/mean_gap/
                        max_gap per iteration, computed against its own
                        refined outer approximation).
-  probabilistic_long   fully intact, same artifacts as probabilistic_short,
-                       13x more refinement iterations.
   oracle               oracle_summary/ (polytope.npz + diagnostics.csv) is
                        empty -- the run was interrupted before it could
                        write them, per the user's account of stopping it
@@ -126,10 +110,10 @@ Figures (data/outputs/figures/mga_results/):
                                  cumulative real ZEN-garden solving time (log).
                                  Each has 2 rows: frozen initial box (all
                                  available modes, this project's own choice for
-                                 a shared comparison) and each probabilistic
+                                 a shared comparison) and the probabilistic
                                  run's own evolving, cut-refined outer
-                                 approximation (reference-equivalent, only the
-                                 two modes whose cut history survives -- see
+                                 approximation (reference-equivalent, the only
+                                 mode whose cut history survives -- see
                                  load_native_outer_at). This file's only
                                  per-mode convergence trace now (an earlier
                                  fig1_convergence and
@@ -181,35 +165,30 @@ MGA_ROOT = REPO_ROOT / "data" / "outputs" / "euler_outputs_mga"
 MODEL = "Crystal_Ball_ind_heat_v8_0_nodiffusion"
 RUN_PREFIX = f"{MODEL}_2050_1a_5a_interval_5ts_MGA"
 WEIGHTS_DIR = MGA_ROOT / f"{RUN_PREFIX}_weights"
-PROBABILISTIC_LONG_DIR = MGA_ROOT / f"{RUN_PREFIX}_probabilistic"
-PROBABILISTIC_SHORT_DIR = MGA_ROOT / f"{RUN_PREFIX}_probabilistic_short"
+PROBABILISTIC_DIR = MGA_ROOT / f"{RUN_PREFIX}_probabilistic"
 ORACLE_DIR = MGA_ROOT / f"{RUN_PREFIX}_oracle"
 
 # Positional colours reused from figure_settings.SCENARIO_PALETTE (ETH
 # corporate design: blue, petrol, green, olive, red, magenta, grey), per this
 # project's convention of never inventing a separate palette for print
 # figures. weights was ETH blue, too close to probabilistic's original
-# petrol to tell apart at a glance; weights moved to green. The two
-# probabilistic runs share the "cool" end of the palette (blue/petrol) since
-# they're the same method at two tolerance_prob settings; oracle keeps red.
-_ETH_BLUE, _ETH_PETROL, _ETH_GREEN, _ETH_RED = (
-    SCENARIO_PALETTE[0], SCENARIO_PALETTE[1], SCENARIO_PALETTE[2], SCENARIO_PALETTE[4],
+# petrol to tell apart at a glance; weights moved to green; oracle keeps red.
+_ETH_BLUE, _ETH_GREEN, _ETH_RED = (
+    SCENARIO_PALETTE[0], SCENARIO_PALETTE[2], SCENARIO_PALETTE[4],
 )
 MODE_COLOR = {
     "weights": _ETH_GREEN,
-    "probabilistic_short": _ETH_PETROL,
-    "probabilistic_long": _ETH_BLUE,
+    "probabilistic": _ETH_BLUE,
     "oracle": _ETH_RED,
 }
 MODE_LABEL = {
     "weights": "Weights",
     # $\tau$ (mathtext, "cm" fontset) rather than a literal unicode tau --
     # the plain text font (cmr10) has no tau glyph.
-    "probabilistic_short": r"Probabilistic (short, $\tau$=0.05)",
-    "probabilistic_long": r"Probabilistic (long, $\tau$=0.95)",
+    "probabilistic": r"Probabilistic ($\tau$=0.95)",
     "oracle": "Oracle",
 }
-MODES = ("weights", "probabilistic_short", "probabilistic_long", "oracle")
+MODES = ("weights", "probabilistic", "oracle")
 
 # config_mga_weights.json's "iterations" list: weight sign, combined with
 # run_iteration's fixed sense="min", determines whether each solve minimises
@@ -298,27 +277,24 @@ def solving_time(folder: Path) -> float:
 
 
 def load_shared_polytope() -> Polytope:
-    """The probabilistic-long run's own polytope.npz: the shared coordinate
+    """The probabilistic run's own polytope.npz: the shared coordinate
     frame (names/scale/offset/z_star/bounds/initial box) every mode is
-    expressed in, plus its own true (cut-refined) inner+outer approximation.
-    See module docstring for why the long run is picked over the short one."""
-    summary = PROBABILISTIC_LONG_DIR / f"{MODEL}_probabilistic_summary"
+    expressed in, plus its own true (cut-refined) inner+outer approximation."""
+    summary = PROBABILISTIC_DIR / f"{MODEL}_probabilistic_summary"
     poly_files = sorted(summary.glob("polytope*.npz"))
     if not poly_files:
         raise FileNotFoundError(
-            f"No polytope*.npz in {summary}; the probabilistic-long run is "
+            f"No polytope*.npz in {summary}; the probabilistic run is "
             f"this script's shared coordinate frame and must be present."
         )
     return load_polytope(poly_files[0])
 
 
 def load_probabilistic_points(poly: Polytope, run_dir: Path) -> list[tuple[str, np.ndarray, float]]:
-    """[(label, phys_point, solving_time)] for one probabilistic run's own
+    """[(label, phys_point, solving_time)] for the probabilistic run's own
     polytope.npz, in solve order (baseline/VMM points, then refinement
     iterates)."""
-    summary = run_dir / f"{MODEL}_probabilistic_summary"
-    poly_files = sorted(summary.glob("polytope*.npz"))
-    run_poly = poly if run_dir == PROBABILISTIC_LONG_DIR else load_polytope(poly_files[0])
+    run_poly = poly
     iterate_count = 0
     rows = []
     for lab, pt in zip(run_poly.point_origin, run_poly.X):
@@ -524,10 +500,8 @@ def fig1_pairwise_points(poly: Polytope, points: dict[str, list[tuple[str, np.nd
 # membership LP (X^T lambda = z, sum(lambda) = 1, lambda >= 0). The retained
 # fraction estimates vol(I)/vol(O) (his Eq. 13) -- Steen's run of the full
 # 10-D, 700-iteration ORACLE certificate got 11.6% over 9.3M proposals; ours,
-# a 6-D, 129-iteration probabilistic-long run (the tolerance_prob=0.95 run,
-# picked over probabilistic-short's 9-iteration hull for exactly this -- a
-# far better-refined inner hull to sample), gets 84% (see the printed
-# acceptance rate) -- much higher than Steen's, not the same order of
+# a 6-D, 129-iteration probabilistic run (tolerance_prob=0.95), gets 84%
+# (see the printed acceptance rate) -- much higher than Steen's, not the same order of
 # magnitude, consistent with tolerance_prob=0.95 pushing this run to
 # near-complete coverage of its (lower-dimensional, 6-D vs. his 10-D) space
 # rather than a coincidence; the useful cross-check is still that the number
@@ -669,7 +643,7 @@ def fig2_polytope_samples(poly: Polytope, points: dict[str, list[tuple[str, np.n
         fig.legend(handles, labels, loc="upper right", fontsize=9, frameon=False)
     fig.suptitle(
         f"MGA Near-Optimal Interior: Uniform Samples of the Inner Approximation (n={len(samples_norm)}, "
-        f"acceptance {rate:.1%})\nprobabilistic-long's certified hull; darker hexes = more of the near-optimal volume",
+        f"acceptance {rate:.1%})\nprobabilistic's certified hull; darker hexes = more of the near-optimal volume",
         fontsize=12, fontweight="bold",
     )
     fig.tight_layout(rect=[0, 0, 1, 0.95])
@@ -704,7 +678,7 @@ def fig3_axis_correlations(poly: Polytope, samples_norm: np.ndarray) -> None:
     fig.colorbar(im, ax=ax, label="Pearson r", shrink=0.85)
     ax.set_title(
         f"MGA Pairwise Axis Correlations over the Near-Optimal Interior (n={len(samples_norm)})\n"
-        "negative = substitution, positive = co-requirement (probabilistic-long's inner hull)",
+        "negative = substitution, positive = co-requirement (probabilistic's inner hull)",
         fontsize=11, fontweight="bold",
     )
     fig.tight_layout()
@@ -780,22 +754,22 @@ def query_time_scores(poly: Polytope, X_norm: np.ndarray, solve_seconds: list[fl
 # box. query_time_scores above deliberately does NOT do that (see its
 # docstring and the module docstring's "Convergence metric" section): oracle's
 # own cut history was lost with its oracle_summary/, and weights never builds
-# an outer approximation at all, so a fair *shared* comparison across all four
-# modes needs everyone evaluated against the same fixed initial box.
+# an outer approximation at all, so a fair *shared* comparison across all
+# three modes needs everyone evaluated against the same fixed initial box.
 #
-# But for the two probabilistic runs specifically, the cut history was NOT
-# lost: supf_explore.explore calls poly_approx.add_point(new_point) and
+# But for the probabilistic run specifically, the cut history was NOT lost:
+# supf_explore.explore calls poly_approx.add_point(new_point) and
 # poly_approx.add_cut(direction, support_value) exactly once per iteration
 # (near_optimal_tools/src/pyoNearOpt/exploration_methods/supf_explore.py),
 # and diagnostics.csv logs precisely those two raw arguments every iteration.
 # Replaying them in order therefore reconstructs each iteration's own live
-# A_k/b_k exactly -- verified directly: reconstructing probabilistic-short's
-# full cut history this way and comparing against its own saved final A/b
-# gives an identical feasible region (same shape, and every one of 20,000
-# random test points agrees on which polytope contains it). So this project
-# CAN add a faithful, reference-notebook-equivalent "own approximation" row
-# for probabilistic-short/-long; it still cannot for oracle (no surviving cut
-# data at all) or weights (no such object exists for that mode).
+# A_k/b_k exactly -- verified directly: reconstructing the run's full cut
+# history this way and comparing against its own saved final A/b gives an
+# identical feasible region (same shape, and every one of 20,000 random test
+# points agrees on which polytope contains it). So this project CAN add a
+# faithful, reference-notebook-equivalent "own approximation" row for
+# probabilistic; it still cannot for oracle (no surviving cut data at all)
+# or weights (no such object exists for that mode).
 def _parse_diagnostics_vector(s: str) -> np.ndarray:
     """Parses one diagnostics.csv cut_direction cell -- numpy's default
     array repr (e.g. '[ 0.36 -0.62 ... ]', occasionally wrapped over several
@@ -826,14 +800,11 @@ def load_native_outer_at(run_dir: Path, run_poly: Polytope):
 
 
 def _compute_fig4_scores(poly: Polytope, points: dict[str, list[tuple[str, np.ndarray, float]]]):
-    """Frozen-box scores for every available mode, plus native (own evolving
-    approximation) scores for the two probabilistic modes. Shared by both
-    fig4a (vs queries) and fig4b (vs time) so the MILP solves only run once."""
+    """Frozen-box scores for every available mode, plus a native (own evolving
+    approximation) score for the probabilistic mode. Shared by both fig4a (vs
+    queries) and fig4b (vs time) so the MILP solves only run once."""
     modes = [m for m in MODES if m in points]
-    # probabilistic_long has ~7x more points than probabilistic_short (140 vs
-    # 20), so it gets a coarser checkpoint stride to keep the number of
-    # max_separation MILP solves comparable across modes.
-    eval_every = {"weights": 1, "probabilistic_short": 2, "probabilistic_long": 10, "oracle": 10}
+    eval_every = {"weights": 1, "probabilistic": 10, "oracle": 10}
     scores = {}
     for mode in modes:
         labels, phys, secs = zip(*points[mode])
@@ -842,20 +813,18 @@ def _compute_fig4_scores(poly: Polytope, points: dict[str, list[tuple[str, np.nd
               f"every {eval_every.get(mode, 5)}th checkpoint, frozen box)...")
         scores[mode] = query_time_scores(poly, X_norm, list(secs), eval_every.get(mode, 5))
 
-    # Native row: each probabilistic run scored against its OWN evolving,
+    # Native row: the probabilistic run scored against its OWN evolving,
     # cut-refined outer approximation instead of the frozen box -- i.e. the
     # reference notebook's own score_run methodology exactly (see
-    # load_native_outer_at's docstring). Only possible for probabilistic_short
-    # and probabilistic_long: oracle's cut history is gone (data-loss note)
-    # and weights never builds an outer approximation at all.
+    # load_native_outer_at's docstring). Only possible for probabilistic:
+    # oracle's cut history is gone (data-loss note) and weights never builds
+    # an outer approximation at all.
     native_scores = {}
     tolerance_prob = {}
-    for mode, run_dir in (("probabilistic_short", PROBABILISTIC_SHORT_DIR),
-                          ("probabilistic_long", PROBABILISTIC_LONG_DIR)):
+    for mode, run_dir in (("probabilistic", PROBABILISTIC_DIR),):
         if mode not in points:
             continue
-        run_poly = poly if run_dir == PROBABILISTIC_LONG_DIR else load_polytope(
-            sorted((run_dir / f"{MODEL}_probabilistic_summary").glob("polytope*.npz"))[0])
+        run_poly = poly
         tolerance_prob[mode] = float(run_poly.convergence_threshold)
         outer_at = load_native_outer_at(run_dir, run_poly)
         labels, phys, secs = zip(*points[mode])
@@ -969,19 +938,11 @@ def main() -> None:
     if w:
         points["weights"] = w
 
-    print("Loading probabilistic-long mode...")
-    points["probabilistic_long"] = load_probabilistic_points(poly, PROBABILISTIC_LONG_DIR)
-    print(f"  probabilistic_long: {poly.X.shape[0]} points on disk "
+    print("Loading probabilistic mode...")
+    points["probabilistic"] = load_probabilistic_points(poly, PROBABILISTIC_DIR)
+    print(f"  probabilistic: {poly.X.shape[0]} points on disk "
           f"(converged={poly.converged}, {poly.run.get('iterations_done', '?')} iterations, "
           f"tolerance_prob={poly.convergence_threshold:g})")
-
-    print("Loading probabilistic-short mode...")
-    short_summary = PROBABILISTIC_SHORT_DIR / f"{MODEL}_probabilistic_summary"
-    short_poly = load_polytope(sorted(short_summary.glob("polytope*.npz"))[0])
-    points["probabilistic_short"] = load_probabilistic_points(poly, PROBABILISTIC_SHORT_DIR)
-    print(f"  probabilistic_short: {short_poly.X.shape[0]} points on disk "
-          f"(converged={short_poly.converged}, {short_poly.run.get('iterations_done', '?')} iterations, "
-          f"tolerance_prob={short_poly.convergence_threshold:g})")
 
     print("Loading oracle mode (best effort)...")
     o = load_oracle_points(poly)

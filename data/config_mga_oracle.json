@@ -42,6 +42,7 @@
         "max_min": {
           "formulation": "kkt_milp",
           "t_max": 1.0,
+          "big_M": 10e4,
           "solver_options": {
             "OutputFlag": 1,
             "MIPGap": 0.02,

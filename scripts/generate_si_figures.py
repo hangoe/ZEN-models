@@ -21,6 +21,7 @@ run_model.py):
   4b. fig4b_industry_fuel_demand_comparison — new-sector heat/fuel demand vs. pre-existing cement/steel fuel mix
   5.  fig5_retrofit_ccs_comparison    — CO2 captured by retrofit-CCS technology, No flexibility vs Crystal Ball base
   6.  fig6_diffusion_mechanisms       — ZEN-garden technology-diffusion/learning mechanisms compared
+  7.  fig7_heat_supply_trajectory     — No flexibility heat-supply capacity, every modeled year 2020-2048
 
 fig4a is the odd one out: unlike every other figure here, it does NOT come from
 a solved model run. It plots the exogenous low-temperature heat-demand
@@ -148,6 +149,7 @@ from figures_by_run import (
     INDUSTRY_HEAT_TECHS_PRODUCTION,
     INDUSTRY_HEAT_TECHS_TEMP_CONV,
     get_capacity,
+    get_capacity_addition,
     get_carrier_production,
     get_storage_flows,
 )
@@ -587,6 +589,160 @@ def fig1b_industry_capacity(runs: list[Run]) -> None:
              ha="center", va="bottom", fontsize=8, style="italic", color="#555555")
     fig.tight_layout(rect=[0, 0.02, 1, 0.95])
     savefig(fig, "fig1b_industry_capacity")
+
+
+# ── 7: Heat-supply capacity trajectory, No flexibility, full horizon ───────
+
+def fig7_heat_supply_trajectory(runs: list[Run]) -> None:
+    """Full-horizon version of fig1b's "Heat Supply" row (same techs, stack
+    order, color/hatch map) for the "No flexibility" scenario only, plotting
+    every modeled year (2020-2048, 2yr steps) instead of the 3-year
+    COMPARISON_YEARS snapshot — lets the buildout/retirement pattern fig1b's
+    docstring already flags (a ~25% capacity dip at 2048 from boiler-fleet
+    lifetime retirement outpacing late-horizon replacement) be read directly
+    off the trajectory rather than inferred from 3 points.
+
+    Top panel: capacity stock per period (as fig1b). Bottom panel: capacity
+    ADDITIONS per period (capacity_addition, i.e. new builds only, not net of
+    retirements) — added per user request to see whether the persistently
+    large natural_gas_boiler_industry stock is legacy fleet coasting on its
+    25yr lifetime or actively being re-invested in.
+
+    natural_gas_boiler_industry's SHARE of total heat-supply capacity does
+    steadily fall (48% in 2020 -> ~17-22% from 2038 on, computed directly
+    from get_capacity) — it just looks flat in the stock panel because total
+    heat-supply capacity itself grows 2x over the same window (48->96 GW), so
+    a shrinking share still occupies a similar-looking absolute band
+    (~24-40 GW). Two different mechanisms are visible in the additions panel:
+    coal_boiler_industry gets ONE addition, ever (2.14 GW in 2020 only, 0 in
+    every subsequent period) — its whole stock is the real 2020 existing
+    fleet (capacity_existing=4.26 GW) plus that one build, coasting on its
+    25yr lifetime until it collapses from 12.7% share (2020) to <1% by 2044,
+    with no reinvestment. natural_gas_boiler_industry instead gets repeated
+    (if individually small) additions across the whole horizon — a large
+    initial pair (7.2/5.5 GW, 2020/2022, on top of a real ~17.4 GW
+    pre-existing 2020 fleet, while heat pumps start from a genuine 0 GW
+    existing base and face the technology-diffusion S-curve ramp limit, see
+    project memory addendum #9/#10), a near-zero trickle 2024-2038, then a
+    small late-horizon replacement wave (1.9-2.7 GW/period, 2040-2046) as
+    the original fleet starts retiring — visually dwarfed in the stacked
+    additions bars by the much larger simultaneous heat-pump buildout, but
+    enough to keep a nonzero natural_gas_boiler_industry floor from ever
+    reaching zero within this horizon, unlike coal.
+
+    Why gas, never coal, gets re-invested in: capex_specific_conversion is
+    90 EUR/kW (natural_gas_boiler_industry) vs. 538.6 EUR/kW (coal_boiler_
+    industry) vs. 1,461 EUR/kW (heat_pump_industry_150_200_water, the
+    cheapest heat-pump alternative) — coal is dominated by gas on CAPEX alone
+    while carrying the same fossil-emissions problem, so it is never the
+    marginal fossil choice once new capacity is needed. Why gas isn't
+    penalized out of existence by its emissions: natural_gas_boiler_industry
+    has NO CCS retrofit option anywhere in this dataset (confirmed: no
+    *_boiler*_CCS tech exists; only power-sector natural_gas_turbine_CCS
+    does), so its emissions are never captured directly — but
+    carbon_emissions_budget is a single pooled cumulative cap across the
+    WHOLE system (all sectors/years combined, not a per-technology or
+    per-sector sub-budget, see project memory addendum #7/#8), so it remains
+    cheaper for the optimizer to keep some cheap gas boilers and offset their
+    emissions via decarbonization elsewhere (retrofit CCS on other
+    processes, power-sector renewables/CCS, DAC — see fig5) than to pay the
+    >16x CAPEX premium to fully electrify industry heat within this
+    horizon.
+
+    Bottom panel: actual OPERATED output (flow_conversion_output summed
+    per tech / HOURS_PER_YEAR, i.e. the average GW each tech actually
+    delivers — directly comparable to the top panel's nameplate GW, their
+    ratio is each tech's implied capacity factor) — added per user request
+    ("why is capacity growing so much, shouldn't it only build what's
+    needed / which techs are actually operated"). Total industry-heat
+    OUTPUT is essentially flat at ~46 GW average across the ENTIRE horizon
+    (confirmed directly, matching the flat glass/ceramic/paper/food product
+    demand already established in fig1b's docstring) while nameplate
+    capacity nearly doubles (48->96 GW, 2020->2028) before falling back.
+
+    SUPERSEDES an earlier, WRONG explanation of this gap (a "baseload vs.
+    peaking capacity" story) that assumed the underlying demand had
+    intra-year peakiness a "No flexibility" system would need extra
+    capacity to cover. Checked directly and disproven: the hourly demand
+    time series (Results.get_full_ts("demand")) for glass/ceramic/paper/
+    food is perfectly flat within every year (std ~1e-12 across all 8760
+    hours of 2020, i.e. genuinely zero intra-year variability, no daily/
+    seasonal shape at all) — there is no peak for any capacity to cover in
+    this dataset.
+
+    The real mechanism, confirmed directly in ZEN-garden's own formulation
+    (constraint_technology_lifetime, zen_garden/model/technology/
+    technology.py:1471): a technology's `capacity` in year y is a purely
+    DETERMINISTIC sum of past `capacity_addition`s that haven't yet aged
+    past their lifetime — `capacity_addition` itself is bounded (0, inf),
+    i.e. STRICTLY NON-NEGATIVE. There is no decision variable anywhere in
+    the model that lets the optimizer voluntarily/early-decommission
+    capacity. Once built (or present as real-world capacity_existing),
+    capacity stays on the books at full nameplate for its ENTIRE lifetime
+    (25-30yr for boilers) regardless of whether running it is still
+    economical.
+
+    So the true sequence is a slow FLEET OVERLAP during a one-way
+    technology transition, not a peak/baseload split: (1) 2020 — the real
+    legacy fossil/biomass fleet covers the flat demand almost entirely,
+    ~100% capacity factor, nameplate ~ output. (2) Heat pumps turn out
+    far cheaper to OPERATE (near-zero marginal cost) despite a >16x CAPEX
+    premium (natural_gas_boiler_industry: 90 EUR/kW vs. heat_pump_
+    industry_150_200_water: 1,461 EUR/kW, capex_specific_conversion), so as
+    the technology-diffusion ramp allows, the model builds heat-pump
+    capacity and shifts nearly all actual output onto it — natural_gas_
+    boiler_industry's capacity factor falls from 100% (2020) to 4-13%
+    (2030+); coal/oil/waste boilers fall to fully idle (0%) by 2022. (3) But
+    the still-young fossil/biomass vintage from 2020-2022 CANNOT be retired
+    early, so it sits on the books doing almost nothing for two decades —
+    this idle-but-still-counted old fleet, stacked on top of the new
+    heat-pump fleet that's actually doing the work, is the entire source of
+    the 48->96 GW apparent "growth." The 96->70 GW drop from 2044 is exactly
+    when that original 2020-2022 vintage finally exhausts its 25-30yr
+    lifetime and leaves the stock (matches fig1b's docstring finding).
+    Not overbuilding, and not a peak-capacity artifact — a mechanical
+    consequence of ZEN-garden having no early-decommissioning decision,
+    combined with a technology cost-crossover partway through the
+    horizon."""
+    r = by_label(runs, "No flexibility")
+    years = get_available_years(r.results)
+
+    def _ordered(df: pd.DataFrame) -> pd.DataFrame:
+        df = df.reindex(
+            [t for t in HEAT_SUPPLY_STACK_ORDER if t in df.index]
+            + [t for t in df.index if t not in HEAT_SUPPLY_STACK_ORDER])
+        return df[[y for y in years if y in df.columns]]
+
+    def _output_avg_gw(techs: list[str]) -> pd.DataFrame:
+        flow_out = r.results.get_total("flow_conversion_output")
+        rows = {}
+        for t in techs:
+            if t not in flow_out.index.get_level_values("technology"):
+                continue
+            s = flow_out.xs(t, level="technology").sum(axis=0) / HOURS_PER_YEAR
+            if (s.abs() > 1e-6).any():
+                rows[t] = s
+        return pd.DataFrame(rows).T if rows else pd.DataFrame()
+
+    heat_df = _ordered(get_capacity(r.results, INDUSTRY_HEAT_TECHS_BOILERS_HP, "power"))
+    add_df = _ordered(get_capacity_addition(r.results, INDUSTRY_HEAT_TECHS_BOILERS_HP, "power"))
+    output_df = _ordered(_output_avg_gw(INDUSTRY_HEAT_TECHS_BOILERS_HP))
+
+    fig, axes = plt.subplots(3, 1, figsize=(0.8 * len(heat_df.columns) + 3, 16))
+    with plt.rc_context({"hatch.linewidth": 0.5}):
+        plot_stacked_bars(heat_df, "Industry Heat Supply Capacity (stock) - No Flexibility",
+                          "GW", axes[0], show_segment_labels=False, show_legend=True,
+                          color_map=HEAT_SUPPLY_COLOR_MAP, hatch_map=HEAT_SUPPLY_HATCH_MAP)
+        plot_stacked_bars(add_df, "Industry Heat Supply Capacity Additions (new builds/period) - No Flexibility",
+                          "GW added", axes[1], show_segment_labels=False, show_legend=False,
+                          color_map=HEAT_SUPPLY_COLOR_MAP, hatch_map=HEAT_SUPPLY_HATCH_MAP)
+        plot_stacked_bars(output_df, "Industry Heat Supply Actual Operated Output (avg GW) - No Flexibility",
+                          "avg GW delivered", axes[2], show_segment_labels=False, show_legend=False,
+                          color_map=HEAT_SUPPLY_COLOR_MAP, hatch_map=HEAT_SUPPLY_HATCH_MAP)
+    for ax in axes:
+        plt.setp(ax.get_xticklabels(), rotation=0)
+    fig.tight_layout()
+    savefig(fig, "fig7_heat_supply_trajectory_no_flexibility")
 
 
 # ── 5: Retrofit carbon-capture tech usage, No flexibility vs. base ─────────
@@ -1890,8 +2046,9 @@ def main() -> None:
     fig4b_industry_fuel_demand_comparison(runs)
     if any(r.label == "No flexibility" for r in runs):
         fig6_diffusion_mechanisms(runs)
+        fig7_heat_supply_trajectory(runs)
     else:
-        print("  skipping fig6_diffusion_mechanisms: 'No flexibility' scenario not loaded")
+        print("  skipping fig6_diffusion_mechanisms/fig7_heat_supply_trajectory: 'No flexibility' scenario not loaded")
     print(f"Done. Figures in {FIGURES_DIR.relative_to(REPO_ROOT)}/")
 
 
