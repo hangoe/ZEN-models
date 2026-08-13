@@ -1,80 +1,72 @@
-"""Compare the three MGA exploration modes (weights, probabilistic, oracle)
-run against Crystal_Ball_ind_heat_v8_0_nodiffusion on Euler.
+"""Compare the four MGA exploration modes (weights, sampling, bbo, oracle)
+run against Crystal_Ball_ind_heat_v8_0_no_flexibility_nodiffusion on Euler.
 
-All three modes explore the same near-optimal space: 6 axes (nuclear,
+All four modes explore the same near-optimal space: 6 axes (nuclear,
 photovoltaics, wind_offshore, wind_onshore capacity additions, biomass
 carrier import, total cost), epsilon = 0.1, same baseline solve -- so their
 results live in one shared coordinate system and can be overlaid directly.
-That shared frame (names/scale/offset/z_star/bounds, and the initial outer
-box A0/b0) is taken from the probabilistic run's own saved polytope.npz
-(data/outputs/euler_outputs_mga/..._MGA_probabilistic/
-..._probabilistic_summary/). The "sanity checks" section of this file's dev
-history (not reproduced here) confirmed weights' own baseline solve
-reproduces that same z* bit-for-bit, and its explored points all fall
-inside the VMM-derived box.
 
-The probabilistic run uses pyoNearOpt's support-function sampling method
-with `tolerance_prob` (the CI-lower-bound convergence bar in
-`pyoNearOpt.metrics.ci_convergence_metric` -- see probabilistic_driver.py)
-set to 0.95, n_samples=2000, max_iterations=500 -- a near-complete-coverage
-bar (need 95% of sampled directions well-approximated). It ran 129
-iterations (of its 500-iteration budget) and had NOT converged
-(converged=False) when the run was stopped; final_gap = 0.140, and
-diagnostics.csv shows ci_lower climbing steadily to 0.94 by the last
-iteration, just short of the 0.95 bar. Note `tolerance_prob` is a
-*confidence* target, not an error tolerance: higher means stricter (more of
-the space must be certified), not looser -- the opposite sense of `epsilon`
-or `tolerance_explore`.
+sampling and bbo both run through pyoNearOpt's generic supf_explore harness
+(near_optimal_tools' shared support-function polytope bookkeeping) and only
+differ in how the next direction to query is picked: sampling scores many
+candidate directions and takes the largest observed inner/outer gap; bbo
+searches for that direction with a black-box optimiser (SHADE) instead. Both
+therefore save their own independent polytope.npz + diagnostics.csv under
+..._MGA_<mode>/..._<mode>_summary/ (data/outputs/euler_outputs_mga/) --
+unlike the older single "probabilistic" run this script used to compare
+against weights/oracle, there is now no one mode whose polytope is *the*
+shared frame by construction. This script picks sampling's own polytope.npz
+as the canonical shared frame for axis names/units/z*/scale/offset (used by
+fig0 and fig1), falling back to bbo's if sampling's is missing, and prints a
+sanity check comparing the two runs' baselines (they
+solve the same cost-optimal model, so z*/bounds/A0/b0 should agree to full
+floating-point precision -- same check this script used to do for weights
+vs. the old probabilistic run). For fig2/fig3 specifically -- the ones this
+project actually cares about *comparing* bbo against sampling on -- each
+mode gets its own inner-hull sample and its own panel; see those functions'
+docstrings.
 
-(An earlier, more loosely converged probabilistic run at tolerance_prob=0.05
-was dropped from this script and its Euler output folder deleted once the
-0.95 run above was available -- it is no longer referenced anywhere below.)
+oracle is now downloaded and wired in like sampling/bbo: 31 points (z*, 10
+VMM bound solves, 20 KKT/MILP refinement iterations named
+..._oracle_iter_<n>, mapped to real per-point solving times by
+load_supf_points exactly like sampling/bbo's own ..._supf_iter_<n> --
+oracle_driver.py just uses a different folder-naming convention for the
+same point_origin schema, see that function's docstring). Every
+oracle-touching step still degrades to "skip, log why" rather than erroring
+if its data is ever incomplete (e.g. a partial re-download): missing
+polytope -> load_oracle_points falls back to a best-effort reconstruction
+from the individual oracle_iter_N / vmm_*_<axis> Postprocess folders, and if
+even those are unreadable, oracle is dropped from every figure rather than
+plotting fabricated data. One real asymmetry remains, not a bug: oracle's
+diagnostics.csv logs its own certified max_min_distance per iteration --
+directly comparable to max_separation, no recomputation needed, so fig4
+DOES include oracle on that one metric (see load_oracle_native_gap) -- but
+not the OA_A/OA_b outer-approximation snapshots sampling/bbo's
+diagnostics.csv has (this run's oracle_driver.py call didn't set
+save_intermediate=True, unlike near_optimal_tools' own reference notebook,
+docs/examples/method_comparison.ipynb, which does and so gets a full
+ci_lower curve for its ORACLE too). Without those snapshots
+fraction_well_explored/ci_lower has nothing to evaluate for oracle, so
+fig4's ci_lower panel stays sampling/bbo-only; see load_oracle_native_gap's
+docstring for the full reasoning and _comparison_figure's in-figure note.
 
-Mode status as of writing:
-  weights              every result folder intact. No polytope: each
-                       iteration is a single min/max-weighted-capacity
-                       solve, not a refinement step.
-  probabilistic         fully intact, including its own polytope.npz +
-                       diagnostics.csv (native ci_lower/ci_upper/mean_gap/
-                       max_gap per iteration, computed against its own
-                       refined outer approximation).
-  oracle               oracle_summary/ (polytope.npz + diagnostics.csv) is
-                       empty -- the run was interrupted before it could
-                       write them, per the user's account of stopping it
-                       because it seemed stuck revisiting the same vertex.
-                       load_oracle_points below reconstructs its trajectory
-                       from the individual oracle_iter_N / vmm_*_<axis>
-                       Postprocess folders (which exist independently of the
-                       lost summary) and degrades gracefully: unreadable
-                       folders are skipped with a logged count, and if
-                       nothing is readable oracle is dropped from every
-                       figure rather than plotting fabricated data (this
-                       mattered during development, when every var_dict.h5
-                       under the oracle folder was truncated by a
-                       mid-download disk-full -- re-running after a clean
-                       download picked the run back up with no code
-                       changes). That reconstruction confirms the user's
-                       account precisely: iterations 13-85 (73 of 85, 86% of
-                       the run) returned the exact same design point
-                       bit-for-bit -- not just a slow approach to one, a
-                       hard stall -- which is visible directly in fig1
-                       (oracle's points forming one dense overlapping
-                       cluster rather than spreading out) and in fig4's
-                       max-separation trace (a flat plateau from ~solve 21
-                       onward).
-
-Convergence metric: pyoNearOpt.metrics.fraction_well_explored and
-max_separation (the same machinery behind probabilistic's own
-ci_convergence_metric and oracle's own max-min distance), evaluated in fig4
-on each mode's growing set of known near-optimal points against one shared,
-FROZEN initial outer box (probabilistic's A0/b0 -- the initial VMM box
-before any cuts). This is deliberately not each method's own native metric:
-oracle's and probabilistic's real outer approximations shrink via cuts as
-they run (information the lost oracle summary can't provide, and weights
-never produces at all), so comparing native metrics would mostly compare cut
-quality, not point coverage. Freezing the box isolates "how much of the
-near-optimal box do the known points cover" as the common denominator -- the
-only question that is fairly askable of weights' 6 directional solves too.
+Convergence metric (fig4): pyoNearOpt.metrics.fraction_well_explored and
+max_separation (the same machinery behind sampling/bbo's own
+ci_convergence_metric and oracle's own max-min distance), evaluated on each
+mode's growing set of known near-optimal points against ITS OWN live,
+evolving outer approximation -- sampling/bbo's fully reconstructed from
+their own cut history (see load_native_outer_at), oracle's own certified gap
+read directly off its own diagnostics for max_separation only (see
+load_oracle_native_gap). An earlier version of this figure also scored every
+mode against one shared, FROZEN initial outer box (the un-cut VMM box before
+any refinement) as a second row, so all modes had one common ruler despite
+each building a different real approximation. That row was dropped: scoring
+against a box that never shrinks conflates "coverage of a fixed region" with
+actual convergence, and made every mode look like it stalled well before it
+actually had (each mode's real, evolving approximation kept shrinking
+substantially past the point the frozen-box metric stopped moving). weights
+never builds an outer approximation at all, so it has no representation in
+fig4 any more -- fig0 remains the figure for weights' own behaviour.
 
 Figures (data/outputs/figures/mga_results/):
   fig0_weights_axis_bars        weights-mode capacity ADDITION per axis, per
@@ -83,46 +75,56 @@ Figures (data/outputs/figures/mga_results/):
                                  exploration directions).
   fig1_pairwise_points           pairwise projections of every mode's actual
                                  visited points, colour-coded by mode.
-  fig2_polytope_samples          hexbin density of a uniform sample of the
-                                 INNER approximation (rejection-sampled from
-                                 probabilistic's outer body -- see
-                                 rejection_sample_inner's docstring and
+  fig2_polytope_samples          One panel per mode with its own polytope
+                                 (sampling, bbo, and oracle once downloaded):
+                                 hexbin density of a uniform sample of THAT
+                                 mode's own INNER approximation
+                                 (rejection-sampled from its own outer body --
+                                 see rejection_sample_inner's docstring and
                                  Steen2026_Thesis Sec 3.3), diagonal = per-axis
                                  marginals, green outline = exact 2D
-                                 projection of the inner hull, modes overlaid.
-  fig3_axis_correlations         Pearson correlation heatmap of the 6 axes
-                                 over the same inner-hull sample (Steen
-                                 2026_Thesis Figure 7 analog): which axes
-                                 substitute (negative) or move together
-                                 (positive) across the near-optimal volume.
-                                 Pearson r is invariant to per-axis affine
-                                 rescaling (verified: physical-unit and
-                                 normalised draws give the same matrix to
-                                 1e-14), so this is on physical units purely
-                                 for readability -- normalising would not
-                                 change a single value.
-  fig4a/b_query/time_comparison  Two figures, matching near_optimal_tools' own
-                                 docs/examples/method_comparison.ipynb layout
-                                 exactly (its method_comparison.png/_time.png):
-                                 columns are max_separation and
+                                 projection of that mode's inner hull; every
+                                 mode's actual points (weights/sampling/bbo/
+                                 oracle) overlaid on every panel for context.
+                                 Side-by-side panels are the actual bbo-vs-
+                                 sampling comparison this project wanted --
+                                 weights never builds a polytope, so it never
+                                 gets its own panel.
+  fig3_axis_correlations         Same per-mode panel layout as fig2, one
+                                 Pearson correlation heatmap of the 6 axes per
+                                 mode's own inner-hull sample (Steen2026_Thesis
+                                 Figure 7 analog): which axes substitute
+                                 (negative) or move together (positive) across
+                                 that mode's own near-optimal volume. Pearson r
+                                 is invariant to per-axis affine rescaling
+                                 (verified: physical-unit and normalised draws
+                                 give the same matrix to 1e-14), so this is on
+                                 physical units purely for readability --
+                                 normalising would not change a single value.
+  fig4a/b_query/time_comparison  Two figures, columns are max_separation and
                                  fraction_well_explored's ci_lower; fig4a's
                                  x-axis is number of model queries, fig4b's is
                                  cumulative real ZEN-garden solving time (log).
-                                 Each has 2 rows: frozen initial box (all
-                                 available modes, this project's own choice for
-                                 a shared comparison) and the probabilistic
-                                 run's own evolving, cut-refined outer
-                                 approximation (reference-equivalent, the only
-                                 mode whose cut history survives -- see
-                                 load_native_outer_at). This file's only
-                                 per-mode convergence trace now (an earlier
-                                 fig1_convergence and
-                                 fig2_axis_range_comparison were dropped:
+                                 One row: each mode's own live, evolving
+                                 approximation -- sampling AND bbo fully
+                                 (reference-equivalent to near_optimal_tools'
+                                 docs/examples/method_comparison.ipynb, see
+                                 load_native_outer_at), oracle on
+                                 max_separation only (see
+                                 load_oracle_native_gap), weights absent (it
+                                 never builds an approximation -- see fig0
+                                 instead). An earlier 2-row version also
+                                 scored every mode against one shared frozen
+                                 initial box; dropped, see the module
+                                 docstring's "Convergence metric" section for
+                                 why. This file's only per-mode convergence
+                                 trace now (an earlier fig1_convergence and
+                                 fig2_axis_range_comparison were dropped too:
                                  the former didn't add much beyond this
                                  figure's own max-separation/query panel, and
                                  the latter mostly just showed which modes
-                                 ran VMM -- probabilistic and oracle both do,
-                                 so they trivially span the full axis range,
+                                 ran VMM -- sampling/bbo/oracle all do, so
+                                 they trivially span the full axis range,
                                  while weights doesn't and so trivially
                                  doesn't; not a real exploration comparison).
 
@@ -162,33 +164,38 @@ from pyoNearOpt.polytope_approximation.polytope_samples import PolytopeSamples
 FIGURES_DIR = REPO_ROOT / "data" / "outputs" / "figures" / "mga_results"
 MGA_ROOT = REPO_ROOT / "data" / "outputs" / "euler_outputs_mga"
 
-MODEL = "Crystal_Ball_ind_heat_v8_0_nodiffusion"
+MODEL = "Crystal_Ball_ind_heat_v8_0_no_flexibility_nodiffusion"
 RUN_PREFIX = f"{MODEL}_2050_1a_5a_interval_5ts_MGA"
 WEIGHTS_DIR = MGA_ROOT / f"{RUN_PREFIX}_weights"
-PROBABILISTIC_DIR = MGA_ROOT / f"{RUN_PREFIX}_probabilistic"
+SAMPLING_DIR = MGA_ROOT / f"{RUN_PREFIX}_sampling"
+BBO_DIR = MGA_ROOT / f"{RUN_PREFIX}_bbo"
 ORACLE_DIR = MGA_ROOT / f"{RUN_PREFIX}_oracle"
+RUN_DIR = {"sampling": SAMPLING_DIR, "bbo": BBO_DIR, "oracle": ORACLE_DIR}
 
-# Positional colours reused from figure_settings.SCENARIO_PALETTE (ETH
-# corporate design: blue, petrol, green, olive, red, magenta, grey), per this
+# Colours reused from figure_settings.SCENARIO_PALETTE (the full 7-color ETH
+# corporate swatch: blue, petrol, green, bronze, red, purple, grey), per this
 # project's convention of never inventing a separate palette for print
-# figures. weights was ETH blue, too close to probabilistic's original
-# petrol to tell apart at a glance; weights moved to green; oracle keeps red.
-_ETH_BLUE, _ETH_GREEN, _ETH_RED = (
-    SCENARIO_PALETTE[0], SCENARIO_PALETTE[2], SCENARIO_PALETTE[4],
+# figures -- picked for maximum pairwise contrast (not adjacent palette
+# slots) per user request: weights=green, sampling=purple/pink, bbo=blue,
+# oracle=bronze/brown.
+_ETH_BLUE, _ETH_GREEN, _ETH_BRONZE, _ETH_RED, _ETH_PURPLE = (
+    SCENARIO_PALETTE[0], SCENARIO_PALETTE[2], SCENARIO_PALETTE[3], SCENARIO_PALETTE[4], SCENARIO_PALETTE[5],
 )
 MODE_COLOR = {
     "weights": _ETH_GREEN,
-    "probabilistic": _ETH_BLUE,
-    "oracle": _ETH_RED,
+    "sampling": _ETH_PURPLE,
+    "bbo": _ETH_BLUE,
+    "oracle": _ETH_BRONZE,
 }
 MODE_LABEL = {
     "weights": "Weights",
     # $\tau$ (mathtext, "cm" fontset) rather than a literal unicode tau --
     # the plain text font (cmr10) has no tau glyph.
-    "probabilistic": r"Probabilistic ($\tau$=0.95)",
+    "sampling": r"Sampling ($\tau$=0.95)",
+    "bbo": r"BBO ($\tau$=0.95)",
     "oracle": "Oracle",
 }
-MODES = ("weights", "probabilistic", "oracle")
+MODES = ("weights", "sampling", "bbo", "oracle")
 
 # config_mga_weights.json's "iterations" list: weight sign, combined with
 # run_iteration's fixed sense="min", determines whether each solve minimises
@@ -276,25 +283,36 @@ def solving_time(folder: Path) -> float:
         return float("nan")
 
 
-def load_shared_polytope() -> Polytope:
-    """The probabilistic run's own polytope.npz: the shared coordinate
-    frame (names/scale/offset/z_star/bounds/initial box) every mode is
-    expressed in, plus its own true (cut-refined) inner+outer approximation."""
-    summary = PROBABILISTIC_DIR / f"{MODEL}_probabilistic_summary"
-    poly_files = sorted(summary.glob("polytope*.npz"))
+def try_load_run_polytope(run_dir: Path, mode: str) -> Polytope | None:
+    """mode's own polytope.npz (sampling/bbo/oracle all save under
+    ..._<mode>_summary/, see supf_driver.py/oracle_driver.py), or None
+    (logged) if the summary folder or its polytope*.npz is missing/unreadable
+    -- e.g. oracle before its download lands, or an interrupted run whose
+    summary was never written (see the module docstring)."""
+    summary = run_dir / f"{MODEL}_{mode}_summary"
+    poly_files = sorted(summary.glob("polytope*.npz")) if summary.exists() else []
     if not poly_files:
-        raise FileNotFoundError(
-            f"No polytope*.npz in {summary}; the probabilistic run is "
-            f"this script's shared coordinate frame and must be present."
-        )
-    return load_polytope(poly_files[0])
+        return None
+    try:
+        return load_polytope(poly_files[0])
+    except Exception as exc:
+        print(f"  {mode}: polytope present at {summary.relative_to(REPO_ROOT)} but unreadable ({exc!r})")
+        return None
 
 
-def load_probabilistic_points(poly: Polytope, run_dir: Path) -> list[tuple[str, np.ndarray, float]]:
-    """[(label, phys_point, solving_time)] for the probabilistic run's own
-    polytope.npz, in solve order (baseline/VMM points, then refinement
-    iterates)."""
-    run_poly = poly
+def load_supf_points(run_poly: Polytope, run_dir: Path,
+                     iter_prefix: str = "supf_iter") -> list[tuple[str, np.ndarray, float]]:
+    """[(label, phys_point, solving_time)] for any mode whose own polytope.npz
+    point_origin follows the shared z_star/max:<axis>/min:<axis>/iterate
+    convention (every mode does -- see polytope_io.py's schema) and whose
+    refinement iterates are saved as one Postprocess folder per iterate,
+    named ..._<iter_prefix>_<n>. Default iter_prefix="supf_iter" covers
+    sampling/bbo (both share supf_explore's folder-naming); pass
+    iter_prefix="oracle_iter" for oracle -- same point_origin convention,
+    different folder name (oracle_driver.py's own per-iteration label), and
+    unlike sampling/bbo it uses a KKT/MILP loop, not supf_explore, but that
+    doesn't matter here since this function only maps points to folders and
+    reads each one's own benchmarking.json, not the exploration logic."""
     iterate_count = 0
     rows = []
     for lab, pt in zip(run_poly.point_origin, run_poly.X):
@@ -302,7 +320,7 @@ def load_probabilistic_points(poly: Polytope, run_dir: Path) -> list[tuple[str, 
             folder = run_dir / MODEL
         elif lab == "iterate":
             iterate_count += 1
-            folder = run_dir / f"{MODEL}_probabilistic_iter_{iterate_count}"
+            folder = run_dir / f"{MODEL}_{iter_prefix}_{iterate_count}"
         else:  # "max:<axis>" / "min:<axis>"
             sense, axis = lab.split(":", 1)
             folder = run_dir / f"{MODEL}_vmm_{sense}_{axis}"
@@ -332,32 +350,21 @@ def load_weights_points(poly: Polytope) -> list[tuple[str, np.ndarray, float]]:
     return rows
 
 
-# ── Oracle mode (best-effort reconstruction) ─────────────────────────────
+# ── Oracle mode (best-effort reconstruction, no polytope available) ──────
+#
+# Only used as a fallback when oracle has NO usable polytope.npz at all (see
+# main(): whenever try_load_run_polytope succeeds for oracle, load_supf_points
+# is used instead -- same as sampling/bbo, with real per-point solving times).
+# This function exists for a run interrupted badly enough that even its own
+# oracle_summary/ was never written (the scenario this project hit with an
+# earlier, unrelated oracle run) -- it reconstructs whatever it can directly
+# from the individual vmm_<sense>_<axis> and oracle_iter_N Postprocess
+# folders, which survive independently of that summary.
 
 def load_oracle_points(poly: Polytope) -> list[tuple[str, np.ndarray, float]] | None:
     """[("z_star", ...), ("max:<axis>"/"min:<axis>", ...)*, (iter_n, ...)*]
-    in solve order, or None if nothing beyond z* is readable.
-
-    Prefers the official oracle_summary/polytope.npz + diagnostics.csv when
-    present and loadable; otherwise reconstructs from the individual
-    vmm_<sense>_<axis> and oracle_iter_N Postprocess folders that survive
-    independently of that summary. See the module docstring for why this is
-    necessary and how it degrades when folders are unreadable.
-    """
-    summary = ORACLE_DIR / f"{MODEL}_oracle_summary"
-    poly_files = sorted(summary.glob("polytope*.npz")) if summary.exists() else []
-    if poly_files:
-        try:
-            official = load_polytope(poly_files[0])
-            print(f"  oracle: loaded official artifacts from {summary.relative_to(REPO_ROOT)}")
-            labels = official.point_origin
-            points_norm = official.X
-            # No per-point folder mapping from the summary alone (repeated
-            # "iterate" origins aren't indexed), so solving_time is unknown here.
-            return [(lab, official.to_phys(pt), float("nan")) for lab, pt in zip(labels, points_norm)]
-        except Exception as exc:
-            print(f"  oracle: official artifacts present but unreadable ({exc!r}); reconstructing from folders")
-
+    in solve order, or None if nothing beyond z* is readable. See the
+    section comment above for when this is used instead of load_supf_points."""
     design_axes = [a for a in poly.meta["axes"] if a["kind"] != "total_cost"]
     rows: list[tuple[str, np.ndarray, float]] = []
     n_vmm_ok = 0
@@ -386,7 +393,7 @@ def load_oracle_points(poly: Polytope) -> list[tuple[str, np.ndarray, float]] | 
     print(
         f"  oracle: reconstructed from folders -- {n_vmm_ok}/{2 * len(design_axes)} VMM bound "
         f"solves and {n_iter_ok}/{len(iter_dirs)} iterations readable "
-        f"(baseline folder is empty; z* taken from the shared probabilistic frame)"
+        f"(baseline folder is empty; z* taken from the shared frame)"
     )
     if n_vmm_ok == 0 and n_iter_ok == 0:
         print("  oracle: nothing readable -- dropping oracle from every figure")
@@ -436,7 +443,7 @@ def _pairwise_grid(names: list[str], units: list[str], title: str, name: str, pl
     if n < 2:
         print(f"  skipping {name}: fewer than 2 design axes")
         return
-    fig, axes = plt.subplots(n - 1, n - 1, figsize=(3.2 * (n - 1), 3.2 * (n - 1)), squeeze=False)
+    fig, axes = plt.subplots(n - 1, n - 1, figsize=(3.4 * (n - 1), 3.4 * (n - 1)), squeeze=False)
     for i in range(1, n):
         for j in range(0, n - 1):
             ax = axes[i - 1, j]
@@ -445,19 +452,19 @@ def _pairwise_grid(names: list[str], units: list[str], title: str, name: str, pl
                 continue
             plot_fn(ax, j, i)
             if i == n - 1:
-                ax.set_xlabel(f"{names[j]}\n[{UNIT_LABEL.get(units[j], units[j] or 'n/a')}]", fontsize=8)
+                ax.set_xlabel(f"{names[j]}\n[{UNIT_LABEL.get(units[j], units[j] or 'n/a')}]", fontsize=11)
             else:
                 ax.set_xticklabels([])
             if j == 0:
-                ax.set_ylabel(f"{names[i]}\n[{UNIT_LABEL.get(units[i], units[i] or 'n/a')}]", fontsize=8)
+                ax.set_ylabel(f"{names[i]}\n[{UNIT_LABEL.get(units[i], units[i] or 'n/a')}]", fontsize=11)
             else:
                 ax.set_yticklabels([])
-            ax.tick_params(labelsize=7)
+            ax.tick_params(labelsize=9)
             ax.grid(alpha=0.25)
     handles, labels = axes[0, 0].get_legend_handles_labels()
     if handles:
-        fig.legend(handles, labels, loc="upper right", fontsize=9, frameon=False)
-    fig.suptitle(title, fontsize=12, fontweight="bold")
+        fig.legend(handles, labels, loc="upper right", fontsize=12, frameon=False)
+    fig.suptitle(title, fontsize=16, fontweight="bold")
     fig.tight_layout(rect=[0, 0, 1, 0.95])
     savefig(fig, name)
 
@@ -499,20 +506,16 @@ def fig1_pairwise_points(poly: Polytope, points: dict[str, list[tuple[str, np.nd
 # walk O cheaply, keep only proposals that also satisfy I's convex-combination
 # membership LP (X^T lambda = z, sum(lambda) = 1, lambda >= 0). The retained
 # fraction estimates vol(I)/vol(O) (his Eq. 13) -- Steen's run of the full
-# 10-D, 700-iteration ORACLE certificate got 11.6% over 9.3M proposals; ours,
-# a 6-D, 129-iteration probabilistic run (tolerance_prob=0.95), gets 84%
-# (see the printed acceptance rate) -- much higher than Steen's, not the same order of
-# magnitude, consistent with tolerance_prob=0.95 pushing this run to
-# near-complete coverage of its (lower-dimensional, 6-D vs. his 10-D) space
-# rather than a coincidence; the useful cross-check is still that the number
-# is a sane fraction and not near-0 or near-1-by-construction, i.e. nothing
-# about the geometry here is pathological. Steen's own proposal count is well
+# 10-D, 700-iteration ORACLE certificate got 11.6% over 9.3M proposals; see
+# each mode's printed acceptance rate for how this run's 6-D sampling/bbo
+# hulls compare (both are run separately now -- one cache/one acceptance
+# rate per mode, see sampling_cache_path). Steen's own proposal count is well
 # beyond this script's purpose; a few tens of thousands is enough for a
 # readable density plot at the same statistical validity, just a noisier one.
 def _poly_fingerprint(poly: Polytope) -> str:
     """Identifies which polytope a cached sample was drawn from, so a stale
-    cache (e.g. after re-downloading a re-run probabilistic mode) is
-    detected and regenerated rather than silently reused."""
+    cache (e.g. after re-downloading a re-run mode) is detected and
+    regenerated rather than silently reused."""
     import hashlib
     h = hashlib.sha256()
     h.update(poly.X.tobytes())
@@ -521,34 +524,42 @@ def _poly_fingerprint(poly: Polytope) -> str:
     return h.hexdigest()
 
 
-SAMPLING_CACHE = MGA_ROOT / "mga_inner_sampling" / "rejection_sample_probabilistic_inner.npz"
+def sampling_cache_path(mode: str) -> Path:
+    """One cache file per mode (sampling/bbo/oracle each have their own
+    independent polytope now, unlike the old single-"probabilistic" cache) --
+    this doubles as the "re-run the sampling for both bbo and sampling
+    outputs" step: each mode's inner-hull sample is a local, LP-only
+    computation over its already-downloaded polytope.npz, run on this
+    machine (not Euler -- there is no HPC-scale work here, just SciPy)."""
+    return MGA_ROOT / "mga_inner_sampling" / f"rejection_sample_{mode}_inner.npz"
 
 
-def cached_rejection_sample_inner(poly: Polytope, n_propose: int = 30_000,
+def cached_rejection_sample_inner(poly: Polytope, mode: str, n_propose: int = 30_000,
                                    seed: int = 0) -> tuple[np.ndarray, float]:
-    """rejection_sample_inner, cached to SAMPLING_CACHE: the sampling in fig2
-    and fig3 depends only on the probabilistic run's polytope (fixed once
-    that run is done, unlike the still-arriving oracle data), so redoing it
-    on every script invocation is pure waste. Regenerates automatically if
-    the polytope, n_propose, or seed have changed since the cache was written."""
+    """rejection_sample_inner, cached to sampling_cache_path(mode): the
+    sampling in fig2/fig3 depends only on that mode's own polytope (fixed
+    once the run is done), so redoing it on every script invocation is pure
+    waste. Regenerates automatically if the polytope, n_propose, or seed have
+    changed since the cache was written."""
+    cache = sampling_cache_path(mode)
     fingerprint = _poly_fingerprint(poly)
-    if SAMPLING_CACHE.exists():
-        cached = np.load(SAMPLING_CACHE)
+    if cache.exists():
+        cached = np.load(cache)
         if (str(cached["fingerprint"]) == fingerprint
                 and int(cached["n_propose"]) == n_propose
                 and int(cached["seed"]) == seed):
-            print(f"  using cached inner sample from {SAMPLING_CACHE.relative_to(REPO_ROOT)} "
+            print(f"  {mode}: using cached inner sample from {cache.relative_to(REPO_ROOT)} "
                   f"({len(cached['samples_norm'])} points, {float(cached['rate']):.2%} acceptance)")
             return cached["samples_norm"], float(cached["rate"])
-        print("  cached inner sample is stale (polytope/n_propose/seed changed); regenerating")
+        print(f"  {mode}: cached inner sample is stale (polytope/n_propose/seed changed); regenerating")
 
     samples_norm, rate = rejection_sample_inner(poly, n_propose, seed)
-    SAMPLING_CACHE.parent.mkdir(parents=True, exist_ok=True)
+    cache.parent.mkdir(parents=True, exist_ok=True)
     np.savez(
-        SAMPLING_CACHE, samples_norm=samples_norm, rate=rate,
+        cache, samples_norm=samples_norm, rate=rate,
         n_propose=n_propose, seed=seed, fingerprint=fingerprint,
     )
-    print(f"  cached inner sample to {SAMPLING_CACHE.relative_to(REPO_ROOT)}")
+    print(f"  {mode}: cached inner sample to {cache.relative_to(REPO_ROOT)} ({len(samples_norm)} points, {rate:.2%} acceptance)")
     return samples_norm, rate
 
 
@@ -572,116 +583,157 @@ def rejection_sample_inner(poly: Polytope, n_propose: int, seed: int = 0) -> tup
     return accepted, rate
 
 
-# ── fig4: hexbin density of the inner approximation's uniform interior samples ─
-# Styled after Steen2026_Thesis Figure 6: hexbin density lower triangle, the
+# ── fig2/fig3: hexbin density / correlations of each mode's OWN inner hull ──
+# Styled after Steen2026_Thesis Figure 6/7: hexbin density lower triangle, the
 # exact 2D projection of I as a green outline (a linear projection of a convex
 # hull is the hull of the projected vertices, so this is just ConvexHull on
 # poly.X's projected columns -- no extra approximation), per-axis marginal
-# histograms on the diagonal, baseline marked. Modes are overlaid as before.
+# histograms on the diagonal, baseline marked, every mode's actual points
+# overlaid for context. Unlike the old 3-mode script (one shared hull, from
+# "probabilistic"), sampling and bbo each get their OWN hull now -- neither is
+# more "correct" than the other, they're independent runs of different
+# direction-selection strategies over the same space -- so this is genuinely
+# a bbo-vs-sampling comparison, not one hull with the other mode's points
+# dropped on top. oracle gets a third panel automatically once its own
+# oracle_summary/polytope.npz exists (see try_load_run_polytope); weights
+# never builds a polytope and so never gets a panel here (see fig0 instead).
+_HULL_MODE_ORDER = ("sampling", "bbo", "oracle")
 
-def fig2_polytope_samples(poly: Polytope, points: dict[str, list[tuple[str, np.ndarray, float]]],
-                           samples_norm: np.ndarray, rate: float) -> None:
-    if len(samples_norm) < 20:
-        print("  skipping fig2_polytope_samples: too few accepted samples for a readable density")
+
+def _hull_modes_to_plot(polys: dict[str, Polytope], samples: dict[str, tuple[np.ndarray, float]]) -> list[str]:
+    return [m for m in _HULL_MODE_ORDER if m in polys and m in samples and len(samples[m][0]) >= 20]
+
+
+def fig2_polytope_samples(polys: dict[str, Polytope], points: dict[str, list[tuple[str, np.ndarray, float]]],
+                           samples: dict[str, tuple[np.ndarray, float]]) -> None:
+    modes_to_plot = _hull_modes_to_plot(polys, samples)
+    if not modes_to_plot:
+        print("  skipping fig2_polytope_samples: no mode has >=20 accepted inner samples")
         return
-    samples_phys = poly.to_phys(samples_norm)
-    modes = [m for m in MODES if m in points]
 
     from scipy.spatial import ConvexHull
 
-    n_z = poly.n_axes
+    n_z = polys[modes_to_plot[0]].n_axes
     if n_z < 2:
         print("  skipping fig2_polytope_samples: fewer than 2 design axes")
         return
-    # Full n_z x n_z triangular grid (unlike _pairwise_grid's (n-1) x (n-1)
-    # off-diagonal-only layout used by fig3): row/col i==j is axis i's own
-    # marginal, so every axis gets one, matching Steen2026_Thesis Figure 6.
-    fig, axes = plt.subplots(n_z, n_z, figsize=(3.0 * n_z, 3.0 * n_z), squeeze=False)
-    first_legend_done = False
-    for i in range(n_z):
-        for j in range(n_z):
-            ax = axes[i, j]
-            if j > i:
-                ax.axis("off")
-                continue
-            if j == i:  # diagonal: per-axis marginal of the inner-body sample
-                ax.hist(samples_phys[:, i], bins=25, color="#6b1f5c", alpha=0.8)
-                ax.set_yticks([])
-                ax.tick_params(labelsize=7)
-            else:
-                ax.hexbin(samples_phys[:, j], samples_phys[:, i], gridsize=22, cmap="magma_r",
-                          mincnt=1, linewidths=0.1)
-                proj = poly.X[:, [j, i]]
-                try:
-                    hull = ConvexHull(proj)
-                    loop = np.append(hull.vertices, hull.vertices[0])
-                    ax.plot(proj[loop, 0] * poly.scale[j] + poly.offset[j],
-                            proj[loop, 1] * poly.scale[i] + poly.offset[i],
-                            color="#2ca02c", linewidth=1.2,
-                            label="exact 2D projection of inner hull" if not first_legend_done else None)
-                except Exception:
-                    pass  # degenerate projection (e.g. collinear points); skip the outline
-                for mode in modes:
-                    phys = np.vstack([p for _, p, _ in points[mode]])
-                    ax.scatter(phys[:, j], phys[:, i], s=14, color=MODE_COLOR[mode], alpha=0.8,
-                               edgecolor="white", linewidth=0.3,
-                               label=MODE_LABEL[mode] if not first_legend_done else None)
-                ax.scatter(poly.z_star_phys[j], poly.z_star_phys[i], marker="D", s=55, color="black",
-                           zorder=5, label="baseline (z*)" if not first_legend_done else None)
-                first_legend_done = True
-            if i == n_z - 1:
-                ax.set_xlabel(f"{poly.names[j]}\n[{UNIT_LABEL.get(poly.units[j], poly.units[j] or 'n/a')}]", fontsize=8)
-            else:
-                ax.set_xticklabels([])
-            if j == 0:
-                ax.set_ylabel(f"{poly.names[i]}\n[{UNIT_LABEL.get(poly.units[i], poly.units[i] or 'n/a')}]", fontsize=8)
-            else:
-                ax.set_yticklabels([])
-            ax.tick_params(labelsize=7)
-    handles, labels = axes[1, 0].get_legend_handles_labels()
-    if handles:
-        fig.legend(handles, labels, loc="upper right", fontsize=9, frameon=False)
+    overlay_modes = [m for m in MODES if m in points]
+
+    fig = plt.figure(figsize=(3.3 * n_z * len(modes_to_plot) + 1.0, 3.3 * n_z + 0.9))
+    subfigs = fig.subfigures(1, len(modes_to_plot))
+    subfigs = np.atleast_1d(subfigs)
+    n_panels = len(modes_to_plot)
+    for panel_idx, (subfig, mode) in enumerate(zip(subfigs, modes_to_plot)):
+        poly = polys[mode]
+        samples_norm, rate = samples[mode]
+        samples_phys = poly.to_phys(samples_norm)
+        # Full n_z x n_z triangular grid (unlike _pairwise_grid's (n-1) x
+        # (n-1) off-diagonal-only layout used by fig1): row/col i==j is axis
+        # i's own marginal, so every axis gets one, matching Steen2026_Thesis
+        # Figure 6.
+        axes = subfig.subplots(n_z, n_z, squeeze=False)
+        first_legend_done = False
+        # Only the rightmost (last) panel keeps its legend -- with one panel
+        # per mode, every panel's legend is otherwise identical (same overlay
+        # modes/baseline/hull-outline label), so repeating it on every panel
+        # only added clutter and, combined with each panel's own suptitle
+        # sitting right above it, is what caused the title/legend overlap.
+        show_legend = panel_idx == n_panels - 1
+        for i in range(n_z):
+            for j in range(n_z):
+                ax = axes[i, j]
+                if j > i:
+                    ax.axis("off")
+                    continue
+                if j == i:  # diagonal: per-axis marginal of the inner-body sample
+                    ax.hist(samples_phys[:, i], bins=25, color="#6b1f5c", alpha=0.8)
+                    ax.set_yticks([])
+                    ax.tick_params(labelsize=9)
+                else:
+                    ax.hexbin(samples_phys[:, j], samples_phys[:, i], gridsize=22, cmap="magma_r",
+                              mincnt=1, linewidths=0.1)
+                    proj = poly.X[:, [j, i]]
+                    try:
+                        hull = ConvexHull(proj)
+                        loop = np.append(hull.vertices, hull.vertices[0])
+                        ax.plot(proj[loop, 0] * poly.scale[j] + poly.offset[j],
+                                proj[loop, 1] * poly.scale[i] + poly.offset[i],
+                                color="#2ca02c", linewidth=1.2,
+                                label="exact 2D projection of this mode's inner hull" if not first_legend_done else None)
+                    except Exception:
+                        pass  # degenerate projection (e.g. collinear points); skip the outline
+                    for m in overlay_modes:
+                        phys = np.vstack([p for _, p, _ in points[m]])
+                        ax.scatter(phys[:, j], phys[:, i], s=14, color=MODE_COLOR[m], alpha=0.8,
+                                   edgecolor="white", linewidth=0.3,
+                                   label=MODE_LABEL[m] if not first_legend_done else None)
+                    ax.scatter(poly.z_star_phys[j], poly.z_star_phys[i], marker="D", s=55, color="black",
+                               zorder=5, label="baseline (z*)" if not first_legend_done else None)
+                    first_legend_done = True
+                if i == n_z - 1:
+                    ax.set_xlabel(f"{poly.names[j]}\n[{UNIT_LABEL.get(poly.units[j], poly.units[j] or 'n/a')}]", fontsize=11)
+                else:
+                    ax.set_xticklabels([])
+                if j == 0:
+                    ax.set_ylabel(f"{poly.names[i]}\n[{UNIT_LABEL.get(poly.units[i], poly.units[i] or 'n/a')}]", fontsize=11)
+                else:
+                    ax.set_yticklabels([])
+                ax.tick_params(labelsize=9)
+        if show_legend:
+            handles, labels = axes[1, 0].get_legend_handles_labels()
+            if handles:
+                subfig.legend(handles, labels, loc="upper right", fontsize=11, frameon=False)
+        subfig.suptitle(
+            f"{MODE_LABEL[mode]} (n={len(samples_norm)}, acceptance {rate:.1%})",
+            fontsize=14, fontweight="bold",
+        )
     fig.suptitle(
-        f"MGA Near-Optimal Interior: Uniform Samples of the Inner Approximation (n={len(samples_norm)}, "
-        f"acceptance {rate:.1%})\nprobabilistic's certified hull; darker hexes = more of the near-optimal volume",
-        fontsize=12, fontweight="bold",
+        "MGA Near-Optimal Interior: Uniform Samples of Each Mode's Own Inner Approximation\n"
+        "darker hexes = more of that mode's near-optimal volume",
+        fontsize=17, fontweight="bold", y=0.99,
     )
-    fig.tight_layout(rect=[0, 0, 1, 0.95])
     savefig(fig, "fig2_polytope_samples")
 
 
-# ── fig3: pairwise Pearson correlation of the axes over the inner samples ──
-# Steen2026_Thesis Figure 7 analog: how the near-optimal *volume* trades axes
-# off against each other (substitution, negative) or moves them together
-# (co-requirement, positive) -- a property of the space itself, not of any
-# single design, so it needs the uniform interior sample from fig4, not just
-# the handful of certified vertices.
+# ── fig3: pairwise Pearson correlation of the axes over each mode's OWN
+# inner samples. Steen2026_Thesis Figure 7 analog: how the near-optimal
+# *volume* trades axes off against each other (substitution, negative) or
+# moves them together (co-requirement, positive) -- a property of the shape
+# of the space, not of any one design, so it needs the uniform interior
+# sample from fig2, not just the handful of certified vertices. One heatmap
+# per mode, side by side, for the same bbo-vs-sampling comparison as fig2.
 
-def fig3_axis_correlations(poly: Polytope, samples_norm: np.ndarray) -> None:
-    if len(samples_norm) < 20:
-        print("  skipping fig3_axis_correlations: too few inner samples")
+def fig3_axis_correlations(polys: dict[str, Polytope], samples: dict[str, tuple[np.ndarray, float]]) -> None:
+    modes_to_plot = _hull_modes_to_plot(polys, samples)
+    if not modes_to_plot:
+        print("  skipping fig3_axis_correlations: no mode has >=20 inner samples")
         return
-    df = pd.DataFrame(poly.to_phys(samples_norm), columns=poly.names)
-    corr = df.corr(method="pearson")
 
-    fig, ax = plt.subplots(figsize=(7.5, 6.5))
-    im = ax.imshow(corr.to_numpy(), cmap="RdBu_r", vmin=-1, vmax=1)
-    ax.set_xticks(range(len(poly.names)))
-    ax.set_yticks(range(len(poly.names)))
-    ax.set_xticklabels(poly.names, rotation=45, ha="right", fontsize=9)
-    ax.set_yticklabels(poly.names, fontsize=9)
-    for i in range(len(poly.names)):
-        for j in range(len(poly.names)):
-            v = corr.to_numpy()[i, j]
-            ax.text(j, i, f"{v:.2f}", ha="center", va="center", fontsize=8,
-                    color="white" if abs(v) > 0.6 else "black")
-    fig.colorbar(im, ax=ax, label="Pearson r", shrink=0.85)
-    ax.set_title(
-        f"MGA Pairwise Axis Correlations over the Near-Optimal Interior (n={len(samples_norm)})\n"
-        "negative = substitution, positive = co-requirement (probabilistic's inner hull)",
-        fontsize=11, fontweight="bold",
+    fig, axes = plt.subplots(1, len(modes_to_plot), figsize=(6.5 * len(modes_to_plot) + 1.0, 6.0), squeeze=False)
+    axes = axes[0]
+    im = None
+    for ax, mode in zip(axes, modes_to_plot):
+        poly = polys[mode]
+        samples_norm, rate = samples[mode]
+        df = pd.DataFrame(poly.to_phys(samples_norm), columns=poly.names)
+        corr = df.corr(method="pearson")
+        im = ax.imshow(corr.to_numpy(), cmap="RdBu_r", vmin=-1, vmax=1)
+        ax.set_xticks(range(len(poly.names)))
+        ax.set_yticks(range(len(poly.names)))
+        ax.set_xticklabels(poly.names, rotation=45, ha="right", fontsize=8)
+        ax.set_yticklabels(poly.names, fontsize=8)
+        for i in range(len(poly.names)):
+            for j in range(len(poly.names)):
+                v = corr.to_numpy()[i, j]
+                ax.text(j, i, f"{v:.2f}", ha="center", va="center", fontsize=7,
+                        color="white" if abs(v) > 0.6 else "black")
+        ax.set_title(f"{MODE_LABEL[mode]} (n={len(samples_norm)})", fontsize=10, fontweight="bold")
+    fig.colorbar(im, ax=axes.tolist(), label="Pearson r", shrink=0.85)
+    fig.suptitle(
+        "MGA Pairwise Axis Correlations over Each Mode's Own Near-Optimal Interior\n"
+        "negative = substitution, positive = co-requirement",
+        fontsize=12, fontweight="bold",
     )
-    fig.tight_layout()
     savefig(fig, "fig3_axis_correlations")
 
 
@@ -691,15 +743,12 @@ def fig3_axis_correlations(poly: Polytope, samples_norm: np.ndarray) -> None:
 # it's only evaluated at sparse checkpoints, as the reference notebook itself
 # does via its "eval_every" config); fraction_well_explored's ci_lower is the
 # same cheap LP-based metric used throughout this script. Both are evaluated
-# against poly's frozen initial outer box (poly.A/b up to n_initial_rows --
-# i.e. ignoring any cuts later refined into the full poly.A) rather than each
-# mode's own native, possibly-cut-refined outer approximation -- see the
-# module docstring's "Convergence metric" section for why. "seconds" is the
-# real cumulative ZEN-garden solving_time from each solve's benchmarking.json
-# -- not wall-clock around the whole loop like the reference notebook's
-# TimedCallback, and for oracle specifically it excludes the per-iteration
-# max-min MILP time (lost with the oracle_summary that was never written),
-# so oracle's true wall time is understated here; see module docstring.
+# against each mode's own live, evolving outer approximation (outer_at(k),
+# see load_native_outer_at) -- see the module docstring's "Convergence
+# metric" section for why an earlier, shared frozen-box version was dropped.
+# "seconds" is the real cumulative ZEN-garden solving_time from each solve's
+# benchmarking.json -- not wall-clock around the whole loop like the
+# reference notebook's TimedCallback.
 
 def _gurobi_maxsep_solver(time_limit: float = 30.0):
     import pyomo.environ as pyo
@@ -709,15 +758,11 @@ def _gurobi_maxsep_solver(time_limit: float = 30.0):
 
 
 def query_time_scores(poly: Polytope, X_norm: np.ndarray, solve_seconds: list[float],
-                       eval_every: int, outer_at=None) -> pd.DataFrame:
+                       eval_every: int, outer_at) -> pd.DataFrame:
     """outer_at(k) -> (A_k, b_k), the outer approximation to score checkpoint k
-    against. Defaults to poly's frozen initial box for every k (see the module
-    docstring's "Convergence metric" section); pass native_outer_at's result
-    instead to score against each run's own evolving, cut-refined outer
-    approximation, as the reference notebook's own score_run does."""
-    if outer_at is None:
-        A0, b0 = poly.A[: poly.n_initial_rows], poly.b[: poly.n_initial_rows]
-        outer_at = lambda k: (A0, b0)
+    against -- pass load_native_outer_at's result to score against a run's
+    own evolving, cut-refined outer approximation, as the reference
+    notebook's own score_run does."""
     # NaN entries are points with no logged solve (e.g. the shared frame's z*
     # borrowed for oracle, or a missing benchmarking.json): treated as 0s so
     # one NaN doesn't poison every later cumulative value, at the cost of a
@@ -746,30 +791,34 @@ def query_time_scores(poly: Polytope, X_norm: np.ndarray, solve_seconds: list[fl
     return pd.DataFrame(rows)
 
 
-# ── Native (own evolving) outer approximation, probabilistic modes only ──
+# ── Native (own evolving) outer approximation, supf modes only ──────────
 #
 # The reference notebook's own score_run scores each method against ITS OWN
 # stored approximation state at each checkpoint (oracle_states/direction_
 # states keep a full A/b/X snapshot per iteration) -- not a shared frozen
 # box. query_time_scores above deliberately does NOT do that (see its
 # docstring and the module docstring's "Convergence metric" section): oracle's
-# own cut history was lost with its oracle_summary/, and weights never builds
-# an outer approximation at all, so a fair *shared* comparison across all
-# three modes needs everyone evaluated against the same fixed initial box.
+# own cut history is lost if its oracle_summary/ was never written, and
+# weights never builds an outer approximation at all, so a fair *shared*
+# comparison across every mode needs everyone evaluated against the same
+# fixed initial box.
 #
-# But for the probabilistic run specifically, the cut history was NOT lost:
+# But for sampling and bbo specifically, the cut history is NOT lost:
 # supf_explore.explore calls poly_approx.add_point(new_point) and
 # poly_approx.add_cut(direction, support_value) exactly once per iteration
 # (near_optimal_tools/src/pyoNearOpt/exploration_methods/supf_explore.py),
-# and diagnostics.csv logs precisely those two raw arguments every iteration.
-# Replaying them in order therefore reconstructs each iteration's own live
-# A_k/b_k exactly -- verified directly: reconstructing the run's full cut
-# history this way and comparing against its own saved final A/b gives an
-# identical feasible region (same shape, and every one of 20,000 random test
-# points agrees on which polytope contains it). So this project CAN add a
-# faithful, reference-notebook-equivalent "own approximation" row for
-# probabilistic; it still cannot for oracle (no surviving cut data at all)
-# or weights (no such object exists for that mode).
+# and each run's own diagnostics.csv logs precisely those two raw arguments
+# every iteration. Replaying them in order therefore reconstructs each
+# iteration's own live A_k/b_k exactly -- verified directly (on the old
+# 3-mode script's single "probabilistic" run this was based on):
+# reconstructing a run's full cut history this way and comparing against its
+# own saved final A/b gives an identical feasible region (same shape, and
+# every one of 20,000 random test points agrees on which polytope contains
+# it). So this project CAN add a faithful, reference-notebook-equivalent "own
+# approximation" row for BOTH sampling and bbo now (same shared
+# supf_explore/_run_supf_mode harness, see the module docstring); it still
+# cannot for oracle (no surviving cut data at all) or weights (no such object
+# exists for that mode).
 def _parse_diagnostics_vector(s: str) -> np.ndarray:
     """Parses one diagnostics.csv cut_direction cell -- numpy's default
     array repr (e.g. '[ 0.36 -0.62 ... ]', occasionally wrapped over several
@@ -777,12 +826,14 @@ def _parse_diagnostics_vector(s: str) -> np.ndarray:
     return np.array([float(x) for x in s.strip().lstrip("[").rstrip("]").split()])
 
 
-def load_native_outer_at(run_dir: Path, run_poly: Polytope):
+def load_native_outer_at(run_dir: Path, run_poly: Polytope, mode: str):
     """outer_at(k) callable (see query_time_scores) that reconstructs
     run_dir's own evolving outer approximation at checkpoint k from its
-    diagnostics.csv cut history, falling back to the frozen initial box for
-    any k before the first iterate (the initial VMM/baseline points)."""
-    summary = run_dir / f"{MODEL}_probabilistic_summary"
+    diagnostics.csv cut history, falling back to this run's own un-cut
+    initial VMM box for any k before its first iterate. Works for any
+    supf-mode run (sampling or bbo -- both save the same diagnostics.csv
+    schema via supf_driver.py's shared _run_supf_mode)."""
+    summary = run_dir / f"{MODEL}_{mode}_summary"
     diagnostics = pd.read_csv(summary / "diagnostics.csv")
     cuts_m = np.vstack([_parse_diagnostics_vector(s) for s in diagnostics["cut_direction"]])
     cuts_b = diagnostics["cut_support_value"].to_numpy(dtype=float)
@@ -799,104 +850,214 @@ def load_native_outer_at(run_dir: Path, run_poly: Polytope):
     return outer_at
 
 
-def _compute_fig4_scores(poly: Polytope, points: dict[str, list[tuple[str, np.ndarray, float]]]):
-    """Frozen-box scores for every available mode, plus a native (own evolving
-    approximation) score for the probabilistic mode. Shared by both fig4a (vs
-    queries) and fig4b (vs time) so the MILP solves only run once."""
-    modes = [m for m in MODES if m in points]
-    eval_every = {"weights": 1, "probabilistic": 10, "oracle": 10}
-    scores = {}
-    for mode in modes:
-        labels, phys, secs = zip(*points[mode])
-        X_norm = poly.to_norm(np.vstack(phys))
-        print(f"  fig4: scoring {mode} ({len(X_norm)} points, "
-              f"every {eval_every.get(mode, 5)}th checkpoint, frozen box)...")
-        scores[mode] = query_time_scores(poly, X_norm, list(secs), eval_every.get(mode, 5))
+# ── Oracle's OWN native gap (max_min_distance), not a reconstructed approx ─
+#
+# oracle can't get a full "own evolving approximation" row like sampling/bbo
+# (see load_native_outer_at's docstring: no OA_A/OA_b snapshots saved), but
+# it does not need one for max_separation specifically: near_optimal_tools'
+# ORACLE.explore() calls self.poly_approx.add_cut(mu_cut, b_cut) once per
+# iteration (near_optimal_tools/src/pyoNearOpt/exploration_methods/ORACLE.py)
+# and, immediately before that, computes and logs max_distance = d_IO -- the
+# EXACT max-min L-inf distance between the current inner and outer
+# approximations (an exact MILP solve, `calculate_outer_inner_distance`).
+# That is not an approximation of max_separation; it IS max_separation,
+# computed by the run itself, natively, every iteration -- pyoNearOpt.metrics
+# .max_separation (what query_time_scores calls for every OTHER line on this
+# panel) solves the exact same d_IO formula. So oracle's own diagnostics.csv
+# already contains this row's one usable metric with no reconstruction risk
+# at all -- more faithful than sampling/bbo's replayed-cut lines sharing the
+# panel with it, if anything.
+#
+# There is no oracle line on the ci_lower panel here, but NOT because the
+# metric is conceptually inapplicable to oracle -- fraction_well_explored/
+# ci_lower is a post-hoc diagnostic (draw n_samples random test directions,
+# check each one's gap against a STORED (A, b, X) snapshot) that doesn't
+# care how that snapshot was produced. The reference notebook proves this
+# directly: near_optimal_tools' own docs/examples/method_comparison.ipynb
+# calls its ORACLE with save_intermediate=True precisely so it can rebuild
+# an `approximation` object per iteration (its own oracle_states helper) and
+# run BOTH max_separation and fraction_well_explored on it, exactly like
+# every direction-based method there. This project's oracle run simply
+# didn't set that flag (oracle_driver.py calls near_optimal_tools' ORACLE
+# without it), so no per-iteration OA_A/OA_b snapshot survives for THIS run
+# to rebuild that object from -- a data-availability gap in this particular
+# download, fixable with a future oracle re-run, not a limitation of the
+# method or the metric.
+def load_oracle_native_gap(run_dir: Path, run_poly: Polytope,
+                           points_oracle: list[tuple[str, np.ndarray, float]]) -> pd.DataFrame | None:
+    """[n_queries, seconds, max_separation] for oracle's own max_min_distance
+    trajectory -- same column shape as query_time_scores' output, so it can
+    be overlaid on the same axes via _comparison_figure, but sourced directly
+    from diagnostics.csv rather than recomputed. None if diagnostics.csv is
+    missing/unreadable (e.g. oracle_summary/ never written -- see the module
+    docstring's data-loss note)."""
+    summary = run_dir / f"{MODEL}_oracle_summary"
+    try:
+        diagnostics = pd.read_csv(summary / "diagnostics.csv")
+    except Exception as exc:
+        print(f"  oracle: no native gap available ({exc!r})")
+        return None
 
-    # Native row: the probabilistic run scored against its OWN evolving,
-    # cut-refined outer approximation instead of the frozen box -- i.e. the
-    # reference notebook's own score_run methodology exactly (see
-    # load_native_outer_at's docstring). Only possible for probabilistic:
-    # oracle's cut history is gone (data-loss note) and weights never builds
-    # an outer approximation at all.
+    iterations_done = int(run_poly.run.get("iterations_done", len(diagnostics)))
+    n_initial_points = sum(1 for origin in run_poly.point_origin if origin != "iterate")
+    cum_seconds = np.cumsum(np.nan_to_num([t for _, _, t in points_oracle], nan=0.0))
+
+    rows = []
+    for _, row in diagnostics.iterrows():
+        it = int(row["iteration"])
+        if it > iterations_done or pd.isna(row["max_min_distance"]):
+            continue
+        # calculate_outer_inner_distance() runs BEFORE this iteration's own
+        # point is added (see ORACLE.py's explore loop), so max_min_distance
+        # at iteration `it` reflects the approximation as it stood after
+        # `it - 1` oracle iterates -- same "checked before add_point"
+        # convention documented for supf modes elsewhere in this file.
+        n_queries = n_initial_points + it - 1
+        if not (1 <= n_queries <= len(cum_seconds)):
+            continue
+        rows.append({
+            "n_queries": n_queries, "seconds": cum_seconds[n_queries - 1],
+            "max_separation": float(row["max_min_distance"]),
+        })
+    return pd.DataFrame(rows) if rows else None
+
+
+def _compute_fig4_scores(points: dict[str, list[tuple[str, np.ndarray, float]]],
+                         polys: dict[str, Polytope]):
+    """A native (own evolving approximation) score for every supf mode
+    (sampling and bbo -- both now have surviving diagnostics.csv, unlike the
+    old 3-mode script where only "probabilistic" did), and oracle's own
+    certified max_separation-only gap (see load_oracle_native_gap). weights
+    has no representation here at all -- see the module docstring's
+    "Convergence metric" section. Shared by both fig4a (vs queries) and
+    fig4b (vs time) so the MILP solves only run once."""
+    eval_every = {"sampling": 10, "bbo": 10}
+
+    # Each supf mode scored against its OWN evolving, cut-refined outer
+    # approximation -- i.e. the reference notebook's own score_run
+    # methodology exactly (see load_native_outer_at's docstring). Only
+    # possible for sampling/bbo:
+    # their diagnostics.csv logs the incremental cut_direction/cut_support_value
+    # each iteration adds, letting outer_at(k) be replayed exactly; oracle's
+    # diagnostics.csv logs its own certified max_min_distance instead (no
+    # recomputation needed for that quantity, but no OA_A/OA_b snapshots
+    # either, so its OWN evolving box can't be reconstructed here), and
+    # weights never builds an outer approximation at all. Each mode is scored
+    # against ITS OWN polytope (polys[mode]), not the shared frame -- their
+    # own X/A/b differ even though the axes/units they're expressed in are
+    # the same.
     native_scores = {}
     tolerance_prob = {}
-    for mode, run_dir in (("probabilistic", PROBABILISTIC_DIR),):
-        if mode not in points:
+    for mode, run_dir in (("sampling", SAMPLING_DIR), ("bbo", BBO_DIR)):
+        if mode not in points or mode not in polys:
             continue
-        run_poly = poly
+        run_poly = polys[mode]
         tolerance_prob[mode] = float(run_poly.convergence_threshold)
-        outer_at = load_native_outer_at(run_dir, run_poly)
+        outer_at = load_native_outer_at(run_dir, run_poly, mode)
         labels, phys, secs = zip(*points[mode])
-        X_norm = poly.to_norm(np.vstack(phys))
+        X_norm = run_poly.to_norm(np.vstack(phys))
         print(f"  fig4: scoring {mode} ({len(X_norm)} points, "
               f"every {eval_every.get(mode, 5)}th checkpoint, own evolving approximation)...")
-        native_scores[mode] = query_time_scores(poly, X_norm, list(secs), eval_every.get(mode, 5),
+        native_scores[mode] = query_time_scores(run_poly, X_norm, list(secs), eval_every.get(mode, 5),
                                                  outer_at=outer_at)
-    return scores, native_scores, tolerance_prob
+
+    # oracle's own certified gap -- max_separation only, no ci_lower; see
+    # load_oracle_native_gap's docstring for why this is a legitimate,
+    # non-recomputed addition rather than a stretch to match sampling/bbo.
+    # oracle_tol is its own real target for THIS metric (convergence_threshold
+    # is a max_min_distance/L-inf bound for oracle -- see polytope_io.py's
+    # schema docstring), exactly like the reference notebook's ORACLE gets a
+    # `cfg["separation_tol"]` axhline on its max_separation panel (its
+    # comparison_figure draws that line for every method from one shared
+    # config value; here only oracle actually targets this metric natively,
+    # so only oracle gets the line -- sampling/bbo's tolerance_prob is a
+    # ci_lower-type target, not a max_separation-type one).
+    oracle_native_gap = None
+    oracle_tol = None
+    if "oracle" in points and "oracle" in polys:
+        oracle_native_gap = load_oracle_native_gap(ORACLE_DIR, polys["oracle"], points["oracle"])
+        if oracle_native_gap is not None:
+            oracle_tol = float(polys["oracle"].convergence_threshold)
+
+    return native_scores, tolerance_prob, oracle_native_gap, oracle_tol
 
 
 def _comparison_figure(x_column: str, x_label: str, name: str, title: str,
-                       scores: dict, native_scores: dict, tolerance_prob: dict, log_x: bool) -> None:
-    """One query-time comparison figure, columns/rows matching the reference
-    notebook's own comparison_figure exactly (near_optimal_tools/docs/examples/
-    method_comparison.ipynb): columns are the two metrics (max_separation |
-    fraction_well_explored's ci_lower), not the two x-axis choices -- an
-    earlier version of this project's fig4 put the x-axis choice in the
-    columns instead (metric in rows), which showed the same four combinations
-    but did not read side by side against the reference's own figures the way
-    this layout does. The reference itself makes one row per test-problem
-    dimensionality (its "case"); this project has only one real problem (the
-    6-D MGA space), so the row grouping is repurposed for "which outer
-    approximation was scored against" instead: frozen initial box (row 1, all
-    available modes, comparable but not each mode's own criterion -- see the
-    module docstring's "Convergence metric" section) vs. each probabilistic
-    run's own live, cut-refined approximation (row 2, reference-equivalent,
-    restricted to the two modes whose cut history survives)."""
-    has_native = bool(native_scores)
-    n_rows = 2 if has_native else 1
-    fig, axes = plt.subplots(n_rows, 2, figsize=(11, 4.2 * n_rows), squeeze=False, constrained_layout=True)
-    ax_sep, ax_ci = axes[0]
+                       native_scores: dict, tolerance_prob: dict, log_x: bool,
+                       oracle_native_gap: pd.DataFrame | None = None, oracle_tol: float | None = None) -> None:
+    """One query-time comparison figure, columns matching the reference
+    notebook's own comparison_figure (near_optimal_tools/docs/examples/
+    method_comparison.ipynb): max_separation | fraction_well_explored's
+    ci_lower. Every mode shown is scored against ITS OWN live approximation
+    -- sampling/bbo fully reconstructed and scored (see load_native_outer_at,
+    reference-equivalent to the notebook's own score_run), oracle's own
+    certified max_separation read directly off its diagnostics (see
+    load_oracle_native_gap) with no ci_lower equivalent (see that function's
+    docstring for why). weights never appears here: it never builds an
+    outer approximation at all -- see fig0 for weights' own behaviour. An
+    earlier version also scored every mode against one shared frozen initial
+    box; dropped, see the module docstring's "Convergence metric" section."""
+    fig, (ax_sep, ax_ci) = plt.subplots(1, 2, figsize=(11, 4.2), constrained_layout=True)
 
-    for mode, df in scores.items():
+    for mode, df in native_scores.items():
         color = MODE_COLOR[mode]
         group = df[df[x_column] > 0] if log_x else df  # "the initial state sits at zero"
         ax_sep.plot(group[x_column], group["max_separation"], marker="o", markersize=4,
                    color=color, label=MODE_LABEL[mode])
         ax_ci.plot(group[x_column], group["ci_lower"], marker="o", markersize=4, color=color)
+        # Each run's own real convergence target for THIS metric: its own
+        # tolerance_prob (see README), colour-matched, exactly like the
+        # reference's cfg["tolerance_prob"] axhline. No target line on the
+        # max_separation panel: unlike ORACLE's own "tol" in the reference
+        # notebook, sampling/bbo never target an exact worst-case
+        # max_separation bound at all.
+        ax_ci.axhline(tolerance_prob[mode], color=color, ls="--", lw=1)
+    if oracle_native_gap is not None:
+        # oracle's own EXACT max_min_distance (see load_oracle_native_gap)
+        # -- dashed + triangle markers to visually flag "read directly off
+        # this run's own diagnostics", not reconstructed/recomputed the way
+        # sampling/bbo's lines on this same axes are. oracle_tol is its own
+        # real target for this metric (a max_min_distance/L-inf bound,
+        # unlike sampling/bbo's CI-based tolerance_prob) -- matching the
+        # reference notebook's own ORACLE, which gets this exact axhline on
+        # its max_separation panel too (comparison_figure's
+        # cfg["separation_tol"] line).
+        group = oracle_native_gap[oracle_native_gap[x_column] > 0] if log_x else oracle_native_gap
+        ax_sep.plot(group[x_column], group["max_separation"], marker="^", markersize=5,
+                   color=MODE_COLOR["oracle"], linestyle="--", label=MODE_LABEL["oracle"])
+        if oracle_tol is not None:
+            ax_sep.axhline(oracle_tol, color=MODE_COLOR["oracle"], ls=":", lw=1)
     ax_sep.set_yscale("log")
-    ax_sep.set_title("max separation (frozen initial box)")
+    ax_sep.set_title("max separation")
     ax_sep.set_ylabel("max $L_\\infty$ separation")
-    ax_ci.set_title("directions with gap $\\leq$ 0.1, 95% CI lower bound (frozen initial box)")
+    ax_ci.set_title("directions with gap $\\leq$ 0.1, 95% CI lower bound")
     ax_ci.set_ylabel("fraction of well-explored directions")
     ax_ci.set_ylim(-0.03, 1.03)
+    weights_note = "weights not shown here: it never builds an approximation at all."
+    # NOT "oracle never samples directions so ci_lower is undefined for it"
+    # -- fraction_well_explored is a post-hoc diagnostic that only needs a
+    # stored (A, b, X) snapshot, and the reference notebook DOES compute it
+    # for its own ORACLE (oracle_states relies on save_intermediate=True).
+    # The real reason is narrower: THIS run's oracle_driver.py didn't
+    # request that flag, so no per-iteration OA_A/OA_b snapshot survives to
+    # build that object from -- a data gap specific to this download,
+    # fixable in a future oracle re-run, not a property of the method itself.
+    oracle_note = (
+        "oracle has no line here (own max separation is shown on the left\n"
+        "instead): fraction_well_explored needs a stored (A, b, X)\n"
+        "snapshot per iteration, and this run's diagnostics don't save\n"
+        "one (save_intermediate wasn't set) -- see load_oracle_native_gap."
+        if oracle_native_gap is not None else
+        "oracle not shown here at all: its diagnostics save neither a\n"
+        "direction sample (no ci_lower) nor OA snapshots (no max\n"
+        "separation reconstruction either) -- see load_oracle_native_gap."
+    )
+    ax_ci.text(
+        0.02, 0.03, f"{oracle_note}\n{weights_note}",
+        transform=ax_ci.transAxes, fontsize=6.8, color="#555555", va="bottom",
+    )
 
-    if has_native:
-        ax_sep_n, ax_ci_n = axes[1]
-        for mode, df in native_scores.items():
-            color = MODE_COLOR[mode]
-            group = df[df[x_column] > 0] if log_x else df
-            ax_sep_n.plot(group[x_column], group["max_separation"], marker="o", markersize=4, color=color)
-            ax_ci_n.plot(group[x_column], group["ci_lower"], marker="o", markersize=4, color=color)
-            # Each run's own real convergence target for THIS metric: its own
-            # tolerance_prob (0.05 short / 0.95 long -- see README), colour-
-            # matched, exactly like the reference's cfg["tolerance_prob"]
-            # axhline. No target line on the max_separation panel: unlike
-            # ORACLE's own "tol" in the reference notebook, probabilistic mode
-            # never targets an exact worst-case max_separation bound at all.
-            ax_ci_n.axhline(tolerance_prob[mode], color=color, ls="--", lw=1)
-        ax_sep_n.set_yscale("log")
-        ax_sep_n.set_title("max separation (own evolving approximation)")
-        ax_sep_n.set_ylabel("max $L_\\infty$ separation")
-        ax_ci_n.set_title("directions with gap $\\leq$ 0.1, 95% CI lower bound (own evolving approximation)")
-        ax_ci_n.set_ylabel("fraction of well-explored directions")
-        ax_ci_n.set_ylim(-0.03, 1.03)
-        ax_sep_n.text(
-            0.02, 0.03, "oracle/weights not shown here: oracle's cut history\nwas lost; weights never builds one.",
-            transform=ax_sep_n.transAxes, fontsize=7.5, color="#555555", va="bottom",
-        )
-
-    for ax in axes.flat:
+    for ax in (ax_sep, ax_ci):
         ax.set_xlabel(x_label)
         if log_x:
             ax.set_xscale("log")
@@ -906,30 +1067,63 @@ def _comparison_figure(x_column: str, x_label: str, name: str, title: str,
     savefig(fig, name)
 
 
-def fig4_query_time_comparison(poly: Polytope, points: dict[str, list[tuple[str, np.ndarray, float]]]) -> None:
-    scores, native_scores, tolerance_prob = _compute_fig4_scores(poly, points)
-    if not scores:
+def fig4_query_time_comparison(points: dict[str, list[tuple[str, np.ndarray, float]]],
+                               polys: dict[str, Polytope]) -> None:
+    native_scores, tolerance_prob, oracle_native_gap, oracle_tol = _compute_fig4_scores(points, polys)
+    if not native_scores and oracle_native_gap is None:
         print("  skipping fig4_query_time_comparison: no scored modes")
         return
     _comparison_figure(
         "n_queries", "number of model queries", "fig4a_query_comparison",
         "MGA Method Comparison vs. Model Queries\n"
         "(cf. near_optimal_tools docs/examples/method_comparison.ipynb, method_comparison.png)",
-        scores, native_scores, tolerance_prob, log_x=False,
+        native_scores, tolerance_prob, log_x=False,
+        oracle_native_gap=oracle_native_gap, oracle_tol=oracle_tol,
     )
     _comparison_figure(
         "seconds", "cumulative ZEN-garden solving time [s]", "fig4b_time_comparison",
         "MGA Method Comparison vs. Cumulative Solving Time\n"
         "(cf. near_optimal_tools docs/examples/method_comparison.ipynb, method_comparison_time.png)",
-        scores, native_scores, tolerance_prob, log_x=True,
+        native_scores, tolerance_prob, log_x=True,
+        oracle_native_gap=oracle_native_gap, oracle_tol=oracle_tol,
     )
 
 
 # ── Main ──────────────────────────────────────────────────────────────────
 
 def main() -> None:
-    poly = load_shared_polytope()
-    print(f"Shared frame: axes={poly.names}, epsilon={poly.epsilon:g}, c_star={poly.c_star:,.0f}")
+    print("Loading run polytopes...")
+    polys: dict[str, Polytope] = {}
+    for mode, run_dir in (("sampling", SAMPLING_DIR), ("bbo", BBO_DIR), ("oracle", ORACLE_DIR)):
+        run_poly = try_load_run_polytope(run_dir, mode)
+        if run_poly is not None:
+            polys[mode] = run_poly
+            print(f"  {mode}: polytope loaded ({run_poly.X.shape[0]} points on disk, "
+                  f"converged={run_poly.converged}, {run_poly.run.get('iterations_done', '?')} iterations, "
+                  f"tolerance_prob={run_poly.convergence_threshold:g})")
+        else:
+            note = "placeholder -- not yet downloaded" if mode == "oracle" else "skipping this mode entirely"
+            print(f"  {mode}: no usable polytope.npz under {run_dir.relative_to(REPO_ROOT)} ({note})")
+
+    if "sampling" not in polys and "bbo" not in polys:
+        raise SystemExit(
+            "Neither sampling nor bbo has a usable polytope -- nothing to build "
+            "the shared coordinate frame or fig2/fig3 from."
+        )
+
+    # Shared coordinate frame (axis names/units/z*/scale/offset, used by fig0
+    # and fig1) -- sampling's own polytope, falling back to bbo's if
+    # sampling isn't available. See module docstring.
+    frame_mode = "sampling" if "sampling" in polys else "bbo"
+    poly = polys[frame_mode]
+    print(f"Shared frame (from {frame_mode}): axes={poly.names}, epsilon={poly.epsilon:g}, c_star={poly.c_star:,.0f}")
+    if "sampling" in polys and "bbo" in polys:
+        z_diff = float(np.abs(polys["sampling"].z_star_phys - polys["bbo"].z_star_phys).max())
+        if z_diff > 1e-6:
+            print(f"  WARNING: sampling's and bbo's baselines (z*) differ by up to {z_diff:g} -- "
+                  f"expected bit-for-bit identical (same model, same cost-optimal baseline solve)")
+        else:
+            print(f"  sanity check: sampling's and bbo's baselines (z*) agree to {z_diff:g} -- same problem, confirmed")
 
     points: dict[str, list[tuple[str, np.ndarray, float]]] = {}
 
@@ -938,16 +1132,27 @@ def main() -> None:
     if w:
         points["weights"] = w
 
-    print("Loading probabilistic mode...")
-    points["probabilistic"] = load_probabilistic_points(poly, PROBABILISTIC_DIR)
-    print(f"  probabilistic: {poly.X.shape[0]} points on disk "
-          f"(converged={poly.converged}, {poly.run.get('iterations_done', '?')} iterations, "
-          f"tolerance_prob={poly.convergence_threshold:g})")
+    for mode, run_dir in (("sampling", SAMPLING_DIR), ("bbo", BBO_DIR)):
+        if mode not in polys:
+            continue
+        print(f"Loading {mode} mode...")
+        points[mode] = load_supf_points(polys[mode], run_dir)
 
-    print("Loading oracle mode (best effort)...")
-    o = load_oracle_points(poly)
-    if o:
-        points["oracle"] = o
+    if "oracle" in polys:
+        # Same treatment as sampling/bbo now that oracle has its own usable
+        # polytope.npz: real per-point solving times from each point's own
+        # Postprocess folder, not the NaN-timed shortcut load_oracle_points
+        # used to take when only the summary (no per-point mapping) was
+        # trusted. oracle_driver.py names its own iteration folders
+        # oracle_iter_N rather than supf_iter_N (different algorithm, same
+        # point_origin convention) -- see load_supf_points's docstring.
+        print("Loading oracle mode...")
+        points["oracle"] = load_supf_points(polys["oracle"], ORACLE_DIR, iter_prefix="oracle_iter")
+    else:
+        print("Loading oracle mode (best effort, no polytope available)...")
+        o = load_oracle_points(poly)
+        if o:
+            points["oracle"] = o
 
     print(f"Modes with usable data: {list(points)}")
     print("Generating figures...")
@@ -959,17 +1164,21 @@ def main() -> None:
 
     fig1_pairwise_points(poly, points)
 
-    print("Sampling the inner approximation for fig2/fig3 (cf. Steen2026_Thesis Eq. 13 "
-          "for what the acceptance rate below means)...")
-    try:
-        samples_norm, rate = cached_rejection_sample_inner(poly, n_propose=30_000)
-    except Exception as exc:
-        print(f"  rejection sampling failed ({exc!r}); skipping fig2/fig3")
-        samples_norm, rate = np.empty((0, poly.n_axes)), float("nan")
+    print("Sampling each mode's own inner approximation for fig2/fig3 (cf. Steen2026_Thesis "
+          "Eq. 13 for what each acceptance rate means; this runs locally -- SciPy/LP only, "
+          "no HPC resources needed)...")
+    samples: dict[str, tuple[np.ndarray, float]] = {}
+    for mode in ("sampling", "bbo", "oracle"):
+        if mode not in polys:
+            continue
+        try:
+            samples[mode] = cached_rejection_sample_inner(polys[mode], mode, n_propose=30_000)
+        except Exception as exc:
+            print(f"  {mode}: rejection sampling failed ({exc!r}); skipping its fig2/fig3 panel")
 
-    fig2_polytope_samples(poly, points, samples_norm, rate)
-    fig3_axis_correlations(poly, samples_norm)
-    fig4_query_time_comparison(poly, points)
+    fig2_polytope_samples(polys, points, samples)
+    fig3_axis_correlations(polys, samples)
+    fig4_query_time_comparison(points, polys)
 
     print(f"Done. Figures in {FIGURES_DIR.relative_to(REPO_ROOT)}/")
 
