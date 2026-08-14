@@ -7,7 +7,7 @@ These files lie into the `ZEN-models` repo.
 | `run_model.py` | Run, adapted so `my_dataset`, `my_comment`, `config` and all `system_overrides` come from **one row** of a sweep CSV (chosen by `--task_id`; the CSV itself by `--params`, default `parameters.csv`). |
 | `parameters.csv` | Normal (non-MGA) sweep table — **one row per run**. Columns = `my_dataset`, `my_comment`, and one column per `system.json` override. No `config` column, so every row runs `data/config.json`. |
 | `submit_euler.sh` | The SLURM **array** job for the normal sweep: one job per row of `parameters.csv`. |
-| `parameters_mga.csv` | MGA sweep table — same shape as `parameters.csv` plus a `config` column picking which `data/config_mga*.json` to run (weights / oracle / probabilistic). |
+| `parameters_mga.csv` | MGA sweep table — same shape as `parameters.csv` plus a `config` column picking which `data/config_mga*.json` to run (weights / sampling / bbo / oracle, sampling and bbo each with a `relative`- and `units`-normalisation config). |
 | `submit_euler_mga.sh` | The SLURM **array** job for the MGA sweep: one job per row of `parameters_mga.csv`. |
 | `setup_euler_env.sh` | One-time environment build (venv + `zen_garden`, plus the MGA plugin + `pyoNearOpt` if you'll run MGA sweeps). Run once on a login node. |
 
@@ -115,16 +115,18 @@ source .venv/bin/activate
 python run_model.py --task_id 0 --run_on local --params parameters_mga.csv
 
 # 3. Calibrate on the cluster, one row at a time, before trusting the
-#    24h walltime in submit_euler_mga.sh -- oracle can run much longer
+#    48h walltime in submit_euler_mga.sh -- oracle can run much longer
 #    than weights/sampling/bbo. sampling, bbo and oracle are run first
 #    this round (weights stays task_id 0, run later if needed):
-sbatch --array=1 submit_euler_mga.sh   # sampling  (task_id 1)
+sbatch --array=1 submit_euler_mga.sh   # sampling, relative  (task_id 1)
 myjobs -j <jobID>                      # check actual time/CPU/RAM used
-sbatch --array=2 submit_euler_mga.sh   # bbo       (task_id 2)
-sbatch --array=3 submit_euler_mga.sh   # oracle    (task_id 3, can be slow)
+sbatch --array=2 submit_euler_mga.sh   # sampling, units     (task_id 2)
+sbatch --array=3 submit_euler_mga.sh   # bbo, relative       (task_id 3)
+sbatch --array=4 submit_euler_mga.sh   # bbo, units          (task_id 4)
+sbatch --array=5 submit_euler_mga.sh   # oracle              (task_id 5, can be slow)
 
 # 4. Once you trust the resources, submit them together:
-sbatch --array=1-3 submit_euler_mga.sh
+sbatch --array=1-5 submit_euler_mga.sh
 ```
 
 Results land in the same place as the normal sweep:

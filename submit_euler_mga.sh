@@ -4,28 +4,36 @@
 # SLURM array sweep on Euler (the MGA counterpart of submit_euler.sh).
 #
 # One array task = one row of parameters_mga.csv (selected by SLURM_ARRAY_TASK_ID):
-#   task_id 0 = weights    (cheapest, no pyoNearOpt/Gurobi-MILP)
-#   task_id 1 = sampling   (LP-only, cheaper than oracle but iterative;
-#                            formerly called "probabilistic")
-#   task_id 2 = bbo        (LP-only support-function pipeline like sampling,
-#                            but directions come from a black-box optimiser;
-#                            needs pyoNearOpt's "bbo" extra, see setup_euler_env.sh)
-#   task_id 3 = oracle     (can be slow: up to 700 refinement iterations,
-#                            each an LP + MILP -- calibrate before trusting
-#                            the --time below)
+#   task_id 0 = weights           (cheapest, no pyoNearOpt/Gurobi-MILP)
+#   task_id 1 = sampling relative (LP-only, cheaper than oracle but iterative;
+#                                   formerly called "probabilistic"; axes
+#                                   normalised to their near-optimal max)
+#   task_id 2 = sampling units    (same as task_id 1, but design axes kept in
+#                                   raw physical units -- only sensible once
+#                                   the selected axes share comparable units)
+#   task_id 3 = bbo relative      (LP-only support-function pipeline like
+#                                   sampling, but directions come from a
+#                                   black-box optimiser; needs pyoNearOpt's
+#                                   "bbo" extra, see setup_euler_env.sh)
+#   task_id 4 = bbo units         (same as task_id 3, raw physical units)
+#   task_id 5 = oracle            (can be slow: up to 700 refinement
+#                                   iterations, each an LP + MILP --
+#                                   calibrate before trusting the --time
+#                                   below; normalisation is always
+#                                   "relative" in oracle mode)
 #
 # Requires the MGA install step in setup_euler_env.sh to have been run once
 # (clones + installs ZEN-garden-plugins and near_optimal_tools/pyoNearOpt,
-# incl. the "bbo" extra for task_id 2).
+# incl. the "bbo" extra for task_ids 3-4).
 #
-# Submit from the ZEN-models directory. sampling/bbo/oracle (1-3) are run
+# Submit from the ZEN-models directory. sampling/bbo/oracle (1-5) are run
 # first this round:
-#   sbatch --array=1-3      submit_euler_mga.sh     # sampling, bbo, oracle
-#   sbatch --array=1        submit_euler_mga.sh     # sampling, alone
-#   sbatch --array=2        submit_euler_mga.sh     # bbo, alone
-#   sbatch --array=3        submit_euler_mga.sh     # oracle, alone
+#   sbatch --array=1-5      submit_euler_mga.sh     # sampling, bbo, oracle
+#   sbatch --array=1-2      submit_euler_mga.sh     # sampling, both modes
+#   sbatch --array=3-4      submit_euler_mga.sh     # bbo, both modes
+#   sbatch --array=5        submit_euler_mga.sh     # oracle, alone
 #   sbatch --array=0        submit_euler_mga.sh     # weights, once needed
-#   sbatch --array=0-3      submit_euler_mga.sh      # once you trust the walltime
+#   sbatch --array=0-5      submit_euler_mga.sh      # once you trust the walltime
 ###############################################################################
 
 #SBATCH --job-name=zen_run_mga

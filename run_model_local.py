@@ -4,11 +4,17 @@ from pathlib import Path
 from zen_garden import run, Results
 
 # Which data/*.json config to run with. Available:
-#   config.json                    - normal (non-MGA) run
-#   config_mga_weights.json        - MGA, weights mode
-#   config_mga_oracle.json         - MGA, oracle mode
-#   config_mga_probabilistic.json  - MGA, probabilistic mode
+#   config.json                - normal (non-MGA) run
+#   config_mga_weights.json    - MGA, weights mode (normalisation has no effect)
+#   config_mga_oracle.json     - MGA, oracle mode (normalisation always "relative")
+#   config_mga_sampling.json   - MGA, sampling mode
+#   config_mga_bbo.json        - MGA, bbo mode
 config = "config_mga_weights.json"
+
+# Overrides plugins.mga.normalisation ("relative" or "units") in a private
+# staged copy of `config` -- the shared data/*.json file is never touched.
+# Set to None to leave the config's own default in place.
+normalisation = None
 
 my_dataset = str("Crystal_Ball_ind_heat_v8_0_no_flexibility")
 my_comment = "2050_1a_5a_interval_5ts_MGA_weights"
@@ -27,6 +33,24 @@ system_overrides = {
 }
 
 if __name__ == "__main__":
+    with open(DATA_DIR_CONFIG / config) as f:
+        config_json = json.load(f)
+    mga_cfg = config_json.get("plugins", {}).get("mga")
+    if normalisation is not None:
+        if mga_cfg is None:
+            raise SystemExit(f"normalisation={normalisation!r} but {config} has no plugins.mga block.")
+        mga_cfg["normalisation"] = normalisation
+    if mga_cfg is not None:
+        from zen_garden_plugins.mga.plugin import validate_config
+        validate_config(mga_cfg)  # fail fast, before system.json is patched below
+
+    # Stage the (possibly normalisation-patched) config to a temp file so
+    # the shared data/*.json file is never touched.
+    staged_config_dir = tempfile.mkdtemp(prefix="zen_config_")
+    staged_config_path = Path(staged_config_dir) / config
+    with open(staged_config_path, "w") as f:
+        json.dump(config_json, f, indent=2)
+
     system_json_path = DATA_DIR / my_dataset / "system.json"
 
     # Load dataset system.json, apply overrides, restore after run
@@ -38,7 +62,7 @@ if __name__ == "__main__":
 
     try:
         run(
-            config=str(DATA_DIR_CONFIG / config),
+            config=str(staged_config_path),
             dataset=str(DATA_DIR / my_dataset),
             folder_output=str(DATA_DIR_CONFIG / "outputs" / "local_outputs" / f"{my_dataset}_{my_comment}"),
         )

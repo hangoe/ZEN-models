@@ -15,6 +15,11 @@ CHANGES:
     row may also set a `config` column (e.g. config_mga_weights.json) to pick
     which data/*.json config to run with; rows without it use config.json, so
     the original parameters.csv/submit_euler.sh path is unaffected.
+  * Rows may also set a `normalisation` column (e.g. "relative" or "units")
+    that overwrites plugins.mga.normalisation in a private staged copy of
+    the chosen config -- the shared data/*.json config is never touched, so
+    one config_mga_bbo.json / config_mga_sampling.json covers both
+    normalisation modes instead of needing a config file per mode.
 
 Run one row by hand (local test):   python run_model.py --task_id 0 --run_on local
 On Euler it is launched by submit_euler.sh (or submit_euler_mga.sh) via the
@@ -45,11 +50,46 @@ DATASET_SEARCH_DIRS = [
 
 # Columns in parameters.csv that are NOT system.json overrides.
 # Everything else in a row is applied as a system_overrides key.
-META_COLUMNS = {"my_dataset", "my_comment", "config"}
+META_COLUMNS = {"my_dataset", "my_comment", "config", "normalisation"}
 
 # config.json used when a row/CSV has no "config" column (or leaves it
 # blank) -- keeps the original non-MGA parameters.csv working unchanged.
 DEFAULT_CONFIG = "config.json"
+
+
+def apply_normalisation_override(config_json: dict, config_name: str, normalisation: str) -> None:
+    """Overwrite plugins.mga.normalisation in-place with the CSV row's value.
+
+    Lets one config_mga_bbo.json / config_mga_sampling.json serve both
+    normalisation modes -- the CSV row picks the mode, run_model.py bakes
+    it into a private staged copy of the config (see main()), the shared
+    data/*.json file is never touched.
+    """
+    mga_cfg = config_json.get("plugins", {}).get("mga")
+    if mga_cfg is None:
+        raise SystemExit(
+            f"[run_model] row sets normalisation={normalisation!r} but "
+            f"{config_name} has no plugins.mga block to apply it to."
+        )
+    mga_cfg["normalisation"] = normalisation
+
+
+def validate_plugin_config(config_json: dict, config_name: str) -> None:
+    """Fail fast on an invalid plugins.mga block, before staging/running.
+
+    The plugin's own validate_config() only runs from an after_solve hook,
+    i.e. after the (potentially long) baseline solve has already finished.
+    Calling it here catches a bad "normalisation" value or an
+    oracle+"units" mismatch before a SLURM array task burns its walltime.
+    """
+    mga_cfg = config_json.get("plugins", {}).get("mga")
+    if mga_cfg is None:
+        return
+    from zen_garden_plugins.mga.plugin import validate_config
+    try:
+        validate_config(mga_cfg)
+    except ValueError as e:
+        raise SystemExit(f"[run_model] invalid plugins.mga config in {config_name}: {e}")
 
 
 def resolve_dataset_dir(name: str) -> Path:
@@ -116,12 +156,21 @@ def main() -> None:
     config_name = DEFAULT_CONFIG
     if "config" in table.columns and pd.notna(row["config"]) and str(row["config"]).strip():
         config_name = str(row["config"]).strip()
+    normalisation = None
+    if "normalisation" in table.columns and pd.notna(row["normalisation"]) and str(row["normalisation"]).strip():
+        normalisation = str(row["normalisation"]).strip()
     system_overrides = {col: to_native(row[col])
                         for col in table.columns if col not in META_COLUMNS}
 
     print(f"[run_model] task_id={args.task_id}  dataset={my_dataset}  comment={my_comment}")
-    print(f"[run_model] config={config_name}")
+    print(f"[run_model] config={config_name}  normalisation={normalisation}")
     print(f"[run_model] system_overrides={system_overrides}")
+
+    with open(DATA_DIR_CONFIG / config_name) as f:
+        config_json = json.load(f)
+    if normalisation is not None:
+        apply_normalisation_override(config_json, config_name, normalisation)
+    validate_plugin_config(config_json, config_name)
 
     # --- 2. Stage a PRIVATE copy of the dataset (safe for parallel array tasks) --
     work = working_root(args.run_on) / f"task_{args.task_id}"
@@ -130,6 +179,13 @@ def main() -> None:
         shutil.rmtree(staged_dataset)
     staged_dataset.parent.mkdir(parents=True, exist_ok=True)
     shutil.copytree(resolve_dataset_dir(my_dataset), staged_dataset)
+
+    # Write the (possibly normalisation-patched) config to the same private
+    # per-task folder, so the shared data/*.json file is never touched and
+    # concurrent array tasks never read/write it at once.
+    staged_config_path = work / config_name
+    with open(staged_config_path, "w") as f:
+        json.dump(config_json, f, indent=2)
 
     # --- 3. Apply the system.json overrides to the COPY --------------------------
     system_json_path = staged_dataset / "system.json"
@@ -148,7 +204,7 @@ def main() -> None:
 
     # --- 5. Run the model --------------------------------------------------------
     run(
-        config=str(DATA_DIR_CONFIG / config_name),
+        config=str(staged_config_path),
         dataset=str(staged_dataset),
         folder_output=str(out_dir),
     )
