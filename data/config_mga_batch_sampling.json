@@ -49,7 +49,7 @@
       },
       "batch": {
         "tolerance_prob": 0.95,
-        "max_iterations": 500,
+        "max_iterations": 800,
         "tolerance_explore": 0.1,
         "n_samples": 2000,
         "alpha": 0.05,
