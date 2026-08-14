@@ -2,4 +2,5 @@
 /.vscode
 *.lp
 data/outputs/**/*.h5
+/data/naturalearth/
 /.venv/

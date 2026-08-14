@@ -20,6 +20,9 @@ CHANGES:
     the chosen config -- the shared data/*.json config is never touched, so
     one config_mga_bbo.json / config_mga_sampling.json covers both
     normalisation modes instead of needing a config file per mode.
+  * Rows may also set `batch_size` / `n_workers` columns that overwrite the
+    matching keys under plugins.mga.batch (batch mode only) in the same
+    private staged copy, the same way `normalisation` does.
 
 Run one row by hand (local test):   python run_model.py --task_id 0 --run_on local
 On Euler it is launched by submit_euler.sh (or submit_euler_mga.sh) via the
@@ -50,7 +53,7 @@ DATASET_SEARCH_DIRS = [
 
 # Columns in parameters.csv that are NOT system.json overrides.
 # Everything else in a row is applied as a system_overrides key.
-META_COLUMNS = {"my_dataset", "my_comment", "config", "normalisation"}
+META_COLUMNS = {"my_dataset", "my_comment", "config", "normalisation", "batch_size", "n_workers"}
 
 # config.json used when a row/CSV has no "config" column (or leaves it
 # blank) -- keeps the original non-MGA parameters.csv working unchanged.
@@ -72,6 +75,27 @@ def apply_normalisation_override(config_json: dict, config_name: str, normalisat
             f"{config_name} has no plugins.mga block to apply it to."
         )
     mga_cfg["normalisation"] = normalisation
+
+
+def apply_batch_overrides(config_json: dict, config_name: str, batch_size, n_workers) -> None:
+    """Overwrite plugins.mga.batch.{batch_size,n_workers} in-place with the CSV row's values.
+
+    Same private-staged-copy pattern as apply_normalisation_override(): lets
+    one config_mga_batch_*.json be swept over different batch_size/n_workers
+    values from parameters.csv without touching the shared data/*.json file.
+    """
+    if batch_size is None and n_workers is None:
+        return
+    batch_cfg = config_json.get("plugins", {}).get("mga", {}).get("batch")
+    if batch_cfg is None:
+        raise SystemExit(
+            f"[run_model] row sets batch_size/n_workers but "
+            f"{config_name} has no plugins.mga.batch block to apply them to."
+        )
+    if batch_size is not None:
+        batch_cfg["batch_size"] = batch_size
+    if n_workers is not None:
+        batch_cfg["n_workers"] = n_workers
 
 
 def validate_plugin_config(config_json: dict, config_name: str) -> None:
@@ -159,17 +183,25 @@ def main() -> None:
     normalisation = None
     if "normalisation" in table.columns and pd.notna(row["normalisation"]) and str(row["normalisation"]).strip():
         normalisation = str(row["normalisation"]).strip()
+    batch_size = None
+    if "batch_size" in table.columns and pd.notna(row["batch_size"]) and str(row["batch_size"]).strip():
+        batch_size = to_native(row["batch_size"])
+    n_workers = None
+    if "n_workers" in table.columns and pd.notna(row["n_workers"]) and str(row["n_workers"]).strip():
+        n_workers = to_native(row["n_workers"])
     system_overrides = {col: to_native(row[col])
                         for col in table.columns if col not in META_COLUMNS}
 
     print(f"[run_model] task_id={args.task_id}  dataset={my_dataset}  comment={my_comment}")
     print(f"[run_model] config={config_name}  normalisation={normalisation}")
+    print(f"[run_model] batch_size={batch_size}  n_workers={n_workers}")
     print(f"[run_model] system_overrides={system_overrides}")
 
     with open(DATA_DIR_CONFIG / config_name) as f:
         config_json = json.load(f)
     if normalisation is not None:
         apply_normalisation_override(config_json, config_name, normalisation)
+    apply_batch_overrides(config_json, config_name, batch_size, n_workers)
     validate_plugin_config(config_json, config_name)
 
     # --- 2. Stage a PRIVATE copy of the dataset (safe for parallel array tasks) --

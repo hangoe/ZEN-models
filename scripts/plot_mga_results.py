@@ -68,7 +68,7 @@ substantially past the point the frozen-box metric stopped moving). weights
 never builds an outer approximation at all, so it has no representation in
 fig4 any more -- fig0 remains the figure for weights' own behaviour.
 
-Figures (data/outputs/figures/mga_results/):
+Figures (data/outputs/figures/mga_tests/):
   fig0_weights_axis_bars        weights-mode capacity ADDITION per axis, per
                                  iteration, vs baseline (4 tech axes; weights
                                  never touches the biomass/cost axes as
@@ -161,7 +161,7 @@ from pyoNearOpt.metrics import fraction_well_explored, max_separation
 from pyoNearOpt.polytope_approximation.approximation_class import approximation
 from pyoNearOpt.polytope_approximation.polytope_samples import PolytopeSamples
 
-FIGURES_DIR = REPO_ROOT / "data" / "outputs" / "figures" / "mga_results"
+FIGURES_DIR = REPO_ROOT / "data" / "outputs" / "figures" / "mga_tests"
 MGA_ROOT = REPO_ROOT / "data" / "outputs" / "euler_outputs_mga"
 
 MODEL = "Crystal_Ball_ind_heat_v8_0_no_flexibility_nodiffusion"

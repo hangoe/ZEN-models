@@ -21,10 +21,18 @@
 #                                   calibrate before trusting the --time
 #                                   below; normalisation is always
 #                                   "relative" in oracle mode)
+#   task_id 6 = batch bbo relative      (batch mode, strategy_mode="bbo";
+#                                         solves batch_size directions
+#                                         concurrently per iteration via a
+#                                         worker pool; batch_size=n_workers=4
+#                                         for now, needs pyoNearOpt's "bbo"
+#                                         extra like task_ids 3-4)
+#   task_id 7 = batch sampling relative (same, strategy_mode="sampling",
+#                                         batch_size=n_workers=4 for now)
 #
 # Requires the MGA install step in setup_euler_env.sh to have been run once
 # (clones + installs ZEN-garden-plugins and near_optimal_tools/pyoNearOpt,
-# incl. the "bbo" extra for task_ids 3-4).
+# incl. the "bbo" extra for task_ids 3-4, 6-7).
 #
 # Submit from the ZEN-models directory. sampling/bbo/oracle (1-5) are run
 # first this round:
@@ -32,8 +40,9 @@
 #   sbatch --array=1-2      submit_euler_mga.sh     # sampling, both modes
 #   sbatch --array=3-4      submit_euler_mga.sh     # bbo, both modes
 #   sbatch --array=5        submit_euler_mga.sh     # oracle, alone
+#   sbatch --array=6-7      submit_euler_mga.sh     # batch, both strategies
 #   sbatch --array=0        submit_euler_mga.sh     # weights, once needed
-#   sbatch --array=0-5      submit_euler_mga.sh      # once you trust the walltime
+#   sbatch --array=0-7      submit_euler_mga.sh      # once you trust the walltime
 ###############################################################################
 
 #SBATCH --job-name=zen_run_mga
