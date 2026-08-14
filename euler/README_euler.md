@@ -7,7 +7,7 @@ These files lie into the `ZEN-models` repo.
 | `run_model.py` | Run, adapted so `my_dataset`, `my_comment`, `config` and all `system_overrides` come from **one row** of a sweep CSV (chosen by `--task_id`; the CSV itself by `--params`, default `parameters.csv`). |
 | `parameters.csv` | Normal (non-MGA) sweep table — **one row per run**. Columns = `my_dataset`, `my_comment`, and one column per `system.json` override. No `config` column, so every row runs `data/config.json`. |
 | `submit_euler.sh` | The SLURM **array** job for the normal sweep: one job per row of `parameters.csv`. |
-| `parameters_mga.csv` | MGA sweep table — same shape as `parameters.csv` plus a `config` column picking which `data/config_mga*.json` to run (weights / sampling / bbo / oracle, sampling and bbo each with a `relative`- and `units`-normalisation config). |
+| `parameters_mga.csv` | MGA sweep table — same shape as `parameters.csv` plus a `config` column picking which `data/config_mga*.json` to run (weights / sampling / bbo / oracle / batch; sampling, bbo and batch each with a `relative`- and `units`-normalisation config; batch rows also set `batch_size`/`n_workers` overrides). |
 | `submit_euler_mga.sh` | The SLURM **array** job for the MGA sweep: one job per row of `parameters_mga.csv`. |
 | `setup_euler_env.sh` | One-time environment build (venv + `zen_garden`, plus the MGA plugin + `pyoNearOpt` if you'll run MGA sweeps). Run once on a login node. |
 
@@ -125,8 +125,18 @@ sbatch --array=3 submit_euler_mga.sh   # bbo, relative       (task_id 3)
 sbatch --array=4 submit_euler_mga.sh   # bbo, units          (task_id 4)
 sbatch --array=5 submit_euler_mga.sh   # oracle              (task_id 5, can be slow)
 
+# 3b. Batch mode (task_ids 6-9): solves batch_size=4 directions concurrently
+#     per iteration via a worker pool (n_workers=4 for now). Needs the same
+#     pyoNearOpt "bbo" extra as bbo mode -- already installed by step 1 above.
+#     Calibrate these separately too, since concurrent solves change the
+#     CPU/RAM footprint vs. the single-solve modes above:
+sbatch --array=6 submit_euler_mga.sh   # batch bbo, units          (task_id 6)
+sbatch --array=7 submit_euler_mga.sh   # batch sampling, units     (task_id 7)
+sbatch --array=8 submit_euler_mga.sh   # batch bbo, relative       (task_id 8)
+sbatch --array=9 submit_euler_mga.sh   # batch sampling, relative  (task_id 9)
+
 # 4. Once you trust the resources, submit them together:
-sbatch --array=1-5 submit_euler_mga.sh
+sbatch --array=1-9 submit_euler_mga.sh
 ```
 
 Results land in the same place as the normal sweep:
