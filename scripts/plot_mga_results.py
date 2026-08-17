@@ -1,54 +1,66 @@
-"""Compare the four MGA exploration modes (weights, sampling, bbo, oracle)
-run against Crystal_Ball_ind_heat_v8_0_no_flexibility_nodiffusion on Euler.
+"""Compare the MGA exploration modes/variants (weights, bbo x2, sampling x2,
+optionally oracle) run against
+Crystal_Ball_ind_heat_v8_0_no_flexibility_nodiffusion on Euler.
 
-All four modes explore the same near-optimal space: 6 axes (nuclear,
-photovoltaics, wind_offshore, wind_onshore capacity additions, biomass
-carrier import, total cost), epsilon = 0.1, same baseline solve -- so their
-results live in one shared coordinate system and can be overlaid directly.
+As of the axis/normalisation overhaul (commit "new axes in mga and implement
+normalisation modes to run on euler"), the design-axis set grew from 6 to 9:
+nuclear, photovoltaics, wind_offshore, wind_onshore, electrolysis, DAC,
+battery, ccs_lump (a lumped axis over 6 CCS-tagged technologies) capacity
+additions, plus net_present_cost. bbo and sampling were each re-run once per
+plugins.mga.normalisation setting -- "relative" (the original per-axis-bounds
+scaling), "units" (raw physical-unit scaling), and "minmax" (each axis's own
+near-optimal [min, max] mapped onto [0, 1]) -- giving six real supf-mode runs
+now instead of two:
+bbo_relative, bbo_units, bbo_minmax, sampling_relative, sampling_units,
+sampling_minmax. All six solve
+the same epsilon=0.1 near-optimal space around the same baseline, so their
+results still live in one shared coordinate system and overlay directly; on
+disk each saves under its own
+..._MGA_<mode>_<normalisation>/..._<mode>_summary/ (data/outputs/
+euler_outputs_mga/) -- the folder's own name carries the normalisation
+suffix, but the Postprocess subfolder inside it is still named after the
+bare mode ("..._bbo_summary", "..._sampling_summary"), see BASE_MODE.
 
 sampling and bbo both run through pyoNearOpt's generic supf_explore harness
 (near_optimal_tools' shared support-function polytope bookkeeping) and only
 differ in how the next direction to query is picked: sampling scores many
 candidate directions and takes the largest observed inner/outer gap; bbo
-searches for that direction with a black-box optimiser (SHADE) instead. Both
-therefore save their own independent polytope.npz + diagnostics.csv under
-..._MGA_<mode>/..._<mode>_summary/ (data/outputs/euler_outputs_mga/) --
-unlike the older single "probabilistic" run this script used to compare
-against weights/oracle, there is now no one mode whose polytope is *the*
-shared frame by construction. This script picks sampling's own polytope.npz
-as the canonical shared frame for axis names/units/z*/scale/offset (used by
-fig0 and fig1), falling back to bbo's if sampling's is missing, and prints a
-sanity check comparing the two runs' baselines (they
-solve the same cost-optimal model, so z*/bounds/A0/b0 should agree to full
-floating-point precision -- same check this script used to do for weights
-vs. the old probabilistic run). For fig2/fig3 specifically -- the ones this
-project actually cares about *comparing* bbo against sampling on -- each
-mode gets its own inner-hull sample and its own panel; see those functions'
-docstrings.
+searches for that direction with a black-box optimiser (SHADE) instead.
+normalisation is an orthogonal axis (how directions are scaled while
+searching), not a third strategy, hence the 2x3 naming.
 
-oracle is now downloaded and wired in like sampling/bbo: 31 points (z*, 10
-VMM bound solves, 20 KKT/MILP refinement iterations named
-..._oracle_iter_<n>, mapped to real per-point solving times by
-load_supf_points exactly like sampling/bbo's own ..._supf_iter_<n> --
-oracle_driver.py just uses a different folder-naming convention for the
-same point_origin schema, see that function's docstring). Every
-oracle-touching step still degrades to "skip, log why" rather than erroring
-if its data is ever incomplete (e.g. a partial re-download): missing
-polytope -> load_oracle_points falls back to a best-effort reconstruction
-from the individual oracle_iter_N / vmm_*_<axis> Postprocess folders, and if
-even those are unreadable, oracle is dropped from every figure rather than
-plotting fabricated data. One real asymmetry remains, not a bug: oracle's
-diagnostics.csv logs its own certified max_min_distance per iteration --
-directly comparable to max_separation, no recomputation needed, so fig4
-DOES include oracle on that one metric (see load_oracle_native_gap) -- but
-not the OA_A/OA_b outer-approximation snapshots sampling/bbo's
-diagnostics.csv has (this run's oracle_driver.py call didn't set
-save_intermediate=True, unlike near_optimal_tools' own reference notebook,
-docs/examples/method_comparison.ipynb, which does and so gets a full
-ci_lower curve for its ORACLE too). Without those snapshots
-fraction_well_explored/ci_lower has nothing to evaluate for oracle, so
-fig4's ci_lower panel stays sampling/bbo-only; see load_oracle_native_gap's
-docstring for the full reasoning and _comparison_figure's in-figure note.
+This script picks whichever of the six supf-mode runs loads first (in
+SUPF_MODES order) as the canonical shared frame for axis names/units/z*/
+scale/offset (used by fig0 and fig1), and prints a sanity check comparing
+every pair of loaded runs' baselines (they solve the same cost-optimal
+model, so z* should agree to full floating-point precision regardless of
+mode or normalisation). For fig2/fig3 -- the ones this project actually
+cares about *comparing* modes on -- each run gets its own inner-hull sample
+and its own panel; see those functions' docstrings.
+
+weights was re-run fresh alongside the above but was NOT re-scoped to the
+new 9-axis set (config_mga_weights.json still only drives the original 4
+tech axes: photovoltaics, wind_onshore, wind_offshore, nuclear) as its own
+MGA *directions* -- but each of its solves is still a full ZEN-garden run,
+so every OTHER axis in the shared frame moves too as a side effect (e.g.
+does maximising PV also move electrolysis/battery capacity?). fig0 reads
+each weights point's physical value on every one of poly's axes (see
+point_from_results / load_weights_points, unchanged), so it now plots all
+of them -- one panel per axis, taken from poly.meta["axes"] rather than a
+hard-coded subset -- not just the 4 weights explicitly targets as
+directions.
+
+oracle has no data under the new 9-axis set at all right now (only an
+archived run against the old 6-axis set exists, under
+data/outputs/euler_outputs_mga/archive/) -- every oracle-touching code path
+below is unchanged from the earlier 3-mode version and degrades to "skip,
+log why" exactly as it always did when ORACLE_DIR doesn't exist, so this is
+a live, ready-to-use path for a future oracle re-run against the new axes,
+not dead code. See the pre-existing docstrings on load_oracle_points and
+load_oracle_native_gap for the full reasoning (best-effort folder
+reconstruction if only a partial polytope survives; fig4 would include
+oracle on max_separation only, via its own certified max_min_distance, once
+such a run exists).
 
 Convergence metric (fig4): pyoNearOpt.metrics.fraction_well_explored and
 max_separation (the same machinery behind sampling/bbo's own
@@ -70,29 +82,37 @@ fig4 any more -- fig0 remains the figure for weights' own behaviour.
 
 Figures (data/outputs/figures/mga_tests/):
   fig0_weights_axis_bars        weights-mode capacity ADDITION per axis, per
-                                 iteration, vs baseline (4 tech axes; weights
-                                 never touches the biomass/cost axes as
-                                 exploration directions).
-  fig1_pairwise_points           pairwise projections of every mode's actual
-                                 visited points, colour-coded by mode.
-  fig2_polytope_samples          One panel per mode with its own polytope
-                                 (sampling, bbo, and oracle once downloaded):
+                                 iteration, vs baseline (every axis in the
+                                 shared frame, one panel each -- weights only
+                                 ever targets 4 of them (photovoltaics,
+                                 wind_onshore, wind_offshore, nuclear) as its
+                                 own exploration directions, but every solve
+                                 still moves the whole system, so the other
+                                 axes -- electrolysis/DAC/battery/ccs_lump/
+                                 cost -- show that side effect too).
+  fig1_pairwise_points           pairwise projections of every mode/variant's
+                                 actual visited points, colour-coded by mode.
+  fig2_polytope_samples          One panel per supf-mode run with its own
+                                 polytope (bbo_relative, bbo_units,
+                                 bbo_minmax, sampling_relative,
+                                 sampling_units, sampling_minmax, and oracle
+                                 once re-downloaded against the new axes):
                                  hexbin density of a uniform sample of THAT
-                                 mode's own INNER approximation
+                                 run's own INNER approximation
                                  (rejection-sampled from its own outer body --
                                  see rejection_sample_inner's docstring and
                                  Steen2026_Thesis Sec 3.3), diagonal = per-axis
                                  marginals, green outline = exact 2D
-                                 projection of that mode's inner hull; every
-                                 mode's actual points (weights/sampling/bbo/
-                                 oracle) overlaid on every panel for context.
-                                 Side-by-side panels are the actual bbo-vs-
-                                 sampling comparison this project wanted --
-                                 weights never builds a polytope, so it never
-                                 gets its own panel.
-  fig3_axis_correlations         Same per-mode panel layout as fig2, one
-                                 Pearson correlation heatmap of the 6 axes per
-                                 mode's own inner-hull sample (Steen2026_Thesis
+                                 projection of that run's inner hull; every
+                                 mode/variant's actual points (weights + all
+                                 loaded supf runs) overlaid on every panel for
+                                 context. Side-by-side panels are the actual
+                                 bbo-vs-sampling-vs-normalisation comparison
+                                 this project wants -- weights never builds a
+                                 polytope, so it never gets its own panel.
+  fig3_axis_correlations         Same per-run panel layout as fig2, one
+                                 Pearson correlation heatmap of the 9 axes per
+                                 run's own inner-hull sample (Steen2026_Thesis
                                  Figure 7 analog): which axes substitute
                                  (negative) or move together (positive) across
                                  that mode's own near-optimal volume. Pearson r
@@ -105,8 +125,8 @@ Figures (data/outputs/figures/mga_tests/):
                                  fraction_well_explored's ci_lower; fig4a's
                                  x-axis is number of model queries, fig4b's is
                                  cumulative real ZEN-garden solving time (log).
-                                 One row: each mode's own live, evolving
-                                 approximation -- sampling AND bbo fully
+                                 One row: each run's own live, evolving
+                                 approximation -- all six supf runs fully
                                  (reference-equivalent to near_optimal_tools'
                                  docs/examples/method_comparison.ipynb, see
                                  load_native_outer_at), oracle on
@@ -154,7 +174,7 @@ plt.rcParams.update({
 
 from scipy.optimize import linprog
 
-from figure_settings import SCENARIO_PALETTE
+from figure_settings import SCENARIO_PALETTE, eth_tint
 from zen_garden import Results
 from zen_garden_plugins.mga.polytope_io import Polytope, load_polytope
 from pyoNearOpt.metrics import fraction_well_explored, max_separation
@@ -167,35 +187,60 @@ MGA_ROOT = REPO_ROOT / "data" / "outputs" / "euler_outputs_mga"
 MODEL = "Crystal_Ball_ind_heat_v8_0_no_flexibility_nodiffusion"
 RUN_PREFIX = f"{MODEL}_2050_1a_5a_interval_5ts_MGA"
 WEIGHTS_DIR = MGA_ROOT / f"{RUN_PREFIX}_weights"
-SAMPLING_DIR = MGA_ROOT / f"{RUN_PREFIX}_sampling"
-BBO_DIR = MGA_ROOT / f"{RUN_PREFIX}_bbo"
 ORACLE_DIR = MGA_ROOT / f"{RUN_PREFIX}_oracle"
-RUN_DIR = {"sampling": SAMPLING_DIR, "bbo": BBO_DIR, "oracle": ORACLE_DIR}
+
+# The six real supf-mode runs (2 direction-selection strategies x 3
+# normalisation settings, see module docstring). Each run's OWN folder
+# carries the normalisation suffix, but the Postprocess subfolder it saves
+# internally is still named after the bare mode alone (e.g.
+# "..._bbo_summary" inside bbo_relative/, bbo_units/ and bbo_minmax/) --
+# BASE_MODE maps a variant key back to that bare-mode folder-naming
+# component.
+SUPF_MODES = ("bbo_relative", "bbo_units", "bbo_minmax",
+              "sampling_relative", "sampling_units", "sampling_minmax")
+RUN_DIR = {m: MGA_ROOT / f"{RUN_PREFIX}_{m}" for m in SUPF_MODES}
+RUN_DIR["oracle"] = ORACLE_DIR
+BASE_MODE = {m: m.split("_", 1)[0] for m in SUPF_MODES}
 
 # Colours reused from figure_settings.SCENARIO_PALETTE (the full 7-color ETH
 # corporate swatch: blue, petrol, green, bronze, red, purple, grey), per this
 # project's convention of never inventing a separate palette for print
 # figures -- picked for maximum pairwise contrast (not adjacent palette
-# slots) per user request: weights=green, sampling=purple/pink, bbo=blue,
-# oracle=bronze/brown.
-_ETH_BLUE, _ETH_GREEN, _ETH_BRONZE, _ETH_RED, _ETH_PURPLE = (
-    SCENARIO_PALETTE[0], SCENARIO_PALETTE[2], SCENARIO_PALETTE[3], SCENARIO_PALETTE[4], SCENARIO_PALETTE[5],
+# slots): weights=green, oracle=bronze/brown, and the two bbo/sampling
+# variants form their own colour-family pairs so the relative/units/minmax
+# split of ONE mode reads as related (bbo=blue-family, sampling=warm-family)
+# while still being distinguishable per variant. minmax was added after the
+# palette's 6 saturated slots were already spoken for (grey is reserved, see
+# SCENARIO_PALETTE's own comment), so each mode's minmax variant reuses its
+# family's base colour via eth_tint (ETH's documented tint system) rather
+# than inventing an off-palette hue.
+_ETH_BLUE, _ETH_PETROL, _ETH_GREEN, _ETH_BRONZE, _ETH_RED, _ETH_PURPLE = (
+    SCENARIO_PALETTE[0], SCENARIO_PALETTE[1], SCENARIO_PALETTE[2],
+    SCENARIO_PALETTE[3], SCENARIO_PALETTE[4], SCENARIO_PALETTE[5],
 )
 MODE_COLOR = {
     "weights": _ETH_GREEN,
-    "sampling": _ETH_PURPLE,
-    "bbo": _ETH_BLUE,
+    "bbo_relative": _ETH_BLUE,
+    "bbo_units": _ETH_PETROL,
+    "bbo_minmax": eth_tint(_ETH_BLUE, 0.5),
+    "sampling_relative": _ETH_PURPLE,
+    "sampling_units": _ETH_RED,
+    "sampling_minmax": eth_tint(_ETH_PURPLE, 0.5),
     "oracle": _ETH_BRONZE,
 }
 MODE_LABEL = {
     "weights": "Weights",
     # $\tau$ (mathtext, "cm" fontset) rather than a literal unicode tau --
     # the plain text font (cmr10) has no tau glyph.
-    "sampling": r"Sampling ($\tau$=0.95)",
-    "bbo": r"BBO ($\tau$=0.95)",
+    "bbo_relative": r"BBO relative ($\tau$=0.95)",
+    "bbo_units": r"BBO units ($\tau$=0.95)",
+    "bbo_minmax": r"BBO minmax ($\tau$=0.95)",
+    "sampling_relative": r"Sampling relative ($\tau$=0.95)",
+    "sampling_units": r"Sampling units ($\tau$=0.95)",
+    "sampling_minmax": r"Sampling minmax ($\tau$=0.95)",
     "oracle": "Oracle",
 }
-MODES = ("weights", "sampling", "bbo", "oracle")
+MODES = ("weights", *SUPF_MODES, "oracle")
 
 # config_mga_weights.json's "iterations" list: weight sign, combined with
 # run_iteration's fixed sense="min", determines whether each solve minimises
@@ -209,11 +254,14 @@ WEIGHTS_ITERATIONS = [
     ("mga_iter_4", "nuclear", "min"),
     ("mga_iter_5", "nuclear", "max"),
 ]
-# The 4 tech-capacity axes weights mode actually drives (see fig0); it never
-# targets the biomass carrier-import or cost axes.
-WEIGHTS_TECH_AXES = ["photovoltaics", "wind_onshore", "wind_offshore", "nuclear"]
 
-UNIT_LABEL = {"gigawatt": "GW", "gigawatt * hour": "GWh", "megaEuro": "MEUR"}
+UNIT_LABEL = {
+    "gigawatt": "GW", "gigawatt * hour": "GWh", "megaEuro": "MEUR",
+    # DAC and ccs_lump are captured-emissions axes (capacity_type="power" but
+    # physically a CO2 flow rate), not power capacity -- see the new axes'
+    # "unit" field in each polytope.npz's meta.
+    "kilotCO2eq / hour": "ktCO$_2$eq/h",
+}
 # fig0's per-iteration bars cycle through the palette minus _ETH_RED, which
 # is reserved for the baseline bar -- otherwise one iteration's colour would
 # be visually indistinguishable from the baseline.
@@ -283,13 +331,17 @@ def solving_time(folder: Path) -> float:
         return float("nan")
 
 
-def try_load_run_polytope(run_dir: Path, mode: str) -> Polytope | None:
+def try_load_run_polytope(run_dir: Path, mode: str, folder_mode: str | None = None) -> Polytope | None:
     """mode's own polytope.npz (sampling/bbo/oracle all save under
-    ..._<mode>_summary/, see supf_driver.py/oracle_driver.py), or None
+    ..._<folder_mode>_summary/, see supf_driver.py/oracle_driver.py), or None
     (logged) if the summary folder or its polytope*.npz is missing/unreadable
     -- e.g. oracle before its download lands, or an interrupted run whose
-    summary was never written (see the module docstring)."""
-    summary = run_dir / f"{MODEL}_{mode}_summary"
+    summary was never written (see the module docstring). folder_mode
+    defaults to mode; pass BASE_MODE[mode] for a bbo_relative/bbo_units/
+    sampling_relative/sampling_units variant, whose Postprocess subfolder is
+    still named after the bare mode alone (e.g. "..._bbo_summary")."""
+    folder_mode = folder_mode or mode
+    summary = run_dir / f"{MODEL}_{folder_mode}_summary"
     poly_files = sorted(summary.glob("polytope*.npz")) if summary.exists() else []
     if not poly_files:
         return None
@@ -407,31 +459,51 @@ def fig0_weights_axis_bars(poly: Polytope, weights_points: list[tuple[str, np.nd
     if len(weights_points) < 2:
         print("  skipping fig0_weights_axis_bars: no completed iterations")
         return
-    axis_idx = {a["name"]: i for i, a in enumerate(poly.meta["axes"])}
+    # Every axis in the shared frame (poly.meta["axes"], driven entirely by
+    # whichever supf-mode run supplied it -- see module docstring), not a
+    # fixed subset: weights_points already carries each solve's physical
+    # value on every one of these (point_from_results loops over
+    # poly.meta["axes"] regardless of mode), so as the frame's axis set
+    # grows/shrinks this figure follows without code changes. One panel per
+    # axis since axes span different physical units (GW/GWh/ktCO2eq per h/
+    # MEUR) that can't share a single y-axis.
+    axes_meta = poly.meta["axes"]
+    names = [a["name"] for a in axes_meta]
+    units = [a["unit"] for a in axes_meta]
+    axis_idx = {name: i for i, name in enumerate(names)}
     df = pd.DataFrame(
-        {label: [phys[axis_idx[axname]] for axname in WEIGHTS_TECH_AXES] for label, phys, _ in weights_points},
-        index=WEIGHTS_TECH_AXES,
+        {label: [phys[axis_idx[name]] for name in names] for label, phys, _ in weights_points},
+        index=names,
     )
 
-    fig, ax = plt.subplots(figsize=(10, 6))
-    n = len(df.columns)
-    width = 0.8 / n
-    x = np.arange(len(df))
-    for i, label in enumerate(df.columns):
-        offsets = x + (i - (n - 1) / 2) * width
-        color = _ETH_RED if label == "baseline" else _ITER_PALETTE[(i - 1) % len(_ITER_PALETTE)]
-        ax.bar(offsets, df[label].to_numpy(), width, label=label, color=color, edgecolor="white")
-    ax.set_xticks(x)
-    ax.set_xticklabels(df.index, rotation=15, ha="right", fontsize=9)
-    ax.set_ylabel("capacity addition [GW]")
-    ax.set_title(
+    n_iter = len(df.columns)
+    ncols = min(3, len(names))
+    nrows = -(-len(names) // ncols)
+    fig, axs = plt.subplots(nrows, ncols, figsize=(4.6 * ncols, 3.4 * nrows), squeeze=False)
+    for k, name in enumerate(names):
+        ax = axs[k // ncols][k % ncols]
+        for i, label in enumerate(df.columns):
+            color = _ETH_RED if label == "baseline" else _ITER_PALETTE[(i - 1) % len(_ITER_PALETTE)]
+            ax.bar(i, df.loc[name, label], color=color, edgecolor="white",
+                   label=label if k == 0 else None)
+        ax.set_xticks(range(n_iter))
+        ax.set_xticklabels(df.columns, rotation=45, ha="right", fontsize=8)
+        ax.set_ylabel(f"[{UNIT_LABEL.get(units[k], units[k] or 'n/a')}]", fontsize=9)
+        ax.set_title(name.replace("_", " "), fontsize=10, fontweight="bold")
+        ax.grid(axis="y", alpha=0.3)
+        ax.tick_params(labelsize=8)
+    for k in range(len(names), nrows * ncols):
+        axs[k // ncols][k % ncols].axis("off")
+
+    fig.suptitle(
         "MGA Weights-Mode: Capacity Addition per Axis, per Directional Solve\n"
-        "(each iteration minimises or maximises ONE weighted direction; bars show its effect on all 4 axes)",
-        fontsize=12, fontweight="bold",
+        "(each iteration minimises or maximises ONE weighted direction; panels show its effect on every shared-frame axis)",
+        fontsize=13, fontweight="bold", y=0.99,
     )
-    ax.legend(fontsize=9, frameon=False, ncol=min(n, 4))
-    ax.grid(axis="y", alpha=0.3)
-    fig.tight_layout()
+    handles, labels = axs[0][0].get_legend_handles_labels()
+    fig.legend(handles, labels, loc="upper center", bbox_to_anchor=(0.5, 0.9),
+               fontsize=9, frameon=False, ncol=min(n_iter, 4))
+    fig.tight_layout(rect=[0, 0, 1, 0.86])
     savefig(fig, "fig0_weights_axis_bars")
 
 
@@ -597,7 +669,8 @@ def rejection_sample_inner(poly: Polytope, n_propose: int, seed: int = 0) -> tup
 # dropped on top. oracle gets a third panel automatically once its own
 # oracle_summary/polytope.npz exists (see try_load_run_polytope); weights
 # never builds a polytope and so never gets a panel here (see fig0 instead).
-_HULL_MODE_ORDER = ("sampling", "bbo", "oracle")
+_HULL_MODE_ORDER = ("bbo_relative", "bbo_units", "bbo_minmax",
+                     "sampling_relative", "sampling_units", "sampling_minmax", "oracle")
 
 
 def _hull_modes_to_plot(polys: dict[str, Polytope], samples: dict[str, tuple[np.ndarray, float]]) -> list[str]:
@@ -826,14 +899,18 @@ def _parse_diagnostics_vector(s: str) -> np.ndarray:
     return np.array([float(x) for x in s.strip().lstrip("[").rstrip("]").split()])
 
 
-def load_native_outer_at(run_dir: Path, run_poly: Polytope, mode: str):
+def load_native_outer_at(run_dir: Path, run_poly: Polytope, mode: str, folder_mode: str | None = None):
     """outer_at(k) callable (see query_time_scores) that reconstructs
     run_dir's own evolving outer approximation at checkpoint k from its
     diagnostics.csv cut history, falling back to this run's own un-cut
     initial VMM box for any k before its first iterate. Works for any
-    supf-mode run (sampling or bbo -- both save the same diagnostics.csv
-    schema via supf_driver.py's shared _run_supf_mode)."""
-    summary = run_dir / f"{MODEL}_{mode}_summary"
+    supf-mode run (sampling or bbo, any normalisation -- all save the same
+    diagnostics.csv schema via supf_driver.py's shared _run_supf_mode).
+    folder_mode defaults to mode; pass BASE_MODE[mode] for a
+    bbo_relative/bbo_units/sampling_relative/sampling_units variant (see
+    try_load_run_polytope)."""
+    folder_mode = folder_mode or mode
+    summary = run_dir / f"{MODEL}_{folder_mode}_summary"
     diagnostics = pd.read_csv(summary / "diagnostics.csv")
     cuts_m = np.vstack([_parse_diagnostics_vector(s) for s in diagnostics["cut_direction"]])
     cuts_b = diagnostics["cut_support_value"].to_numpy(dtype=float)
@@ -924,14 +1001,19 @@ def load_oracle_native_gap(run_dir: Path, run_poly: Polytope,
 
 def _compute_fig4_scores(points: dict[str, list[tuple[str, np.ndarray, float]]],
                          polys: dict[str, Polytope]):
-    """A native (own evolving approximation) score for every supf mode
-    (sampling and bbo -- both now have surviving diagnostics.csv, unlike the
-    old 3-mode script where only "probabilistic" did), and oracle's own
-    certified max_separation-only gap (see load_oracle_native_gap). weights
-    has no representation here at all -- see the module docstring's
-    "Convergence metric" section. Shared by both fig4a (vs queries) and
-    fig4b (vs time) so the MILP solves only run once."""
-    eval_every = {"sampling": 10, "bbo": 10}
+    """A native (own evolving approximation) score for every supf-mode run
+    (bbo_relative, bbo_units, bbo_minmax, sampling_relative, sampling_units,
+    sampling_minmax -- all six have their own surviving diagnostics.csv), and
+    oracle's own certified
+    max_separation-only gap (see load_oracle_native_gap). weights has no
+    representation here at all -- see the module docstring's "Convergence
+    metric" section. Shared by both fig4a (vs queries) and fig4b (vs time)
+    so the MILP solves only run once."""
+    # 25 rather than the original 10: with 9 axes (vs. the old 6) each
+    # checkpoint's max_separation MILP is markedly slower, so this keeps a
+    # full 4-run fig4 finishing within a practical wall-clock budget at the
+    # cost of a coarser convergence curve.
+    eval_every = {m: 25 for m in SUPF_MODES}
 
     # Each supf mode scored against its OWN evolving, cut-refined outer
     # approximation -- i.e. the reference notebook's own score_run
@@ -948,12 +1030,13 @@ def _compute_fig4_scores(points: dict[str, list[tuple[str, np.ndarray, float]]],
     # the same.
     native_scores = {}
     tolerance_prob = {}
-    for mode, run_dir in (("sampling", SAMPLING_DIR), ("bbo", BBO_DIR)):
+    for mode in SUPF_MODES:
+        run_dir = RUN_DIR[mode]
         if mode not in points or mode not in polys:
             continue
         run_poly = polys[mode]
         tolerance_prob[mode] = float(run_poly.convergence_threshold)
-        outer_at = load_native_outer_at(run_dir, run_poly, mode)
+        outer_at = load_native_outer_at(run_dir, run_poly, mode, BASE_MODE[mode])
         labels, phys, secs = zip(*points[mode])
         X_norm = run_poly.to_norm(np.vstack(phys))
         print(f"  fig4: scoring {mode} ({len(X_norm)} points, "
@@ -1094,36 +1177,47 @@ def fig4_query_time_comparison(points: dict[str, list[tuple[str, np.ndarray, flo
 def main() -> None:
     print("Loading run polytopes...")
     polys: dict[str, Polytope] = {}
-    for mode, run_dir in (("sampling", SAMPLING_DIR), ("bbo", BBO_DIR), ("oracle", ORACLE_DIR)):
-        run_poly = try_load_run_polytope(run_dir, mode)
+    for mode in SUPF_MODES:
+        run_poly = try_load_run_polytope(RUN_DIR[mode], mode, BASE_MODE[mode])
         if run_poly is not None:
             polys[mode] = run_poly
             print(f"  {mode}: polytope loaded ({run_poly.X.shape[0]} points on disk, "
                   f"converged={run_poly.converged}, {run_poly.run.get('iterations_done', '?')} iterations, "
                   f"tolerance_prob={run_poly.convergence_threshold:g})")
         else:
-            note = "placeholder -- not yet downloaded" if mode == "oracle" else "skipping this mode entirely"
-            print(f"  {mode}: no usable polytope.npz under {run_dir.relative_to(REPO_ROOT)} ({note})")
+            print(f"  {mode}: no usable polytope.npz under {RUN_DIR[mode].relative_to(REPO_ROOT)} "
+                  f"(skipping this mode entirely)")
 
-    if "sampling" not in polys and "bbo" not in polys:
+    oracle_poly = try_load_run_polytope(ORACLE_DIR, "oracle")
+    if oracle_poly is not None:
+        polys["oracle"] = oracle_poly
+        print(f"  oracle: polytope loaded ({oracle_poly.X.shape[0]} points on disk, "
+              f"converged={oracle_poly.converged}, {oracle_poly.run.get('iterations_done', '?')} iterations, "
+              f"tolerance_prob={oracle_poly.convergence_threshold:g})")
+    else:
+        print(f"  oracle: no usable polytope.npz under {ORACLE_DIR.relative_to(REPO_ROOT)} "
+              f"(placeholder -- not yet re-run against the new 9-axis set)")
+
+    if not any(m in polys for m in SUPF_MODES):
         raise SystemExit(
-            "Neither sampling nor bbo has a usable polytope -- nothing to build "
-            "the shared coordinate frame or fig2/fig3 from."
+            "None of bbo_relative/bbo_units/sampling_relative/sampling_units has a usable "
+            "polytope -- nothing to build the shared coordinate frame or fig2/fig3 from."
         )
 
     # Shared coordinate frame (axis names/units/z*/scale/offset, used by fig0
-    # and fig1) -- sampling's own polytope, falling back to bbo's if
-    # sampling isn't available. See module docstring.
-    frame_mode = "sampling" if "sampling" in polys else "bbo"
+    # and fig1) -- whichever supf-mode run loads first, in SUPF_MODES order.
+    # See module docstring.
+    frame_mode = next(m for m in SUPF_MODES if m in polys)
     poly = polys[frame_mode]
     print(f"Shared frame (from {frame_mode}): axes={poly.names}, epsilon={poly.epsilon:g}, c_star={poly.c_star:,.0f}")
-    if "sampling" in polys and "bbo" in polys:
-        z_diff = float(np.abs(polys["sampling"].z_star_phys - polys["bbo"].z_star_phys).max())
+    present = [m for m in SUPF_MODES if m in polys]
+    for a, b in zip(present, present[1:]):
+        z_diff = float(np.abs(polys[a].z_star_phys - polys[b].z_star_phys).max())
         if z_diff > 1e-6:
-            print(f"  WARNING: sampling's and bbo's baselines (z*) differ by up to {z_diff:g} -- "
+            print(f"  WARNING: {a}'s and {b}'s baselines (z*) differ by up to {z_diff:g} -- "
                   f"expected bit-for-bit identical (same model, same cost-optimal baseline solve)")
         else:
-            print(f"  sanity check: sampling's and bbo's baselines (z*) agree to {z_diff:g} -- same problem, confirmed")
+            print(f"  sanity check: {a}'s and {b}'s baselines (z*) agree to {z_diff:g} -- same problem, confirmed")
 
     points: dict[str, list[tuple[str, np.ndarray, float]]] = {}
 
@@ -1132,11 +1226,11 @@ def main() -> None:
     if w:
         points["weights"] = w
 
-    for mode, run_dir in (("sampling", SAMPLING_DIR), ("bbo", BBO_DIR)):
+    for mode in SUPF_MODES:
         if mode not in polys:
             continue
         print(f"Loading {mode} mode...")
-        points[mode] = load_supf_points(polys[mode], run_dir)
+        points[mode] = load_supf_points(polys[mode], RUN_DIR[mode])
 
     if "oracle" in polys:
         # Same treatment as sampling/bbo now that oracle has its own usable
@@ -1168,7 +1262,7 @@ def main() -> None:
           "Eq. 13 for what each acceptance rate means; this runs locally -- SciPy/LP only, "
           "no HPC resources needed)...")
     samples: dict[str, tuple[np.ndarray, float]] = {}
-    for mode in ("sampling", "bbo", "oracle"):
+    for mode in (*SUPF_MODES, "oracle"):
         if mode not in polys:
             continue
         try:

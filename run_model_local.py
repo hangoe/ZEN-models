@@ -11,8 +11,9 @@ from zen_garden import run, Results
 #   config_mga_bbo.json        - MGA, bbo mode
 config = "config_mga_weights.json"
 
-# Overrides plugins.mga.normalisation ("relative" or "units") in a private
-# staged copy of `config` -- the shared data/*.json file is never touched.
+# Overrides plugins.mga.normalisation ("relative", "units" or "minmax") in a
+# private staged copy of `config` -- the shared data/*.json file is never
+# touched.
 # Set to None to leave the config's own default in place.
 normalisation = None
 

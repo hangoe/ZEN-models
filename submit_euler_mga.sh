@@ -35,10 +35,20 @@
 #                                         normalised to their near-optimal
 #                                         max instead of raw units)
 #   task_id 9 = batch sampling relative (same as task_id 7, normalised)
+#   task_id 10 = sampling minmax        (same as task_id 1, but each axis's
+#                                         own near-optimal [min, max] is
+#                                         mapped onto [0, 1] instead of
+#                                         scaled by its max alone)
+#   task_id 11 = bbo minmax             (same as task_id 3, minmax
+#                                         normalisation)
+#   task_id 12 = batch bbo minmax batch4      (same as task_id 6/8, minmax
+#                                               normalisation)
+#   task_id 13 = batch sampling minmax batch4 (same as task_id 7/9, minmax
+#                                               normalisation)
 #
 # Requires the MGA install step in setup_euler_env.sh to have been run once
 # (clones + installs ZEN-garden-plugins and near_optimal_tools/pyoNearOpt,
-# incl. the "bbo" extra for task_ids 3-4, 6-9).
+# incl. the "bbo" extra for task_ids 3-4, 6-9, 11-13).
 #
 # Submit from the ZEN-models directory. sampling/bbo/oracle (1-5) are run
 # first this round:
@@ -47,8 +57,10 @@
 #   sbatch --array=3-4      submit_euler_mga.sh     # bbo, both modes
 #   sbatch --array=5        submit_euler_mga.sh     # oracle, alone
 #   sbatch --array=6-9      submit_euler_mga.sh     # batch, both strategies x both normalisations
+#   sbatch --array=10-11    submit_euler_mga.sh     # sampling + bbo, minmax normalisation
+#   sbatch --array=12-13    submit_euler_mga.sh     # batch, both strategies, minmax normalisation
 #   sbatch --array=0        submit_euler_mga.sh     # weights, once needed
-#   sbatch --array=0-9      submit_euler_mga.sh      # once you trust the walltime
+#   sbatch --array=0-13     submit_euler_mga.sh      # once you trust the walltime
 ###############################################################################
 
 #SBATCH --job-name=zen_run_mga

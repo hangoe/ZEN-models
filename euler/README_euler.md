@@ -7,7 +7,7 @@ These files lie into the `ZEN-models` repo.
 | `run_model.py` | Run, adapted so `my_dataset`, `my_comment`, `config` and all `system_overrides` come from **one row** of a sweep CSV (chosen by `--task_id`; the CSV itself by `--params`, default `parameters.csv`). |
 | `parameters.csv` | Normal (non-MGA) sweep table — **one row per run**. Columns = `my_dataset`, `my_comment`, and one column per `system.json` override. No `config` column, so every row runs `data/config.json`. |
 | `submit_euler.sh` | The SLURM **array** job for the normal sweep: one job per row of `parameters.csv`. |
-| `parameters_mga.csv` | MGA sweep table — same shape as `parameters.csv` plus a `config` column picking which `data/config_mga*.json` to run (weights / sampling / bbo / oracle / batch; sampling, bbo and batch each with a `relative`- and `units`-normalisation config; batch rows also set `batch_size`/`n_workers` overrides). |
+| `parameters_mga.csv` | MGA sweep table — same shape as `parameters.csv` plus a `config` column picking which `data/config_mga*.json` to run (weights / sampling / bbo / oracle / batch; sampling, bbo and batch each with a `relative`-, `units`- and `minmax`-normalisation config; batch rows also set `batch_size`/`n_workers` overrides). |
 | `submit_euler_mga.sh` | The SLURM **array** job for the MGA sweep: one job per row of `parameters_mga.csv`. |
 | `setup_euler_env.sh` | One-time environment build (venv + `zen_garden`, plus the MGA plugin + `pyoNearOpt` if you'll run MGA sweeps). Run once on a login node. |
 
@@ -135,8 +135,17 @@ sbatch --array=7 submit_euler_mga.sh   # batch sampling, units     (task_id 7)
 sbatch --array=8 submit_euler_mga.sh   # batch bbo, relative       (task_id 8)
 sbatch --array=9 submit_euler_mga.sh   # batch sampling, relative  (task_id 9)
 
+# 3c. Minmax normalisation (task_ids 10-13): each axis's own near-optimal
+#     [min, max] is mapped onto [0, 1], instead of scaling by its max alone
+#     ("relative") or leaving it in raw physical units ("units"). Not
+#     supported in oracle mode -- see plugins.mga's normalisation docstring.
+sbatch --array=10 submit_euler_mga.sh  # sampling, minmax               (task_id 10)
+sbatch --array=11 submit_euler_mga.sh  # bbo, minmax                    (task_id 11)
+sbatch --array=12 submit_euler_mga.sh  # batch bbo, minmax              (task_id 12)
+sbatch --array=13 submit_euler_mga.sh  # batch sampling, minmax         (task_id 13)
+
 # 4. Once you trust the resources, submit them together:
-sbatch --array=1-9 submit_euler_mga.sh
+sbatch --array=1-13 submit_euler_mga.sh
 ```
 
 Results land in the same place as the normal sweep:

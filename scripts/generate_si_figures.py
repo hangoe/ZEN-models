@@ -169,6 +169,7 @@ from figure_settings import (
     SCENARIO_PALETTE,
     _apply_shared_ylim,
     _text_color_for_bg,
+    eth_tint,
     get_available_years,
     load_results,
 )
@@ -419,13 +420,7 @@ def fig1a_cost_delta(metrics: pd.DataFrame) -> None:
 
 # ── 1b: Industry capacity, 2050 ─────────────────────────────────────────────
 
-def _eth_tint(hex_color: str, pct: float) -> str:
-    """Blend hex_color toward white by pct (0=original, 1=white) — mirrors
-    ETH's documented 20/40/60/80% corporate-design tint system."""
-    from matplotlib.colors import to_rgb
-    r, g, b = to_rgb(hex_color)
-    r, g, b = (c + (1 - c) * pct for c in (r, g, b))
-    return f"#{int(round(r * 255)):02x}{int(round(g * 255)):02x}{int(round(b * 255)):02x}"
+_eth_tint = eth_tint  # moved to figure_settings.py so plot_carrier_flows.py can share it
 
 
 # Print-figure-specific palette (does NOT touch the shared, dashboard-wide

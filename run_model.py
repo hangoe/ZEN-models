@@ -15,11 +15,11 @@ CHANGES:
     row may also set a `config` column (e.g. config_mga_weights.json) to pick
     which data/*.json config to run with; rows without it use config.json, so
     the original parameters.csv/submit_euler.sh path is unaffected.
-  * Rows may also set a `normalisation` column (e.g. "relative" or "units")
-    that overwrites plugins.mga.normalisation in a private staged copy of
-    the chosen config -- the shared data/*.json config is never touched, so
-    one config_mga_bbo.json / config_mga_sampling.json covers both
-    normalisation modes instead of needing a config file per mode.
+  * Rows may also set a `normalisation` column (e.g. "relative", "units" or
+    "minmax") that overwrites plugins.mga.normalisation in a private staged
+    copy of the chosen config -- the shared data/*.json config is never
+    touched, so one config_mga_bbo.json / config_mga_sampling.json covers
+    all normalisation modes instead of needing a config file per mode.
   * Rows may also set `batch_size` / `n_workers` columns that overwrite the
     matching keys under plugins.mga.batch (batch mode only) in the same
     private staged copy, the same way `normalisation` does.

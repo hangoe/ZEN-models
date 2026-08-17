@@ -63,6 +63,19 @@ EULER_SCENARIO_LABELS = {
 # against the six saturated extension-scenario colors.
 SCENARIO_PALETTE = ["#215CAF", "#007894", "#627313", "#8E6713", "#B7352D", "#A7117A", "#6F6F6F"]
 
+
+def eth_tint(hex_color: str, pct: float) -> str:
+    """Blend hex_color toward white by pct (0=original, 1=white) — mirrors
+    ETH's documented 20/40/60/80% corporate-design tint system. Shared by
+    every script that needs a lighter/darker variant of an ETH color rather
+    than inventing an off-palette one (see generate_si_figures.py,
+    plot_carrier_flows.py)."""
+    from matplotlib.colors import to_rgb
+    r, g, b = to_rgb(hex_color)
+    r, g, b = (c + (1 - c) * pct for c in (r, g, b))
+    return f"#{int(round(r * 255)):02x}{int(round(g * 255)):02x}{int(round(b * 255)):02x}"
+
+
 # ── Merged color palette ──────────────────────────────────────────────────────
 # Base: compare_models.py (system-wide coverage)
 # Added: analyze_model.py entries not present in base (industry heat carriers,
@@ -209,6 +222,8 @@ COLOR_MAP = {
     "carbon_pipeline": "#90a4ae",
     "carbon_storage": "#78909c",
     "cement_post_comb": "#90a4ae",
+    "glass_post_comb": "#a99bc2",
+    "ceramic_post_comb": "#b98bc2",
     # Very old model names (v1_0: "industrial_" prefix instead of "_industry" suffix)
     "industrial_biomass_boiler": "#4caf50",
     "industrial_coal_boiler": "#8b6e5a",
@@ -269,6 +284,13 @@ HATCH_MAP: dict[str, str] = {
     "secondary_steel_DSM": "xx",
     "battery": "..",
     "pumped_hydro": "//",
+    # Post-combustion CCS retrofits -- same "xx" family as the other CCS
+    # retrofits below, added explicitly because their names don't contain
+    # the substring "CCS" so the pattern-loop's `"CCS" in _name` rule below
+    # never catches them.
+    "cement_post_comb": "xx",
+    "glass_post_comb": "xx",
+    "ceramic_post_comb": "xx",
 }
 # Pattern-based for everything else in COLOR_MAP
 for _name in COLOR_MAP:
