@@ -10,16 +10,20 @@ additions, plus net_present_cost. bbo and sampling were each re-run once per
 plugins.mga.normalisation setting -- "relative" (the original per-axis-bounds
 scaling), "units" (raw physical-unit scaling), and "minmax" (each axis's own
 near-optimal [min, max] mapped onto [0, 1]) -- giving six real supf-mode runs
-now instead of two:
-bbo_relative, bbo_units, bbo_minmax, sampling_relative, sampling_units,
-sampling_minmax. All six solve
-the same epsilon=0.1 near-optimal space around the same baseline, so their
-results still live in one shared coordinate system and overlay directly; on
-disk each saves under its own
-..._MGA_<mode>_<normalisation>/..._<mode>_summary/ (data/outputs/
+in total: bbo_relative, bbo_units, bbo_minmax, sampling_relative,
+sampling_units, sampling_minmax. All six solve the same epsilon=0.1
+near-optimal space around the same baseline, so their results still live in
+one shared coordinate system and overlay directly; on disk each saves under
+its own ..._MGA_<mode>_<normalisation>/..._<mode>_summary/ (data/outputs/
 euler_outputs_mga/) -- the folder's own name carries the normalisation
 suffix, but the Postprocess subfolder inside it is still named after the
 bare mode ("..._bbo_summary", "..._sampling_summary"), see BASE_MODE.
+bbo_units' and sampling_units' own data is still on disk under data/outputs/
+euler_outputs_mga/, but SUPF_MODES (the single source of truth every figure
+below, plus RUN_DIR/BASE_MODE, iterates over) omits both "units" variants by
+request, so no figure loads or plots either of them any more -- bbo_relative
+and sampling_relative are the ones actually plotted alongside bbo_minmax and
+sampling_minmax.
 
 sampling and bbo both run through pyoNearOpt's generic supf_explore harness
 (near_optimal_tools' shared support-function polytope bookkeeping) and only
@@ -29,8 +33,10 @@ searches for that direction with a black-box optimiser (SHADE) instead.
 normalisation is an orthogonal axis (how directions are scaled while
 searching), not a third strategy, hence the 2x3 naming.
 
-This script picks whichever of the six supf-mode runs loads first (in
-SUPF_MODES order) as the canonical shared frame for axis names/units/z*/
+This script picks whichever of the four plotted supf-mode runs (SUPF_MODES;
+bbo_units/sampling_units excluded, see above) loads first, in SUPF_MODES
+order, as
+the canonical shared frame for axis names/units/z*/
 scale/offset (used by fig0 and fig1), and prints a sanity check comparing
 every pair of loaded runs' baselines (they solve the same cost-optimal
 model, so z* should agree to full floating-point precision regardless of
@@ -92,11 +98,12 @@ Figures (data/outputs/figures/mga_tests/):
                                  cost -- show that side effect too).
   fig1_pairwise_points           pairwise projections of every mode/variant's
                                  actual visited points, colour-coded by mode.
-  fig2_polytope_samples          One panel per supf-mode run with its own
-                                 polytope (bbo_relative, bbo_units,
-                                 bbo_minmax, sampling_relative,
-                                 sampling_units, sampling_minmax, and oracle
-                                 once re-downloaded against the new axes):
+  fig2_polytope_samples          One panel per plotted supf-mode run with its
+                                 own polytope (bbo_relative, bbo_minmax,
+                                 sampling_relative, sampling_minmax, and
+                                 oracle once re-downloaded against the new
+                                 axes; bbo_units/sampling_units excluded, see
+                                 module docstring above):
                                  hexbin density of a uniform sample of THAT
                                  run's own INNER approximation
                                  (rejection-sampled from its own outer body --
@@ -126,7 +133,8 @@ Figures (data/outputs/figures/mga_tests/):
                                  x-axis is number of model queries, fig4b's is
                                  cumulative real ZEN-garden solving time (log).
                                  One row: each run's own live, evolving
-                                 approximation -- all six supf runs fully
+                                 approximation -- all four plotted supf runs
+                                 fully
                                  (reference-equivalent to near_optimal_tools'
                                  docs/examples/method_comparison.ipynb, see
                                  load_native_outer_at), oracle on
@@ -189,15 +197,16 @@ RUN_PREFIX = f"{MODEL}_2050_1a_5a_interval_5ts_MGA"
 WEIGHTS_DIR = MGA_ROOT / f"{RUN_PREFIX}_weights"
 ORACLE_DIR = MGA_ROOT / f"{RUN_PREFIX}_oracle"
 
-# The six real supf-mode runs (2 direction-selection strategies x 3
-# normalisation settings, see module docstring). Each run's OWN folder
-# carries the normalisation suffix, but the Postprocess subfolder it saves
-# internally is still named after the bare mode alone (e.g.
-# "..._bbo_summary" inside bbo_relative/, bbo_units/ and bbo_minmax/) --
-# BASE_MODE maps a variant key back to that bare-mode folder-naming
-# component.
-SUPF_MODES = ("bbo_relative", "bbo_units", "bbo_minmax",
-              "sampling_relative", "sampling_units", "sampling_minmax")
+# The real supf-mode runs actually plotted (2 direction-selection strategies
+# x 3 normalisation settings, see module docstring, minus bbo_units and
+# sampling_units -- both "units" variants excluded from every figure by
+# request, see module docstring). Each run's OWN folder carries the
+# normalisation suffix, but the Postprocess subfolder it saves internally is
+# still named after the bare mode alone (e.g. "..._bbo_summary" inside
+# bbo_relative/, bbo_units/ and bbo_minmax/) -- BASE_MODE maps a variant key
+# back to that bare-mode folder-naming component.
+SUPF_MODES = ("bbo_relative", "bbo_minmax",
+              "sampling_relative", "sampling_minmax")
 RUN_DIR = {m: MGA_ROOT / f"{RUN_PREFIX}_{m}" for m in SUPF_MODES}
 RUN_DIR["oracle"] = ORACLE_DIR
 BASE_MODE = {m: m.split("_", 1)[0] for m in SUPF_MODES}
@@ -207,10 +216,13 @@ BASE_MODE = {m: m.split("_", 1)[0] for m in SUPF_MODES}
 # project's convention of never inventing a separate palette for print
 # figures -- picked for maximum pairwise contrast (not adjacent palette
 # slots): weights=green, oracle=bronze/brown, and the two bbo/sampling
-# variants form their own colour-family pairs so the relative/units/minmax
-# split of ONE mode reads as related (bbo=blue-family, sampling=warm-family)
-# while still being distinguishable per variant. minmax was added after the
-# palette's 6 saturated slots were already spoken for (grey is reserved, see
+# variants form their own colour-family pairs so the relative/minmax split of
+# ONE mode reads as related (bbo=blue-family, sampling=warm-family) while
+# still being distinguishable per variant (bbo_units/sampling_units are
+# excluded from SUPF_MODES by request, see module docstring, so _ETH_PETROL
+# and _ETH_RED are unused here now -- _ETH_RED is still used by fig0's
+# baseline bar colour below). minmax was added after the palette's 6
+# saturated slots were already spoken for (grey is reserved, see
 # SCENARIO_PALETTE's own comment), so each mode's minmax variant reuses its
 # family's base colour via eth_tint (ETH's documented tint system) rather
 # than inventing an off-palette hue.
@@ -221,10 +233,8 @@ _ETH_BLUE, _ETH_PETROL, _ETH_GREEN, _ETH_BRONZE, _ETH_RED, _ETH_PURPLE = (
 MODE_COLOR = {
     "weights": _ETH_GREEN,
     "bbo_relative": _ETH_BLUE,
-    "bbo_units": _ETH_PETROL,
     "bbo_minmax": eth_tint(_ETH_BLUE, 0.5),
     "sampling_relative": _ETH_PURPLE,
-    "sampling_units": _ETH_RED,
     "sampling_minmax": eth_tint(_ETH_PURPLE, 0.5),
     "oracle": _ETH_BRONZE,
 }
@@ -233,10 +243,8 @@ MODE_LABEL = {
     # $\tau$ (mathtext, "cm" fontset) rather than a literal unicode tau --
     # the plain text font (cmr10) has no tau glyph.
     "bbo_relative": r"BBO relative ($\tau$=0.95)",
-    "bbo_units": r"BBO units ($\tau$=0.95)",
     "bbo_minmax": r"BBO minmax ($\tau$=0.95)",
     "sampling_relative": r"Sampling relative ($\tau$=0.95)",
-    "sampling_units": r"Sampling units ($\tau$=0.95)",
     "sampling_minmax": r"Sampling minmax ($\tau$=0.95)",
     "oracle": "Oracle",
 }
@@ -337,9 +345,10 @@ def try_load_run_polytope(run_dir: Path, mode: str, folder_mode: str | None = No
     (logged) if the summary folder or its polytope*.npz is missing/unreadable
     -- e.g. oracle before its download lands, or an interrupted run whose
     summary was never written (see the module docstring). folder_mode
-    defaults to mode; pass BASE_MODE[mode] for a bbo_relative/bbo_units/
-    sampling_relative/sampling_units variant, whose Postprocess subfolder is
-    still named after the bare mode alone (e.g. "..._bbo_summary")."""
+    defaults to mode; pass BASE_MODE[mode] for a bbo_relative/bbo_minmax/
+    sampling_relative/sampling_minmax variant, whose Postprocess subfolder
+    is still named after the bare mode alone (e.g.
+    "..._bbo_summary")."""
     folder_mode = folder_mode or mode
     summary = run_dir / f"{MODEL}_{folder_mode}_summary"
     poly_files = sorted(summary.glob("polytope*.npz")) if summary.exists() else []
@@ -669,8 +678,8 @@ def rejection_sample_inner(poly: Polytope, n_propose: int, seed: int = 0) -> tup
 # dropped on top. oracle gets a third panel automatically once its own
 # oracle_summary/polytope.npz exists (see try_load_run_polytope); weights
 # never builds a polytope and so never gets a panel here (see fig0 instead).
-_HULL_MODE_ORDER = ("bbo_relative", "bbo_units", "bbo_minmax",
-                     "sampling_relative", "sampling_units", "sampling_minmax", "oracle")
+_HULL_MODE_ORDER = ("bbo_relative", "bbo_minmax",
+                     "sampling_relative", "sampling_minmax", "oracle")
 
 
 def _hull_modes_to_plot(polys: dict[str, Polytope], samples: dict[str, tuple[np.ndarray, float]]) -> list[str]:
@@ -864,6 +873,50 @@ def query_time_scores(poly: Polytope, X_norm: np.ndarray, solve_seconds: list[fl
     return pd.DataFrame(rows)
 
 
+def fig4_cache_path(mode: str) -> Path:
+    """One cache file per supf-mode run, mirroring sampling_cache_path
+    (rejection_sample_inner's own cache): query_time_scores is a
+    deterministic function of that mode's own polytope + eval_every, and its
+    MILP-heavy checkpoints are slow enough (each max_separation call is a
+    Gurobi solve) that a full 4-run fig4 can take hours -- long enough to
+    hit real-world interruptions (this project has seen background runs
+    killed mid-way twice in a row, likely the host machine sleeping, not a
+    script bug). Caching per mode means a re-run after an interruption only
+    redoes whichever mode was still in flight, not all four from zero."""
+    return MGA_ROOT / "mga_inner_sampling" / f"fig4_native_scores_{mode}.npz"
+
+
+def cached_query_time_scores(mode: str, poly: Polytope, X_norm: np.ndarray, solve_seconds: list[float],
+                             eval_every: int, outer_at) -> pd.DataFrame:
+    """query_time_scores, cached to fig4_cache_path(mode); regenerates
+    automatically if the polytope or eval_every have changed since the cache
+    was written (same staleness check as cached_rejection_sample_inner)."""
+    cache = fig4_cache_path(mode)
+    fingerprint = _poly_fingerprint(poly)
+    if cache.exists():
+        cached = np.load(cache)
+        if str(cached["fingerprint"]) == fingerprint and int(cached["eval_every"]) == eval_every:
+            print(f"  {mode}: using cached fig4 scores from {cache.relative_to(REPO_ROOT)} "
+                  f"({len(cached['n_queries'])} checkpoints)")
+            return pd.DataFrame({
+                "n_queries": cached["n_queries"], "seconds": cached["seconds"],
+                "max_separation": cached["max_separation"],
+                "ci_lower": cached["ci_lower"], "ci_upper": cached["ci_upper"],
+            })
+        print(f"  {mode}: cached fig4 scores are stale (polytope/eval_every changed); regenerating")
+
+    df = query_time_scores(poly, X_norm, solve_seconds, eval_every, outer_at=outer_at)
+    cache.parent.mkdir(parents=True, exist_ok=True)
+    np.savez(
+        cache, fingerprint=fingerprint, eval_every=eval_every,
+        n_queries=df["n_queries"].to_numpy(), seconds=df["seconds"].to_numpy(),
+        max_separation=df["max_separation"].to_numpy(),
+        ci_lower=df["ci_lower"].to_numpy(), ci_upper=df["ci_upper"].to_numpy(),
+    )
+    print(f"  {mode}: cached fig4 scores to {cache.relative_to(REPO_ROOT)} ({len(df)} checkpoints)")
+    return df
+
+
 # ── Native (own evolving) outer approximation, supf modes only ──────────
 #
 # The reference notebook's own score_run scores each method against ITS OWN
@@ -907,8 +960,8 @@ def load_native_outer_at(run_dir: Path, run_poly: Polytope, mode: str, folder_mo
     supf-mode run (sampling or bbo, any normalisation -- all save the same
     diagnostics.csv schema via supf_driver.py's shared _run_supf_mode).
     folder_mode defaults to mode; pass BASE_MODE[mode] for a
-    bbo_relative/bbo_units/sampling_relative/sampling_units variant (see
-    try_load_run_polytope)."""
+    bbo_relative/bbo_minmax/sampling_relative/sampling_minmax variant
+    (see try_load_run_polytope)."""
     folder_mode = folder_mode or mode
     summary = run_dir / f"{MODEL}_{folder_mode}_summary"
     diagnostics = pd.read_csv(summary / "diagnostics.csv")
@@ -1001,19 +1054,21 @@ def load_oracle_native_gap(run_dir: Path, run_poly: Polytope,
 
 def _compute_fig4_scores(points: dict[str, list[tuple[str, np.ndarray, float]]],
                          polys: dict[str, Polytope]):
-    """A native (own evolving approximation) score for every supf-mode run
-    (bbo_relative, bbo_units, bbo_minmax, sampling_relative, sampling_units,
-    sampling_minmax -- all six have their own surviving diagnostics.csv), and
-    oracle's own certified
+    """A native (own evolving approximation) score for every plotted
+    supf-mode run (bbo_relative, bbo_minmax, sampling_relative,
+    sampling_minmax -- all four have their own surviving diagnostics.csv;
+    bbo_units/sampling_units excluded from SUPF_MODES, see module
+    docstring), and oracle's own certified
     max_separation-only gap (see load_oracle_native_gap). weights has no
     representation here at all -- see the module docstring's "Convergence
     metric" section. Shared by both fig4a (vs queries) and fig4b (vs time)
     so the MILP solves only run once."""
-    # 25 rather than the original 10: with 9 axes (vs. the old 6) each
-    # checkpoint's max_separation MILP is markedly slower, so this keeps a
-    # full 4-run fig4 finishing within a practical wall-clock budget at the
-    # cost of a coarser convergence curve.
-    eval_every = {m: 25 for m in SUPF_MODES}
+    # 100 rather than the original 10: with 9 axes (vs. the old 6) each
+    # checkpoint's max_separation MILP is markedly slower, and repeated
+    # background-run interruptions (see fig4_cache_path's docstring) meant
+    # even eval_every=25 didn't reliably finish -- this trades a much
+    # coarser convergence curve for a run that actually completes.
+    eval_every = {m: 100 for m in SUPF_MODES}
 
     # Each supf mode scored against its OWN evolving, cut-refined outer
     # approximation -- i.e. the reference notebook's own score_run
@@ -1041,8 +1096,8 @@ def _compute_fig4_scores(points: dict[str, list[tuple[str, np.ndarray, float]]],
         X_norm = run_poly.to_norm(np.vstack(phys))
         print(f"  fig4: scoring {mode} ({len(X_norm)} points, "
               f"every {eval_every.get(mode, 5)}th checkpoint, own evolving approximation)...")
-        native_scores[mode] = query_time_scores(run_poly, X_norm, list(secs), eval_every.get(mode, 5),
-                                                 outer_at=outer_at)
+        native_scores[mode] = cached_query_time_scores(mode, run_poly, X_norm, list(secs), eval_every.get(mode, 5),
+                                                        outer_at=outer_at)
 
     # oracle's own certified gap -- max_separation only, no ci_lower; see
     # load_oracle_native_gap's docstring for why this is a legitimate,
@@ -1200,8 +1255,8 @@ def main() -> None:
 
     if not any(m in polys for m in SUPF_MODES):
         raise SystemExit(
-            "None of bbo_relative/bbo_units/sampling_relative/sampling_units has a usable "
-            "polytope -- nothing to build the shared coordinate frame or fig2/fig3 from."
+            "None of bbo_relative/bbo_minmax/sampling_relative/sampling_minmax has a "
+            "usable polytope -- nothing to build the shared coordinate frame or fig2/fig3 from."
         )
 
     # Shared coordinate frame (axis names/units/z*/scale/offset, used by fig0
