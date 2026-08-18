@@ -25,6 +25,18 @@ request, so no figure loads or plots either of them any more -- bbo_relative
 and sampling_relative are the ones actually plotted alongside bbo_minmax and
 sampling_minmax.
 
+Two more runs -- batch_bbo_relative and batch_sampling_relative (BATCH_MODES)
+-- were added later: same "relative" normalisation and same 9-axis/epsilon=0.1
+near-optimal space, but run through pyoNearOpt's batch harness instead of
+supf_explore (see submit_euler_mga.sh task_ids 6-9), solving batch_size
+directions concurrently per outer iteration via a worker pool instead of one
+at a time. Their on-disk folder suffixes ("_batch4"/"_batch8") are just these
+two runs' own labels, not their actual batch_size -- both runs' polytope.npz
+records batch_size=4. Every figure below that iterates SUPF_MODES also
+iterates ALL_SUPF_MODES = SUPF_MODES + BATCH_MODES; only fig0 (weights-only)
+and the shared-frame selection (still whichever of SUPF_MODES loads first,
+unchanged) stay scoped to the original four.
+
 sampling and bbo both run through pyoNearOpt's generic supf_explore harness
 (near_optimal_tools' shared support-function polytope bookkeeping) and only
 differ in how the next direction to query is picked: sampling scores many
@@ -69,13 +81,19 @@ oracle on max_separation only, via its own certified max_min_distance, once
 such a run exists).
 
 Convergence metric (fig4): pyoNearOpt.metrics.fraction_well_explored and
-max_separation (the same machinery behind sampling/bbo's own
-ci_convergence_metric and oracle's own max-min distance), evaluated on each
-mode's growing set of known near-optimal points against ITS OWN live,
-evolving outer approximation -- sampling/bbo's fully reconstructed from
-their own cut history (see load_native_outer_at), oracle's own certified gap
-read directly off its own diagnostics for max_separation only (see
-load_oracle_native_gap). An earlier version of this figure also scored every
+max_separation (the same machinery behind sampling/bbo/batch's own
+ci_convergence_metric/batch_oracle convergence check and oracle's own max-min
+distance), evaluated on each mode's growing set of known near-optimal points
+against ITS OWN live, evolving outer approximation. max_separation (a MILP)
+is actually solved here, at sparse checkpoints, against sampling/bbo/batch's
+own cut history fully reconstructed (see load_native_outer_at/
+load_native_outer_at_batch) or oracle's own certified gap read directly off
+its own diagnostics (see load_oracle_native_gap). ci_lower needs no solving
+at all for sampling/bbo/batch: it IS each of their own live convergence
+checks, already logged into their diagnostics.csv once per iteration, so it
+is read straight off disk at full per-iteration density instead (see
+load_native_ci_history) -- oracle has no ci_lower equivalent at all (see
+that function's docstring). An earlier version of this figure also scored every
 mode against one shared, FROZEN initial outer box (the un-cut VMM box before
 any refinement) as a second row, so all modes had one common ruler despite
 each building a different real approximation. That row was dropped: scoring
@@ -100,7 +118,8 @@ Figures (data/outputs/figures/mga_tests/):
                                  actual visited points, colour-coded by mode.
   fig2_polytope_samples          One panel per plotted supf-mode run with its
                                  own polytope (bbo_relative, bbo_minmax,
-                                 sampling_relative, sampling_minmax, and
+                                 batch_bbo_relative, sampling_relative,
+                                 sampling_minmax, batch_sampling_relative, and
                                  oracle once re-downloaded against the new
                                  axes; bbo_units/sampling_units excluded, see
                                  module docstring above):
@@ -128,16 +147,20 @@ Figures (data/outputs/figures/mga_tests/):
                                  give the same matrix to 1e-14), so this is on
                                  physical units purely for readability --
                                  normalising would not change a single value.
-  fig4a/b_query/time_comparison  Two figures, columns are max_separation and
-                                 fraction_well_explored's ci_lower; fig4a's
-                                 x-axis is number of model queries, fig4b's is
-                                 cumulative real ZEN-garden solving time (log).
-                                 One row: each run's own live, evolving
-                                 approximation -- all four plotted supf runs
-                                 fully
-                                 (reference-equivalent to near_optimal_tools'
-                                 docs/examples/method_comparison.ipynb, see
-                                 load_native_outer_at), oracle on
+  fig4a/b_query/time_comparison  Two figures, columns are max_separation
+                                 (solved here, sparse checkpoints) and
+                                 fraction_well_explored's ci_lower (read
+                                 natively off diagnostics.csv, full density,
+                                 no solving -- see load_native_ci_history);
+                                 fig4a's x-axis is number of model queries,
+                                 fig4b's is cumulative real ZEN-garden
+                                 solving time (log). One row: each run's own
+                                 live, evolving approximation -- all six
+                                 plotted supf-mode runs (reference-equivalent
+                                 to near_optimal_tools' docs/examples/
+                                 method_comparison.ipynb, see
+                                 load_native_outer_at/
+                                 load_native_outer_at_batch), oracle on
                                  max_separation only (see
                                  load_oracle_native_gap), weights absent (it
                                  never builds an approximation -- see fig0
@@ -161,6 +184,7 @@ Usage:
 """
 
 import json
+import re
 import warnings
 from pathlib import Path
 
@@ -185,7 +209,7 @@ from scipy.optimize import linprog
 from figure_settings import SCENARIO_PALETTE, eth_tint
 from zen_garden import Results
 from zen_garden_plugins.mga.polytope_io import Polytope, load_polytope
-from pyoNearOpt.metrics import fraction_well_explored, max_separation
+from pyoNearOpt.metrics import max_separation
 from pyoNearOpt.polytope_approximation.approximation_class import approximation
 from pyoNearOpt.polytope_approximation.polytope_samples import PolytopeSamples
 
@@ -207,9 +231,39 @@ ORACLE_DIR = MGA_ROOT / f"{RUN_PREFIX}_oracle"
 # back to that bare-mode folder-naming component.
 SUPF_MODES = ("bbo_relative", "bbo_minmax",
               "sampling_relative", "sampling_minmax")
+
+# Batch-mode runs (strategy_mode="bbo"/"sampling" run through pyoNearOpt's
+# batch harness instead of supf_explore -- see submit_euler_mga.sh task_ids
+# 6-9): each outer iteration solves batch_size directions concurrently via a
+# worker pool instead of one at a time. Folder-name suffixes "_batch4"/
+# "_batch8" are just these two runs' own labels, NOT their batch_size --
+# both runs' polytope.npz run_json actually records batch_size=4 (verified
+# on disk; presumably named after a SLURM array/job identifier rather than
+# the worker count), so batch_size is always read from run.run["batch_size"]
+# below rather than parsed from the folder name. Only "relative"
+# normalisation exists for either so far. Every per-run Postprocess folder
+# saves under one shared "..._batch_summary/" (unlike SUPF_MODES, whose
+# summary folder name still carries the bare mode "bbo"/"sampling" --
+# BASE_MODE below maps both batch variants to the literal string "batch"),
+# and each iteration's batch_size points land in their own
+# "..._iter<N>_<k>/" folder (1-indexed iteration N, 0-indexed worker k) --
+# see load_batch_points.
+BATCH_MODES = ("batch_bbo_relative", "batch_sampling_relative")
+BATCH_RUN_SUFFIX = {
+    "batch_bbo_relative": "batch_bbo_relative_batch4",
+    "batch_sampling_relative": "batch_sampling_relative_batch8",
+}
+# Every mode with its own polytope.npz + outer approximation -- the set
+# fig1/fig2/fig3/fig4 iterate over (fig0 is weights-only, see module
+# docstring).
+ALL_SUPF_MODES = SUPF_MODES + BATCH_MODES
+
 RUN_DIR = {m: MGA_ROOT / f"{RUN_PREFIX}_{m}" for m in SUPF_MODES}
+for m, suffix in BATCH_RUN_SUFFIX.items():
+    RUN_DIR[m] = MGA_ROOT / f"{RUN_PREFIX}_{suffix}"
 RUN_DIR["oracle"] = ORACLE_DIR
 BASE_MODE = {m: m.split("_", 1)[0] for m in SUPF_MODES}
+BASE_MODE.update({m: "batch" for m in BATCH_MODES})
 
 # Colours reused from figure_settings.SCENARIO_PALETTE (the full 7-color ETH
 # corporate swatch: blue, petrol, green, bronze, red, purple, grey), per this
@@ -234,8 +288,13 @@ MODE_COLOR = {
     "weights": _ETH_GREEN,
     "bbo_relative": _ETH_BLUE,
     "bbo_minmax": eth_tint(_ETH_BLUE, 0.5),
+    # batch variants reuse _ETH_PETROL/_ETH_RED -- both otherwise unused now
+    # that bbo_units/sampling_units are excluded (see module docstring) --
+    # keeping the bbo-family/blue vs. sampling-family/warm split from above.
+    "batch_bbo_relative": _ETH_PETROL,
     "sampling_relative": _ETH_PURPLE,
     "sampling_minmax": eth_tint(_ETH_PURPLE, 0.5),
+    "batch_sampling_relative": _ETH_RED,
     "oracle": _ETH_BRONZE,
 }
 MODE_LABEL = {
@@ -244,11 +303,13 @@ MODE_LABEL = {
     # the plain text font (cmr10) has no tau glyph.
     "bbo_relative": r"BBO relative ($\tau$=0.95)",
     "bbo_minmax": r"BBO minmax ($\tau$=0.95)",
+    "batch_bbo_relative": r"Batch BBO relative ($\tau$=0.95)",
     "sampling_relative": r"Sampling relative ($\tau$=0.95)",
     "sampling_minmax": r"Sampling minmax ($\tau$=0.95)",
+    "batch_sampling_relative": r"Batch Sampling relative ($\tau$=0.95)",
     "oracle": "Oracle",
 }
-MODES = ("weights", *SUPF_MODES, "oracle")
+MODES = ("weights", *ALL_SUPF_MODES, "oracle")
 
 # config_mga_weights.json's "iterations" list: weight sign, combined with
 # run_iteration's fixed sense="min", determines whether each solve minimises
@@ -382,6 +443,30 @@ def load_supf_points(run_poly: Polytope, run_dir: Path,
         elif lab == "iterate":
             iterate_count += 1
             folder = run_dir / f"{MODEL}_{iter_prefix}_{iterate_count}"
+        else:  # "max:<axis>" / "min:<axis>"
+            sense, axis = lab.split(":", 1)
+            folder = run_dir / f"{MODEL}_vmm_{sense}_{axis}"
+        rows.append((lab, run_poly.to_phys(pt), solving_time(folder)))
+    return rows
+
+
+def load_batch_points(run_poly: Polytope, run_dir: Path, batch_size: int) -> list[tuple[str, np.ndarray, float]]:
+    """Same contract as load_supf_points, for a batch-mode run (BATCH_MODES):
+    the folder-naming convention differs because batch_size points land per
+    outer iteration instead of one -- disk folders are
+    "..._iter<N>_<k>/", N the 1-indexed outer iteration, k the 0-indexed
+    worker slot within it, in the same left-to-right order the run's own
+    diagnostics.csv logged them (verified: iteration 0 in diagnostics.csv
+    <-> on-disk "_iter1_*", i.e. disk numbering is diagnostics' iteration+1)."""
+    iterate_idx = 0
+    rows = []
+    for lab, pt in zip(run_poly.point_origin, run_poly.X):
+        if lab == "z_star":
+            folder = run_dir / MODEL
+        elif lab == "iterate":
+            iteration_n, k = iterate_idx // batch_size + 1, iterate_idx % batch_size
+            folder = run_dir / f"{MODEL}_iter{iteration_n}_{k}"
+            iterate_idx += 1
         else:  # "max:<axis>" / "min:<axis>"
             sense, axis = lab.split(":", 1)
             folder = run_dir / f"{MODEL}_vmm_{sense}_{axis}"
@@ -678,8 +763,9 @@ def rejection_sample_inner(poly: Polytope, n_propose: int, seed: int = 0) -> tup
 # dropped on top. oracle gets a third panel automatically once its own
 # oracle_summary/polytope.npz exists (see try_load_run_polytope); weights
 # never builds a polytope and so never gets a panel here (see fig0 instead).
-_HULL_MODE_ORDER = ("bbo_relative", "bbo_minmax",
-                     "sampling_relative", "sampling_minmax", "oracle")
+_HULL_MODE_ORDER = ("bbo_relative", "bbo_minmax", "batch_bbo_relative",
+                     "sampling_relative", "sampling_minmax", "batch_sampling_relative",
+                     "oracle")
 
 
 def _hull_modes_to_plot(polys: dict[str, Polytope], samples: dict[str, tuple[np.ndarray, float]]) -> list[str]:
@@ -821,16 +907,137 @@ def fig3_axis_correlations(polys: dict[str, Polytope], samples: dict[str, tuple[
 
 # ── fig4: model-query and time comparison, matching near_optimal_tools' ────
 # docs/examples/method_comparison.ipynb (2 metrics x 2 x-axes). max_separation
-# is the oracle-style max-min L-inf distance (needs a MILP per evaluation, so
-# it's only evaluated at sparse checkpoints, as the reference notebook itself
-# does via its "eval_every" config); fraction_well_explored's ci_lower is the
-# same cheap LP-based metric used throughout this script. Both are evaluated
-# against each mode's own live, evolving outer approximation (outer_at(k),
-# see load_native_outer_at) -- see the module docstring's "Convergence
-# metric" section for why an earlier, shared frozen-box version was dropped.
-# "seconds" is the real cumulative ZEN-garden solving_time from each solve's
-# benchmarking.json -- not wall-clock around the whole loop like the
-# reference notebook's TimedCallback.
+# is the oracle-style max-min L-inf distance -- needs a MILP per evaluation
+# (query_time_scores), so it's only evaluated at sparse checkpoints, as the
+# reference notebook itself does via its "eval_every" config. ci_lower
+# (fraction_well_explored's CI lower bound) does NOT need solving here at
+# all any more: every supf/batch-mode run already evaluates this exact
+# metric against its own live approximation once per iteration during the
+# run itself (ci_convergence_metric/batch_oracle's own convergence check)
+# and logs the result straight into its diagnostics.csv -- so, like oracle's
+# max_min_distance (see load_oracle_native_gap), it is read directly off
+# disk at full per-iteration density rather than resampled (see
+# load_native_ci_history; this used to be resampled here too, 500 fresh LP
+# solves per checkpoint per mode, until this project noticed the run itself
+# already recorded it). Both metrics are evaluated against each mode's own
+# live, evolving outer approximation (outer_at(k), see load_native_outer_at)
+# -- see the module docstring's "Convergence metric" section for why an
+# earlier, shared frozen-box version was dropped. "seconds" started out as
+# just the cumulative ZEN-garden solving_time from each solve's
+# benchmarking.json (deliberately not wall-clock around the whole loop like
+# the reference notebook's TimedCallback), but that alone turned out to be
+# wrong in two separate ways this project verified directly against Euler's
+# own SLURM job accounting -- see _cum_seconds_wallclock (BATCH_MODES'
+# concurrent solves need a max, not a sum, per outer iteration) and
+# _calibrate_cum_seconds (benchmarking.json never captures model-
+# construction/I/O/direction-search overhead, undercounting EVERY mode's
+# real elapsed time, batch or not, by 2.3x-3.7x) immediately below.
+
+def _cum_seconds_wallclock(points: list[tuple[str, np.ndarray, float]],
+                           batch_size: int | None) -> np.ndarray:
+    """Cumulative elapsed wall-clock time after each of `points` (same order
+    as the mode's own X/A/b) -- the array query_time_scores/
+    load_native_ci_history index into for fig4b's x-axis.
+
+    For a sequential mode (batch_size=None -- SUPF_MODES, oracle), every
+    point really was solved one after another, so summing each point's own
+    solving_time straightforwardly IS the real elapsed time.
+
+    For a BATCH_MODES run this is NOT true for the "iterate" points: each
+    outer iteration solves batch_size directions concurrently via a worker
+    pool (ForkedBatchSupportFunction in zen_garden_plugins/mga/
+    parallel_solve.py -- one ProcessPoolExecutor worker per direction, all
+    batch_size futures submitted together and gathered together every
+    iteration), and the whole group only lands in the polytope once every
+    worker in it finishes (_apply_batch_updates applies all batch_size
+    points atomically, after every future.result() returns) -- so summing
+    the group's individual solving_times would overcount real elapsed time
+    by roughly batch_size. The group's real wall-clock contribution is
+    instead approximated as its SLOWEST member (the group can't finish
+    before its slowest worker does), and every point within a group shares
+    that same cumulative timestamp -- which also matches the atomic-commit
+    semantics: none of the batch_size points existed in the approximation
+    before the whole group did. The initial VMM/z* prefix is still summed
+    point-by-point in both kinds of run: solve_axis_bounds (bounds + extreme
+    designs) always runs single-process, before the worker pool is even
+    constructed."""
+    secs = np.nan_to_num([t for _, _, t in points], nan=0.0)
+    if not batch_size:
+        return np.cumsum(secs)
+
+    labels = [lab for lab, _, _ in points]
+    n_initial = sum(1 for lab in labels if lab != "iterate")
+    cum = np.empty(len(secs))
+    cum[:n_initial] = np.cumsum(secs[:n_initial])
+    base = cum[n_initial - 1] if n_initial > 0 else 0.0
+    iter_secs = secs[n_initial:]
+    for start in range(0, len(iter_secs), batch_size):
+        group = iter_secs[start:start + batch_size]
+        base = base + (group.max() if len(group) else 0.0)
+        cum[n_initial + start: n_initial + start + len(group)] = base
+    return cum
+
+
+# ── Calibrating cum_seconds against Euler's own SLURM job accounting ────
+#
+# benchmarking.json (what _cum_seconds_wallclock sums/maxes) only logs the
+# solver's own LP/MILP time -- it does NOT capture model construction, this
+# solve's own output I/O, or (for bbo/sampling) the direction-search
+# overhead between solves. Comparing _cum_seconds_wallclock's own totals
+# against each run's REAL elapsed time (Euler's `sacct`, ground truth,
+# verified directly -- see below) confirmed this gap is large AND present
+# in every mode, not just BATCH_MODES: sampling_relative/bbo_relative
+# undercounted their own real elapsed time by 2.8x/3.7x respectively;
+# batch_bbo_relative/batch_sampling_relative (even with the parallelism-
+# aware fix above) still undercounted theirs by 2.4x/2.3x. There is no way
+# to close this gap from data already on disk -- benchmarking.json simply
+# never recorded the missing time -- so each mode's own real total is
+# looked up here instead, once per run, and the whole cum_seconds curve is
+# rescaled to match it exactly at its endpoint (assumes the missing
+# overhead tracks solving_time roughly proportionally through the run --
+# unverified at checkpoint granularity, only at the final total, but far
+# closer to real elapsed time than leaving the raw undercount in place).
+#
+# HOW TO ADD A NEW MODE'S OWN VERIFIED TOTAL (do this for every future MGA
+# mode/re-run this script is extended to plot): on Euler, run
+#     sacct -u $USER --name=zen_run_mga --format=JobID,State,Elapsed,Start,End -S <run start date> -P
+# find that mode's task_id (see submit_euler_mga.sh's own header comment for
+# the task_id -> mode mapping) among the `_<task_id>` suffixes, take its
+# final COMPLETED row's Elapsed (HH:MM:SS or D-HH:MM:SS), convert to
+# seconds, and add an entry below with the job ID/dates as a citation. A
+# mode missing from this dict is left uncalibrated (a printed warning
+# flags it) rather than silently wrong -- but it WILL keep understating its
+# own real elapsed time on fig4b until an entry is added.
+REAL_ELAPSED_SECONDS = {
+    # sacct job 10695450_1 (task_id=1), COMPLETED 2026-08-14T10:31:12 ->
+    # 2026-08-14T23:32:47, Elapsed=13:01:35.
+    "sampling_relative": 46_895,
+    # sacct job 10695450_3 (task_id=3), COMPLETED 2026-08-15T20:34:48 ->
+    # 2026-08-16T13:34:13, Elapsed=16:59:25.
+    "bbo_relative": 61_165,
+    # sacct job 10958308_8 (task_id=8), COMPLETED 2026-08-17T13:50:42 ->
+    # 2026-08-17T23:40:32, Elapsed=09:49:50.
+    "batch_bbo_relative": 35_390,
+    # sacct job 10990305_9 (task_id=9), COMPLETED 2026-08-17T23:40:43 ->
+    # 2026-08-18T07:27:53, Elapsed=07:47:10.
+    "batch_sampling_relative": 28_030,
+}
+
+
+def _calibrate_cum_seconds(mode: str, cum_seconds: np.ndarray) -> np.ndarray:
+    """Rescales cum_seconds (see _cum_seconds_wallclock) so its endpoint
+    matches `mode`'s own REAL total elapsed time from REAL_ELAPSED_SECONDS
+    -- see the section comment above for why this is necessary and how to
+    extend it. Returns cum_seconds unchanged (with a warning) if `mode` has
+    no verified entry yet, or if its own raw total is <= 0 (nothing to
+    scale against)."""
+    if mode not in REAL_ELAPSED_SECONDS or len(cum_seconds) == 0 or cum_seconds[-1] <= 0:
+        print(f"  {mode}: WARNING -- no verified real elapsed time in REAL_ELAPSED_SECONDS; "
+              f"fig4b's 'seconds' axis for this mode is uncalibrated and will understate its "
+              f"real wall-clock time (see _calibrate_cum_seconds's docstring for how to add one).")
+        return cum_seconds
+    return cum_seconds * (REAL_ELAPSED_SECONDS[mode] / cum_seconds[-1])
+
 
 def _gurobi_maxsep_solver(time_limit: float = 30.0):
     import pyomo.environ as pyo
@@ -839,17 +1046,20 @@ def _gurobi_maxsep_solver(time_limit: float = 30.0):
     return solver
 
 
-def query_time_scores(poly: Polytope, X_norm: np.ndarray, solve_seconds: list[float],
+def query_time_scores(poly: Polytope, X_norm: np.ndarray, cum_seconds: np.ndarray,
                        eval_every: int, outer_at) -> pd.DataFrame:
-    """outer_at(k) -> (A_k, b_k), the outer approximation to score checkpoint k
-    against -- pass load_native_outer_at's result to score against a run's
-    own evolving, cut-refined outer approximation, as the reference
-    notebook's own score_run does."""
-    # NaN entries are points with no logged solve (e.g. the shared frame's z*
-    # borrowed for oracle, or a missing benchmarking.json): treated as 0s so
-    # one NaN doesn't poison every later cumulative value, at the cost of a
-    # slight undercount for that mode's total time.
-    cum_seconds = np.cumsum(np.nan_to_num(solve_seconds, nan=0.0))
+    """[n_queries, seconds, max_separation] at sparse checkpoints -- the one
+    fig4 metric that genuinely needs solving here (no run logs an exact
+    max-min MILP distance for itself except oracle, see
+    load_oracle_native_gap; ci_lower does not belong here any more, see
+    load_native_ci_history). outer_at(k) -> (A_k, b_k), the outer
+    approximation to score checkpoint k against -- pass
+    load_native_outer_at's result to score against a run's own evolving,
+    cut-refined outer approximation, as the reference notebook's own
+    score_run does. cum_seconds -- see _cum_seconds_wallclock -- is each
+    point's own cumulative elapsed wall-clock time, precomputed by the
+    caller (not derived here) so both this function and
+    load_native_ci_history share the exact same batch-aware accounting."""
     n = len(X_norm)
     checkpoints = sorted({0, n - 1} | set(range(0, n, eval_every)))
     rows = []
@@ -858,18 +1068,13 @@ def query_time_scores(poly: Polytope, X_norm: np.ndarray, solve_seconds: list[fl
         X_k = X_norm[: k + 1]
         A_k, b_k = outer_at(k)
         approx = approximation(A=A_k, b=b_k, X=X_k, name_list=poly.names, print_lv=0)
-        cov = fraction_well_explored(approx, threshold=0.1, n_samples=500, alpha=0.05,
-                                     method="jeffreys", seed_rng=0, print_lv=0)
         try:
             sep = max_separation(approx, pyomo_solver=solver, print_lv=0)
             distance = sep.distance
         except Exception as exc:
             print(f"    max_separation failed at k={k + 1}: {exc!r}")
             distance = np.nan
-        rows.append({
-            "n_queries": k + 1, "seconds": cum_seconds[k],
-            "max_separation": distance, "ci_lower": cov.ci_lower, "ci_upper": cov.ci_upper,
-        })
+        rows.append({"n_queries": k + 1, "seconds": cum_seconds[k], "max_separation": distance})
     return pd.DataFrame(rows)
 
 
@@ -878,19 +1083,34 @@ def fig4_cache_path(mode: str) -> Path:
     (rejection_sample_inner's own cache): query_time_scores is a
     deterministic function of that mode's own polytope + eval_every, and its
     MILP-heavy checkpoints are slow enough (each max_separation call is a
-    Gurobi solve) that a full 4-run fig4 can take hours -- long enough to
-    hit real-world interruptions (this project has seen background runs
-    killed mid-way twice in a row, likely the host machine sleeping, not a
-    script bug). Caching per mode means a re-run after an interruption only
-    redoes whichever mode was still in flight, not all four from zero."""
+    Gurobi solve) that a full run can take hours -- long enough to hit
+    real-world interruptions (this project has seen background runs killed
+    mid-way twice in a row, likely the host machine sleeping, not a script
+    bug). Caching per mode means a re-run after an interruption only redoes
+    whichever mode was still in flight, not every mode from zero."""
     return MGA_ROOT / "mga_inner_sampling" / f"fig4_native_scores_{mode}.npz"
 
 
-def cached_query_time_scores(mode: str, poly: Polytope, X_norm: np.ndarray, solve_seconds: list[float],
+def cached_query_time_scores(mode: str, poly: Polytope, X_norm: np.ndarray, cum_seconds: np.ndarray,
                              eval_every: int, outer_at) -> pd.DataFrame:
     """query_time_scores, cached to fig4_cache_path(mode); regenerates
     automatically if the polytope or eval_every have changed since the cache
-    was written (same staleness check as cached_rejection_sample_inner)."""
+    was written (same staleness check as cached_rejection_sample_inner).
+    "seconds" is deliberately NOT part of what's cached/staleness-checked:
+    it's cheap to derive (index cum_seconds, itself just cumulative sums and
+    a scalar rescale -- see _cum_seconds_wallclock/_calibrate_cum_seconds),
+    unlike max_separation's MILP solves, which are the only reason this
+    cache exists at all -- so it's always recomputed fresh from whatever
+    cum_seconds the caller passes in, cache hit or not. This sidesteps a
+    staleness class of bug this project hit directly: cum_seconds'
+    accounting logic changed twice in one session (the batch-aware
+    parallelism fix, then real-elapsed-time calibration), and a cached
+    "seconds" column would have silently kept serving pre-fix values on
+    every subsequent cache hit, since fig4_cache_path's fingerprint is
+    purely a function of poly.X/A/b, not of how cum_seconds itself is
+    computed. Older cache files may still carry now-unused seconds/
+    ci_lower/ci_upper columns (from before this and an earlier refactor)
+    -- harmless, just ignored on read."""
     cache = fig4_cache_path(mode)
     fingerprint = _poly_fingerprint(poly)
     if cache.exists():
@@ -898,23 +1118,68 @@ def cached_query_time_scores(mode: str, poly: Polytope, X_norm: np.ndarray, solv
         if str(cached["fingerprint"]) == fingerprint and int(cached["eval_every"]) == eval_every:
             print(f"  {mode}: using cached fig4 scores from {cache.relative_to(REPO_ROOT)} "
                   f"({len(cached['n_queries'])} checkpoints)")
+            n_queries = cached["n_queries"]
             return pd.DataFrame({
-                "n_queries": cached["n_queries"], "seconds": cached["seconds"],
+                "n_queries": n_queries, "seconds": cum_seconds[n_queries - 1],
                 "max_separation": cached["max_separation"],
-                "ci_lower": cached["ci_lower"], "ci_upper": cached["ci_upper"],
             })
         print(f"  {mode}: cached fig4 scores are stale (polytope/eval_every changed); regenerating")
 
-    df = query_time_scores(poly, X_norm, solve_seconds, eval_every, outer_at=outer_at)
+    df = query_time_scores(poly, X_norm, cum_seconds, eval_every, outer_at=outer_at)
     cache.parent.mkdir(parents=True, exist_ok=True)
     np.savez(
         cache, fingerprint=fingerprint, eval_every=eval_every,
-        n_queries=df["n_queries"].to_numpy(), seconds=df["seconds"].to_numpy(),
+        n_queries=df["n_queries"].to_numpy(),
         max_separation=df["max_separation"].to_numpy(),
-        ci_lower=df["ci_lower"].to_numpy(), ci_upper=df["ci_upper"].to_numpy(),
     )
     print(f"  {mode}: cached fig4 scores to {cache.relative_to(REPO_ROOT)} ({len(df)} checkpoints)")
     return df
+
+
+def load_native_ci_history(run_dir: Path, mode: str, folder_mode: str,
+                           points: list[tuple[str, np.ndarray, float]],
+                           batch_size: int | None = None) -> pd.DataFrame:
+    """[n_queries, seconds, ci_lower, ci_upper], read directly off run_dir's
+    own diagnostics.csv at full per-iteration density -- no LP solving here
+    at all. "seconds" is batch-aware wall-clock via _cum_seconds_wallclock
+    (batch_size's parallel workers, not a plain per-point sum -- see that
+    function), then calibrated against `mode`'s own real elapsed time via
+    _calibrate_cum_seconds -- see that function's docstring for why. Every
+    supf-mode run already evaluates ci_convergence_metric
+    (pyoNearOpt.metrics.fraction_well_explored) against its own live
+    approximation once per iteration as its convergence check, and every
+    batch-mode run does the same via batch_ORACLE's own per-iteration
+    sample_statistics -- both log the resulting ci_lower/ci_upper straight
+    into diagnostics.csv, so reading that column back is exact, not an
+    approximation of a re-sampled version (same treatment as oracle's own
+    max_min_distance, see load_oracle_native_gap).
+
+    Same "checked before this iteration's own point(s) are added" convention
+    as oracle's max_min_distance: diagnostics row `iteration=i` (0-indexed)
+    reflects the approximation as it stood after n_initial_points + i*step
+    points -- verified directly against source: supf_explore.explore calls
+    self.metric.evaluate(...) before that iteration's add_point/add_cut
+    (step=1, one point per iteration); batch_ORACLE.explore computes
+    stats/_update_iteration_histories before that iteration's
+    _apply_batch_updates (step=batch_size, batch_size points per iteration
+    -- pass the run's own batch_size for a BATCH_MODES run, None/1 for a
+    plain supf-mode run)."""
+    summary = run_dir / f"{MODEL}_{folder_mode}_summary"
+    diagnostics = pd.read_csv(summary / "diagnostics.csv")
+    step = batch_size or 1
+    n_initial_points = sum(1 for lab, _, _ in points if lab != "iterate")
+    cum_seconds = _calibrate_cum_seconds(mode, _cum_seconds_wallclock(points, batch_size))
+
+    rows = []
+    for _, row in diagnostics.iterrows():
+        n_queries = n_initial_points + int(row["iteration"]) * step
+        if not (1 <= n_queries <= len(cum_seconds)):
+            continue
+        rows.append({
+            "n_queries": n_queries, "seconds": cum_seconds[n_queries - 1],
+            "ci_lower": float(row["ci_lower"]), "ci_upper": float(row["ci_upper"]),
+        })
+    return pd.DataFrame(rows)
 
 
 # ── Native (own evolving) outer approximation, supf modes only ──────────
@@ -952,6 +1217,15 @@ def _parse_diagnostics_vector(s: str) -> np.ndarray:
     return np.array([float(x) for x in s.strip().lstrip("[").rstrip("]").split()])
 
 
+def _parse_diagnostics_matrix(s: str) -> np.ndarray:
+    """Parses one batch-mode diagnostics.csv batch_directions cell -- numpy's
+    default 2D array repr, one row per batch worker (each row's own values
+    may still wrap across lines like _parse_diagnostics_vector's 1D case,
+    but rows never nest further, so splitting on single-bracket groups is
+    unambiguous)."""
+    return np.array([[float(x) for x in row.split()] for row in re.findall(r"\[([^\[\]]+)\]", s)])
+
+
 def load_native_outer_at(run_dir: Path, run_poly: Polytope, mode: str, folder_mode: str | None = None):
     """outer_at(k) callable (see query_time_scores) that reconstructs
     run_dir's own evolving outer approximation at checkpoint k from its
@@ -967,6 +1241,32 @@ def load_native_outer_at(run_dir: Path, run_poly: Polytope, mode: str, folder_mo
     diagnostics = pd.read_csv(summary / "diagnostics.csv")
     cuts_m = np.vstack([_parse_diagnostics_vector(s) for s in diagnostics["cut_direction"]])
     cuts_b = diagnostics["cut_support_value"].to_numpy(dtype=float)
+
+    A0, b0 = run_poly.A[: run_poly.n_initial_rows], run_poly.b[: run_poly.n_initial_rows]
+    n_initial_points = sum(1 for origin in run_poly.point_origin if origin != "iterate")
+
+    def outer_at(k: int) -> tuple[np.ndarray, np.ndarray]:
+        n_cuts = max(0, min(len(cuts_b), (k + 1) - n_initial_points))
+        if n_cuts == 0:
+            return A0, b0
+        return np.vstack([A0, cuts_m[:n_cuts]]), np.concatenate([b0, cuts_b[:n_cuts]])
+
+    return outer_at
+
+
+def load_native_outer_at_batch(run_dir: Path, run_poly: Polytope):
+    """load_native_outer_at's counterpart for a batch-mode run (BATCH_MODES):
+    same cut-replay idea (pyoNearOpt's batch harness calls add_cut once per
+    worker per outer iteration, so replaying every logged cut in order
+    reconstructs the live outer approximation exactly, same as supf modes),
+    but batch-mode's diagnostics.csv logs batch_size cuts per row instead of
+    one -- "batch_directions" (a batch_size x n_axes matrix per row) and
+    "batch_support_values" (batch_size values per row) -- so cuts are
+    flattened across rows before replay instead of read one-per-row."""
+    summary = run_dir / f"{MODEL}_batch_summary"
+    diagnostics = pd.read_csv(summary / "diagnostics.csv")
+    cuts_m = np.vstack([_parse_diagnostics_matrix(s) for s in diagnostics["batch_directions"]])
+    cuts_b = np.concatenate([_parse_diagnostics_vector(s) for s in diagnostics["batch_support_values"]])
 
     A0, b0 = run_poly.A[: run_poly.n_initial_rows], run_poly.b[: run_poly.n_initial_rows]
     n_initial_points = sum(1 for origin in run_poly.point_origin if origin != "iterate")
@@ -999,20 +1299,21 @@ def load_native_outer_at(run_dir: Path, run_poly: Polytope, mode: str, folder_mo
 # panel with it, if anything.
 #
 # There is no oracle line on the ci_lower panel here, but NOT because the
-# metric is conceptually inapplicable to oracle -- fraction_well_explored/
-# ci_lower is a post-hoc diagnostic (draw n_samples random test directions,
-# check each one's gap against a STORED (A, b, X) snapshot) that doesn't
-# care how that snapshot was produced. The reference notebook proves this
-# directly: near_optimal_tools' own docs/examples/method_comparison.ipynb
-# calls its ORACLE with save_intermediate=True precisely so it can rebuild
-# an `approximation` object per iteration (its own oracle_states helper) and
+# metric is conceptually inapplicable to oracle -- the reference notebook
+# proves this directly: near_optimal_tools' own docs/examples/
+# method_comparison.ipynb runs its ORACLE with save_intermediate=True
+# precisely so it can rebuild an `approximation` object per iteration and
 # run BOTH max_separation and fraction_well_explored on it, exactly like
-# every direction-based method there. This project's oracle run simply
-# didn't set that flag (oracle_driver.py calls near_optimal_tools' ORACLE
-# without it), so no per-iteration OA_A/OA_b snapshot survives for THIS run
-# to rebuild that object from -- a data-availability gap in this particular
-# download, fixable with a future oracle re-run, not a limitation of the
-# method or the metric.
+# every direction-based method there. Sampling/bbo/batch here don't need
+# that rebuilding trick at all any more, though: their own convergence
+# check IS fraction_well_explored (ci_convergence_metric/batch_oracle),
+# logged into diagnostics.csv every iteration, so ci_lower is read straight
+# off disk (see load_native_ci_history) rather than recomputed from a
+# snapshot. oracle's own convergence check is a different, CI-free
+# quantity -- calculate_outer_inner_distance's exact max_min_distance, read
+# below -- so its diagnostics.csv was never going to have a ci_lower column
+# to read in the first place, independent of save_intermediate or any
+# other download-specific gap.
 def load_oracle_native_gap(run_dir: Path, run_poly: Polytope,
                            points_oracle: list[tuple[str, np.ndarray, float]]) -> pd.DataFrame | None:
     """[n_queries, seconds, max_separation] for oracle's own max_min_distance
@@ -1054,27 +1355,34 @@ def load_oracle_native_gap(run_dir: Path, run_poly: Polytope,
 
 def _compute_fig4_scores(points: dict[str, list[tuple[str, np.ndarray, float]]],
                          polys: dict[str, Polytope]):
-    """A native (own evolving approximation) score for every plotted
+    """Two native (own evolving approximation) scores for every plotted
     supf-mode run (bbo_relative, bbo_minmax, sampling_relative,
-    sampling_minmax -- all four have their own surviving diagnostics.csv;
-    bbo_units/sampling_units excluded from SUPF_MODES, see module
-    docstring), and oracle's own certified
-    max_separation-only gap (see load_oracle_native_gap). weights has no
-    representation here at all -- see the module docstring's "Convergence
-    metric" section. Shared by both fig4a (vs queries) and fig4b (vs time)
-    so the MILP solves only run once."""
+    sampling_minmax, batch_bbo_relative, batch_sampling_relative -- all six
+    have their own surviving diagnostics.csv; bbo_units/sampling_units
+    excluded from SUPF_MODES, see module docstring): max_separation, actually
+    solved here (MILP, sparse checkpoints -- see query_time_scores), and
+    ci_lower, read directly off diagnostics.csv at full density with no
+    solving at all (see load_native_ci_history) -- plus oracle's own
+    certified max_separation-only gap (see load_oracle_native_gap). weights
+    has no representation here at all -- see the module docstring's
+    "Convergence metric" section. Shared by both fig4a (vs queries) and
+    fig4b (vs time) so the MILP solves only run once."""
     # 100 rather than the original 10: with 9 axes (vs. the old 6) each
     # checkpoint's max_separation MILP is markedly slower, and repeated
     # background-run interruptions (see fig4_cache_path's docstring) meant
     # even eval_every=25 didn't reliably finish -- this trades a much
-    # coarser convergence curve for a run that actually completes.
-    eval_every = {m: 100 for m in SUPF_MODES}
+    # coarser convergence curve for a run that actually completes. Only
+    # applies to max_separation -- ci_lower is read at full per-iteration
+    # density regardless (see load_native_ci_history), it doesn't need
+    # sparsifying since nothing is solved for it.
+    eval_every = {m: 100 for m in ALL_SUPF_MODES}
 
     # Each supf mode scored against its OWN evolving, cut-refined outer
     # approximation -- i.e. the reference notebook's own score_run
     # methodology exactly (see load_native_outer_at's docstring). Only
-    # possible for sampling/bbo:
-    # their diagnostics.csv logs the incremental cut_direction/cut_support_value
+    # possible for sampling/bbo/batch variants: their diagnostics.csv logs
+    # the incremental cut_direction/cut_support_value (or batch_directions/
+    # batch_support_values for BATCH_MODES, see load_native_outer_at_batch)
     # each iteration adds, letting outer_at(k) be replayed exactly; oracle's
     # diagnostics.csv logs its own certified max_min_distance instead (no
     # recomputation needed for that quantity, but no OA_A/OA_b snapshots
@@ -1083,21 +1391,27 @@ def _compute_fig4_scores(points: dict[str, list[tuple[str, np.ndarray, float]]],
     # against ITS OWN polytope (polys[mode]), not the shared frame -- their
     # own X/A/b differ even though the axes/units they're expressed in are
     # the same.
-    native_scores = {}
+    native_sep = {}
+    native_ci = {}
     tolerance_prob = {}
-    for mode in SUPF_MODES:
+    for mode in ALL_SUPF_MODES:
         run_dir = RUN_DIR[mode]
         if mode not in points or mode not in polys:
             continue
         run_poly = polys[mode]
+        is_batch = mode in BATCH_MODES
         tolerance_prob[mode] = float(run_poly.convergence_threshold)
-        outer_at = load_native_outer_at(run_dir, run_poly, mode, BASE_MODE[mode])
-        labels, phys, secs = zip(*points[mode])
+        outer_at = (load_native_outer_at_batch(run_dir, run_poly) if is_batch
+                    else load_native_outer_at(run_dir, run_poly, mode, BASE_MODE[mode]))
+        batch_size = int(run_poly.run.get("batch_size", 4)) if is_batch else None
+        phys = [p for _, p, _ in points[mode]]
         X_norm = run_poly.to_norm(np.vstack(phys))
-        print(f"  fig4: scoring {mode} ({len(X_norm)} points, "
+        cum_seconds = _calibrate_cum_seconds(mode, _cum_seconds_wallclock(points[mode], batch_size))
+        print(f"  fig4: scoring {mode} max_separation ({len(X_norm)} points, "
               f"every {eval_every.get(mode, 5)}th checkpoint, own evolving approximation)...")
-        native_scores[mode] = cached_query_time_scores(mode, run_poly, X_norm, list(secs), eval_every.get(mode, 5),
-                                                        outer_at=outer_at)
+        native_sep[mode] = cached_query_time_scores(mode, run_poly, X_norm, cum_seconds, eval_every.get(mode, 5),
+                                                     outer_at=outer_at)
+        native_ci[mode] = load_native_ci_history(run_dir, mode, BASE_MODE[mode], points[mode], batch_size=batch_size)
 
     # oracle's own certified gap -- max_separation only, no ci_lower; see
     # load_oracle_native_gap's docstring for why this is a legitimate,
@@ -1117,19 +1431,21 @@ def _compute_fig4_scores(points: dict[str, list[tuple[str, np.ndarray, float]]],
         if oracle_native_gap is not None:
             oracle_tol = float(polys["oracle"].convergence_threshold)
 
-    return native_scores, tolerance_prob, oracle_native_gap, oracle_tol
+    return native_sep, native_ci, tolerance_prob, oracle_native_gap, oracle_tol
 
 
 def _comparison_figure(x_column: str, x_label: str, name: str, title: str,
-                       native_scores: dict, tolerance_prob: dict, log_x: bool,
+                       native_sep: dict, native_ci: dict, tolerance_prob: dict, log_x: bool,
                        oracle_native_gap: pd.DataFrame | None = None, oracle_tol: float | None = None) -> None:
     """One query-time comparison figure, columns matching the reference
     notebook's own comparison_figure (near_optimal_tools/docs/examples/
     method_comparison.ipynb): max_separation | fraction_well_explored's
     ci_lower. Every mode shown is scored against ITS OWN live approximation
-    -- sampling/bbo fully reconstructed and scored (see load_native_outer_at,
-    reference-equivalent to the notebook's own score_run), oracle's own
-    certified max_separation read directly off its diagnostics (see
+    -- sampling/bbo/batch's max_separation solved here at sparse checkpoints
+    (native_sep, see query_time_scores) but ci_lower read directly, at full
+    density, off each run's own diagnostics.csv (native_ci, see
+    load_native_ci_history -- no LP solving involved at all), oracle's own
+    certified max_separation likewise read directly off its diagnostics (see
     load_oracle_native_gap) with no ci_lower equivalent (see that function's
     docstring for why). weights never appears here: it never builds an
     outer approximation at all -- see fig0 for weights' own behaviour. An
@@ -1137,12 +1453,18 @@ def _comparison_figure(x_column: str, x_label: str, name: str, title: str,
     box; dropped, see the module docstring's "Convergence metric" section."""
     fig, (ax_sep, ax_ci) = plt.subplots(1, 2, figsize=(11, 4.2), constrained_layout=True)
 
-    for mode, df in native_scores.items():
+    for mode, df in native_sep.items():
         color = MODE_COLOR[mode]
         group = df[df[x_column] > 0] if log_x else df  # "the initial state sits at zero"
         ax_sep.plot(group[x_column], group["max_separation"], marker="o", markersize=4,
                    color=color, label=MODE_LABEL[mode])
-        ax_ci.plot(group[x_column], group["ci_lower"], marker="o", markersize=4, color=color)
+    for mode, df in native_ci.items():
+        color = MODE_COLOR[mode]
+        group = df[df[x_column] > 0] if log_x else df
+        # markersize=2 (smaller than ax_sep's sparse-checkpoint markers): one
+        # marker per logged iteration, not per eval_every-th checkpoint, so
+        # this line is far denser.
+        ax_ci.plot(group[x_column], group["ci_lower"], marker="o", markersize=2, color=color)
         # Each run's own real convergence target for THIS metric: its own
         # tolerance_prob (see README), colour-matched, exactly like the
         # reference's cfg["tolerance_prob"] axhline. No target line on the
@@ -1172,26 +1494,8 @@ def _comparison_figure(x_column: str, x_label: str, name: str, title: str,
     ax_ci.set_ylabel("fraction of well-explored directions")
     ax_ci.set_ylim(-0.03, 1.03)
     weights_note = "weights not shown here: it never builds an approximation at all."
-    # NOT "oracle never samples directions so ci_lower is undefined for it"
-    # -- fraction_well_explored is a post-hoc diagnostic that only needs a
-    # stored (A, b, X) snapshot, and the reference notebook DOES compute it
-    # for its own ORACLE (oracle_states relies on save_intermediate=True).
-    # The real reason is narrower: THIS run's oracle_driver.py didn't
-    # request that flag, so no per-iteration OA_A/OA_b snapshot survives to
-    # build that object from -- a data gap specific to this download,
-    # fixable in a future oracle re-run, not a property of the method itself.
-    oracle_note = (
-        "oracle has no line here (own max separation is shown on the left\n"
-        "instead): fraction_well_explored needs a stored (A, b, X)\n"
-        "snapshot per iteration, and this run's diagnostics don't save\n"
-        "one (save_intermediate wasn't set) -- see load_oracle_native_gap."
-        if oracle_native_gap is not None else
-        "oracle not shown here at all: its diagnostics save neither a\n"
-        "direction sample (no ci_lower) nor OA snapshots (no max\n"
-        "separation reconstruction either) -- see load_oracle_native_gap."
-    )
     ax_ci.text(
-        0.02, 0.03, f"{oracle_note}\n{weights_note}",
+        0.02, 0.03, weights_note,
         transform=ax_ci.transAxes, fontsize=6.8, color="#555555", va="bottom",
     )
 
@@ -1207,22 +1511,22 @@ def _comparison_figure(x_column: str, x_label: str, name: str, title: str,
 
 def fig4_query_time_comparison(points: dict[str, list[tuple[str, np.ndarray, float]]],
                                polys: dict[str, Polytope]) -> None:
-    native_scores, tolerance_prob, oracle_native_gap, oracle_tol = _compute_fig4_scores(points, polys)
-    if not native_scores and oracle_native_gap is None:
+    native_sep, native_ci, tolerance_prob, oracle_native_gap, oracle_tol = _compute_fig4_scores(points, polys)
+    if not native_sep and oracle_native_gap is None:
         print("  skipping fig4_query_time_comparison: no scored modes")
         return
     _comparison_figure(
         "n_queries", "number of model queries", "fig4a_query_comparison",
         "MGA Method Comparison vs. Model Queries\n"
         "(cf. near_optimal_tools docs/examples/method_comparison.ipynb, method_comparison.png)",
-        native_scores, tolerance_prob, log_x=False,
+        native_sep, native_ci, tolerance_prob, log_x=False,
         oracle_native_gap=oracle_native_gap, oracle_tol=oracle_tol,
     )
     _comparison_figure(
         "seconds", "cumulative ZEN-garden solving time [s]", "fig4b_time_comparison",
         "MGA Method Comparison vs. Cumulative Solving Time\n"
         "(cf. near_optimal_tools docs/examples/method_comparison.ipynb, method_comparison_time.png)",
-        native_scores, tolerance_prob, log_x=True,
+        native_sep, native_ci, tolerance_prob, log_x=True,
         oracle_native_gap=oracle_native_gap, oracle_tol=oracle_tol,
     )
 
@@ -1232,13 +1536,14 @@ def fig4_query_time_comparison(points: dict[str, list[tuple[str, np.ndarray, flo
 def main() -> None:
     print("Loading run polytopes...")
     polys: dict[str, Polytope] = {}
-    for mode in SUPF_MODES:
+    for mode in ALL_SUPF_MODES:
         run_poly = try_load_run_polytope(RUN_DIR[mode], mode, BASE_MODE[mode])
         if run_poly is not None:
             polys[mode] = run_poly
+            batch_note = f", batch_size={run_poly.run.get('batch_size', '?')}" if mode in BATCH_MODES else ""
             print(f"  {mode}: polytope loaded ({run_poly.X.shape[0]} points on disk, "
                   f"converged={run_poly.converged}, {run_poly.run.get('iterations_done', '?')} iterations, "
-                  f"tolerance_prob={run_poly.convergence_threshold:g})")
+                  f"tolerance_prob={run_poly.convergence_threshold:g}{batch_note})")
         else:
             print(f"  {mode}: no usable polytope.npz under {RUN_DIR[mode].relative_to(REPO_ROOT)} "
                   f"(skipping this mode entirely)")
@@ -1265,7 +1570,7 @@ def main() -> None:
     frame_mode = next(m for m in SUPF_MODES if m in polys)
     poly = polys[frame_mode]
     print(f"Shared frame (from {frame_mode}): axes={poly.names}, epsilon={poly.epsilon:g}, c_star={poly.c_star:,.0f}")
-    present = [m for m in SUPF_MODES if m in polys]
+    present = [m for m in ALL_SUPF_MODES if m in polys]
     for a, b in zip(present, present[1:]):
         z_diff = float(np.abs(polys[a].z_star_phys - polys[b].z_star_phys).max())
         if z_diff > 1e-6:
@@ -1286,6 +1591,13 @@ def main() -> None:
             continue
         print(f"Loading {mode} mode...")
         points[mode] = load_supf_points(polys[mode], RUN_DIR[mode])
+
+    for mode in BATCH_MODES:
+        if mode not in polys:
+            continue
+        print(f"Loading {mode} mode...")
+        batch_size = int(polys[mode].run.get("batch_size", 4))
+        points[mode] = load_batch_points(polys[mode], RUN_DIR[mode], batch_size)
 
     if "oracle" in polys:
         # Same treatment as sampling/bbo now that oracle has its own usable
@@ -1317,7 +1629,7 @@ def main() -> None:
           "Eq. 13 for what each acceptance rate means; this runs locally -- SciPy/LP only, "
           "no HPC resources needed)...")
     samples: dict[str, tuple[np.ndarray, float]] = {}
-    for mode in (*SUPF_MODES, "oracle"):
+    for mode in (*ALL_SUPF_MODES, "oracle"):
         if mode not in polys:
             continue
         try:

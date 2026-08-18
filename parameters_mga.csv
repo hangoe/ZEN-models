@@ -12,4 +12,4 @@ task_id,my_dataset,my_comment,config,normalisation,batch_size,n_workers,conduct_
 10,Crystal_Ball_ind_heat_v8_0_no_flexibility_nodiffusion,2050_1a_5a_interval_5ts_MGA_sampling_minmax,config_mga_sampling.json,minmax,,,True,5,2050,1,5,False
 11,Crystal_Ball_ind_heat_v8_0_no_flexibility_nodiffusion,2050_1a_5a_interval_5ts_MGA_bbo_minmax,config_mga_bbo.json,minmax,,,True,5,2050,1,5,False
 12,Crystal_Ball_ind_heat_v8_0_no_flexibility_nodiffusion,2050_1a_5a_interval_5ts_MGA_batch_bbo_minmax_batch4,config_mga_batch_bbo.json,minmax,4,4,True,5,2050,1,5,False
-13,Crystal_Ball_ind_heat_v8_0_no_flexibility_nodiffusion,2050_1a_5a_interval_5ts_MGA_batch_sampling_minmax_batch4,config_mga_batch_sampling.json,minmax,4,4,True,5,2050,1,5,False
+13,Crystal_Ball_ind_heat_v8_0_no_flexibility_nodiffusion,2050_1a_5a_interval_5ts_MGA_batch_sampling_minmax_batch16,config_mga_batch_sampling.json,minmax,16,16,True,5,2050,1,5,False
