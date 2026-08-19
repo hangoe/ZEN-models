@@ -7,7 +7,7 @@
       {"east": ["BG", "CZ", "HU", "PL", "RO", "SK"]}
     ],
     "technology_groups": [
-      {"power": [
+      {"power_group": [
         "photovoltaics", "wind_onshore", "wind_offshore",
         "run-of-river_hydro", "reservoir_hydro",
         "natural_gas_turbine",
@@ -16,14 +16,14 @@
         "waste_plant", "nuclear",
         "battery", "pumped_hydro"
       ]},
-      {"hydrogen": [
+      {"hydrogen_group": [
         "electrolysis", "SMR",
         "salt_cavern_storage",
         "fuel_cell", "haber_bosch", "methanol_from_hydrogen",
         "fischer_tropsch", "methanation",
         "H2_DRI", "HDT_FCEV", "hydrogen_FC_ship", "hydrogen_to_cement_fuel"
       ]},
-      {"carbon": [
+      {"carbon_group": [
         "DAC",
         "BF_BOF_CCS", "NG_DRI_CCS", "SMR_CCS",
         "biomass_plant_CCS", "natural_gas_turbine_CCS",
