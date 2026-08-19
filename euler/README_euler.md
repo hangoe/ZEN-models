@@ -4,11 +4,13 @@ These files lie into the `ZEN-models` repo.
 
 | File | Role |
 |---|---|
-| `run_model.py` | Run, adapted so `my_dataset`, `my_comment`, `config` and all `system_overrides` come from **one row** of a sweep CSV (chosen by `--task_id`; the CSV itself by `--params`, default `parameters.csv`). |
+| `run_model.py` | Run, adapted so `my_dataset`, `my_comment`, `config` and all `system_overrides` come from **one row** of a sweep CSV (chosen by `--task_id`; the CSV itself by `--params`, default `parameters.csv`). For any MGA config except `weights`, also merges in the shared `data/config_mga_axes_capex.json` axes definition. Any `system_overrides` key a row's CSV doesn't set falls back to `DEFAULT_SYSTEM_OVERRIDES`. |
 | `parameters.csv` | Normal (non-MGA) sweep table — **one row per run**. Columns = `my_dataset`, `my_comment`, and one column per `system.json` override. No `config` column, so every row runs `data/config.json`. |
 | `submit_euler.sh` | The SLURM **array** job for the normal sweep: one job per row of `parameters.csv`. |
-| `parameters_mga.csv` | MGA sweep table — same shape as `parameters.csv` plus a `config` column picking which `data/config_mga*.json` to run (weights / sampling / bbo / oracle / batch; sampling, bbo and batch each with a `relative`-, `units`- and `minmax`-normalisation config; batch rows also set `batch_size`/`n_workers` overrides). |
-| `submit_euler_mga.sh` | The SLURM **array** job for the MGA sweep: one job per row of `parameters_mga.csv`. |
+| `parameters_mga.csv` | MGA sweep table, `task_id` 0-10: `my_dataset`, `my_comment`, `config` (which `data/config_mga_*.json` to run), `normalisation`, `batch_size`/`n_workers`. Covers weights / sampling (units+minmax) / bbo (units+minmax) / batch bbo (units+minmax x batch4/8/16). Oracle, batch-sampling and `relative` normalisation aren't swept right now (add a row back to use them). The TSA/time-horizon `system_overrides` that used to be columns here (`conduct_time_series_aggregation` etc.) now come from `run_model.py`'s `DEFAULT_SYSTEM_OVERRIDES` instead. |
+| `submit_euler_mga.sh` | The SLURM **array** job for the MGA sweep: one job per row of `parameters_mga.csv`. `#SBATCH` header carries the batch16 resource profile as a safe default; override `--time`/`--cpus-per-task`/`--mem-per-cpu` per `--array` range on the `sbatch` command line for the cheaper modes (see the script's header comment for the exact per-range values). |
+| `data/config_mga_axes_capex.json` | Shared MGA axes for every mode except `weights`: 4 regions x 3 technology groups (power/hydrogen/carbon) of annualised node capex, 12 axes + cost. One file instead of duplicating the block in every `config_mga_*.json`. |
+| `data/config_mga_axes_capacity.json` | The old technology-capacity axes (7 technologies + a CCS lump), kept for reference — not currently merged into any config. |
 | `setup_euler_env.sh` | One-time environment build (venv + `zen_garden`, plus the MGA plugin + `pyoNearOpt` if you'll run MGA sweeps). Run once on a login node. |
 
 ## Directory layout it assumes (same as your original script)
@@ -108,49 +110,73 @@ bash setup_euler_env.sh
 #   pyoNearOpt OK
 # If 'mga' is missing, your Euler $HOME/ZEN-garden checkout isn't the
 # entry-point-aware version -- update it (match your local $HOME/ZEN-garden
-# checkout) before continuing.
+# checkout) before continuing. This also needs $HOME/ZEN-garden-plugins on
+# branch feature/mga, pulled to its latest commit -- setup_euler_env.sh
+# only clones it once and never re-pulls, so if you've updated the plugin
+# since your last setup_euler_env.sh run, pull it by hand:
+#   git -C $HOME/ZEN-garden-plugins pull
 
 # 2. Smoke-test the cheapest mode (weights) on a login node first:
 source .venv/bin/activate
 python run_model.py --task_id 0 --run_on local --params parameters_mga.csv
-
-# 3. Calibrate on the cluster, one row at a time, before trusting the
-#    48h walltime in submit_euler_mga.sh -- oracle can run much longer
-#    than weights/sampling/bbo. sampling, bbo and oracle are run first
-#    this round (weights stays task_id 0, run later if needed):
-sbatch --array=1 submit_euler_mga.sh   # sampling, relative  (task_id 1)
-myjobs -j <jobID>                      # check actual time/CPU/RAM used
-sbatch --array=2 submit_euler_mga.sh   # sampling, units     (task_id 2)
-sbatch --array=3 submit_euler_mga.sh   # bbo, relative       (task_id 3)
-sbatch --array=4 submit_euler_mga.sh   # bbo, units          (task_id 4)
-sbatch --array=5 submit_euler_mga.sh   # oracle              (task_id 5, can be slow)
-
-# 3b. Batch mode (task_ids 6-9): solves batch_size=4 directions concurrently
-#     per iteration via a worker pool (n_workers=4 for now). Needs the same
-#     pyoNearOpt "bbo" extra as bbo mode -- already installed by step 1 above.
-#     Calibrate these separately too, since concurrent solves change the
-#     CPU/RAM footprint vs. the single-solve modes above:
-sbatch --array=6 submit_euler_mga.sh   # batch bbo, units          (task_id 6)
-sbatch --array=7 submit_euler_mga.sh   # batch sampling, units     (task_id 7)
-sbatch --array=8 submit_euler_mga.sh   # batch bbo, relative       (task_id 8)
-sbatch --array=9 submit_euler_mga.sh   # batch sampling, relative  (task_id 9)
-
-# 3c. Minmax normalisation (task_ids 10-13): each axis's own near-optimal
-#     [min, max] is mapped onto [0, 1], instead of scaling by its max alone
-#     ("relative") or leaving it in raw physical units ("units"). Not
-#     supported in oracle mode -- see plugins.mga's normalisation docstring.
-sbatch --array=10 submit_euler_mga.sh  # sampling, minmax               (task_id 10)
-sbatch --array=11 submit_euler_mga.sh  # bbo, minmax                    (task_id 11)
-sbatch --array=12 submit_euler_mga.sh  # batch bbo, minmax              (task_id 12)
-sbatch --array=13 submit_euler_mga.sh  # batch sampling, minmax         (task_id 13)
-
-# 4. Once you trust the resources, submit them together:
-sbatch --array=1-13 submit_euler_mga.sh
 ```
 
-Results land in the same place as the normal sweep:
+`parameters_mga.csv` (`task_id` 0-10) is now:
+
+| task_id | mode | normalisation | batch_size/n_workers |
+|---|---|---|---|
+| 0 | weights | — | — |
+| 1 | sampling | units | — |
+| 2 | sampling | minmax | — |
+| 3 | bbo | units | — |
+| 4 | bbo | minmax | — |
+| 5 | batch bbo | units | 4 |
+| 6 | batch bbo | units | 8 |
+| 7 | batch bbo | units | 16 |
+| 8 | batch bbo | minmax | 4 |
+| 9 | batch bbo | minmax | 8 |
+| 10 | batch bbo | minmax | 16 |
+
+Oracle, batch-sampling and `relative` normalisation aren't in this sweep
+right now — `config_mga_oracle.json`/`config_mga_batch_sampling.json` and
+the `relative` normalisation still work, just add a row for them by hand if
+you need them (see `submit_euler_mga.sh`'s header comment).
+
+`submit_euler_mga.sh`'s `#SBATCH` header carries the batch16 resource
+profile as a safe default for a bare `sbatch submit_euler_mga.sh`. Submit
+each range with its own tighter resource profile instead (from `sacct`
+history on the old axes, padded for the new bigger 12-axis capex problem —
+see the script's header comment for the full reasoning and exact ranges):
+
+```bash
+sbatch --array=0                                                    \
+       --time=1:00:00  --cpus-per-task=4  --mem-per-cpu=4G  \
+       submit_euler_mga.sh                # weights
+sbatch --array=1-4                                                  \
+       --time=36:00:00 --cpus-per-task=12 --mem-per-cpu=2G  \
+       submit_euler_mga.sh                # sampling + bbo, units + minmax
+sbatch --array=5,8                                                  \
+       --time=24:00:00 --cpus-per-task=16 --mem-per-cpu=4G  \
+       submit_euler_mga.sh                # batch bbo, batch4
+sbatch --array=6,9                                                  \
+       --time=24:00:00 --cpus-per-task=16 --mem-per-cpu=6G  \
+       submit_euler_mga.sh                # batch bbo, batch8
+sbatch --array=7,10                                                 \
+       submit_euler_mga.sh                # batch bbo, batch16 (script default)
+
+myjobs -j <jobID>                          # check actual time/CPU/RAM used
+                                            # against the profile once each
+                                            # range's jobs finish, and adjust
+                                            # if the padding was off
+
+# Once you trust the resources, submit everything together:
+sbatch --array=0-10 submit_euler_mga.sh
 ```
-$SCRATCH/zen_runs/outputs/Crystal_Ball_ind_heat_v8_0_no_flexibility_nodiffusion_2050_1a_5a_interval_5ts_MGA_<mode>/
+
+Results land in the same place as the normal sweep, now tagged `_CAPEX` to
+mark the new region x tech-group capex axes:
+```
+$SCRATCH/zen_runs/outputs/Crystal_Ball_ind_heat_v8_0_no_flexibility_nodiffusion_2050_1a_5a_interval_5ts_MGA_CAPEX_<mode>/
 ```
 Download before scratch is purged (~2 weeks) — see "Results go to scratch" above.
 
