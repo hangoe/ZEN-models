@@ -1,0 +1,37 @@
+{
+  "node_capex_by_technology": {
+    "nodes": [
+      {"north": ["DK", "EE", "FI", "LT", "LV", "NO", "SE"]},
+      {"west": ["AT", "BE", "CH", "DE", "FR", "IE", "LU", "NL", "UK"]},
+      {"south": ["ES", "EL", "HR", "IT", "PT", "SI"]},
+      {"east": ["BG", "CZ", "HU", "PL", "RO", "SK"]}
+    ],
+    "technology_groups": [
+      {"power": [
+        "photovoltaics", "wind_onshore", "wind_offshore",
+        "run-of-river_hydro", "reservoir_hydro",
+        "natural_gas_turbine", "natural_gas_turbine_CCS",
+        "hard_coal_plant", "lignite_coal_plant", "oil_plant",
+        "biomass_plant", "biomass_plant_CCS",
+        "waste_plant", "nuclear", "fuel_cell",
+        "battery", "pumped_hydro"
+      ]},
+      {"hydrogen": [
+        "electrolysis", "SMR", "SMR_CCS",
+        "salt_cavern_storage",
+        "fuel_cell", "haber_bosch", "methanol_from_hydrogen",
+        "fischer_tropsch", "methanation",
+        "H2_DRI", "HDT_FCEV", "hydrogen_FC_ship", "hydrogen_to_cement_fuel"
+      ]},
+      {"carbon": [
+        "DAC",
+        "BF_BOF_CCS", "NG_DRI_CCS", "SMR_CCS",
+        "biomass_plant_CCS", "natural_gas_turbine_CCS",
+        "cement_post_comb", "ceramic_post_comb", "glass_post_comb",
+        "carbon_storage",
+        "methanol_from_hydrogen", "fischer_tropsch", "methanation"
+      ]}
+    ]
+  },
+  "include_cost": true
+}
