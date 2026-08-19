@@ -23,6 +23,16 @@ CHANGES:
   * Rows may also set `batch_size` / `n_workers` columns that overwrite the
     matching keys under plugins.mga.batch (batch mode only) in the same
     private staged copy, the same way `normalisation` does.
+  * The `axes` block for every MGA mode except `weights` is no longer
+    duplicated per config file -- it's merged in from the shared
+    data/config_mga_axes_capex.json into the private staged copy, so all five
+    config_mga_{bbo,sampling,oracle,batch_bbo,batch_sampling}.json files
+    share one axes definition.
+  * Any system_overrides key a row's CSV doesn't set falls back to
+    DEFAULT_SYSTEM_OVERRIDES, so a sweep whose rows all share the same
+    dataset-processing setup (e.g. parameters_mga.csv) doesn't need to repeat
+    those columns in every row -- a row can still override any of them by
+    adding that column, the way parameters.csv already does explicitly.
 
 Run one row by hand (local test):   python run_model.py --task_id 0 --run_on local
 On Euler it is launched by submit_euler.sh (or submit_euler_mga.sh) via the
@@ -55,9 +65,45 @@ DATASET_SEARCH_DIRS = [
 # Everything else in a row is applied as a system_overrides key.
 META_COLUMNS = {"my_dataset", "my_comment", "config", "normalisation", "batch_size", "n_workers"}
 
+# Fallback system.json overrides, used for any of these keys a CSV row
+# doesn't set as its own column. Lets parameters_mga.csv's 11 rows share one
+# dataset-processing setup without repeating it in every row -- a row can
+# still override any of these by adding that column back, the same way
+# parameters.csv (which sets all of them explicitly, to different values)
+# already does.
+DEFAULT_SYSTEM_OVERRIDES = {
+    "conduct_time_series_aggregation": True,
+    "aggregated_time_steps_per_year": 5,
+    "reference_year": 2050,
+    "optimized_years": 1,
+    "interval_between_years": 5,
+    "use_rolling_horizon": False,
+}
+
 # config.json used when a row/CSV has no "config" column (or leaves it
 # blank) -- keeps the original non-MGA parameters.csv working unchanged.
 DEFAULT_CONFIG = "config.json"
+
+# Shared axes definition merged into every MGA config except "weights" mode
+# (see apply_axes_override) so the axes block isn't duplicated per config file.
+# data/config_mga_axes_capacity.json holds the old technology-capacity axes
+# (kept for reference/rollback -- not currently wired in here).
+AXES_CONFIG = DATA_DIR_CONFIG / "config_mga_axes_capex.json"
+
+
+def apply_axes_override(config_json: dict, config_name: str) -> None:
+    """Merge in the shared axes definition from AXES_CONFIG, in-place.
+
+    No-op if plugins.mga is absent (plain config.json runs) or mode is
+    "weights" (that mode has no axes block). Otherwise overwrites
+    plugins.mga.axes with the contents of data/config_mga_axes_capex.json, so
+    the 5 per-mode config files no longer each carry their own copy of the axes.
+    """
+    mga_cfg = config_json.get("plugins", {}).get("mga")
+    if mga_cfg is None or mga_cfg.get("mode") == "weights":
+        return
+    with open(AXES_CONFIG) as f:
+        mga_cfg["axes"] = json.load(f)
 
 
 def apply_normalisation_override(config_json: dict, config_name: str, normalisation: str) -> None:
@@ -189,8 +235,10 @@ def main() -> None:
     n_workers = None
     if "n_workers" in table.columns and pd.notna(row["n_workers"]) and str(row["n_workers"]).strip():
         n_workers = to_native(row["n_workers"])
-    system_overrides = {col: to_native(row[col])
-                        for col in table.columns if col not in META_COLUMNS}
+    system_overrides = {
+        **DEFAULT_SYSTEM_OVERRIDES,
+        **{col: to_native(row[col]) for col in table.columns if col not in META_COLUMNS},
+    }
 
     print(f"[run_model] task_id={args.task_id}  dataset={my_dataset}  comment={my_comment}")
     print(f"[run_model] config={config_name}  normalisation={normalisation}")
@@ -199,6 +247,7 @@ def main() -> None:
 
     with open(DATA_DIR_CONFIG / config_name) as f:
         config_json = json.load(f)
+    apply_axes_override(config_json, config_name)
     if normalisation is not None:
         apply_normalisation_override(config_json, config_name, normalisation)
     apply_batch_overrides(config_json, config_name, batch_size, n_workers)

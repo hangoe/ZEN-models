@@ -1,0 +1,22 @@
+{
+  "technologies": [
+    "nuclear",
+    "photovoltaics",
+    "wind_offshore",
+    "wind_onshore",
+    "electrolysis",
+    "DAC",
+    "battery",
+    {
+      "ccs_lump": [
+        "BF_BOF_CCS",
+        "biomass_plant_CCS",
+        "cement_post_comb",
+        "natural_gas_turbine_CCS",
+        "NG_DRI_CCS",
+        "SMR_CCS"
+      ]
+    }
+  ],
+  "include_cost": true
+}

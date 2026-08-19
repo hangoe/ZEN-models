@@ -2,6 +2,7 @@ import json
 import tempfile
 from pathlib import Path
 from zen_garden import run, Results
+from run_model import apply_axes_override
 
 # Which data/*.json config to run with. Available:
 #   config.json                - normal (non-MGA) run
@@ -36,6 +37,7 @@ system_overrides = {
 if __name__ == "__main__":
     with open(DATA_DIR_CONFIG / config) as f:
         config_json = json.load(f)
+    apply_axes_override(config_json, config)
     mga_cfg = config_json.get("plugins", {}).get("mga")
     if normalisation is not None:
         if mga_cfg is None:

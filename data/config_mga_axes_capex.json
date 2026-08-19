@@ -10,14 +10,14 @@
       {"power": [
         "photovoltaics", "wind_onshore", "wind_offshore",
         "run-of-river_hydro", "reservoir_hydro",
-        "natural_gas_turbine", "natural_gas_turbine_CCS",
+        "natural_gas_turbine",
         "hard_coal_plant", "lignite_coal_plant", "oil_plant",
-        "biomass_plant", "biomass_plant_CCS",
-        "waste_plant", "nuclear", "fuel_cell",
+        "biomass_plant",
+        "waste_plant", "nuclear",
         "battery", "pumped_hydro"
       ]},
       {"hydrogen": [
-        "electrolysis", "SMR", "SMR_CCS",
+        "electrolysis", "SMR",
         "salt_cavern_storage",
         "fuel_cell", "haber_bosch", "methanol_from_hydrogen",
         "fischer_tropsch", "methanation",
@@ -28,8 +28,7 @@
         "BF_BOF_CCS", "NG_DRI_CCS", "SMR_CCS",
         "biomass_plant_CCS", "natural_gas_turbine_CCS",
         "cement_post_comb", "ceramic_post_comb", "glass_post_comb",
-        "carbon_storage",
-        "methanol_from_hydrogen", "fischer_tropsch", "methanation"
+        "carbon_storage"
       ]}
     ]
   },
