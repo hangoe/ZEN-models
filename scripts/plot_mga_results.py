@@ -1,41 +1,42 @@
-"""Compare the MGA exploration modes/variants (weights, bbo x2, sampling x2,
+"""Compare the MGA exploration modes/variants (weights, bbo, sampling,
 optionally oracle) run against
 Crystal_Ball_ind_heat_v8_0_no_flexibility_nodiffusion on Euler.
 
-As of the axis/normalisation overhaul (commit "new axes in mga and implement
-normalisation modes to run on euler"), the design-axis set grew from 6 to 9:
-nuclear, photovoltaics, wind_offshore, wind_onshore, electrolysis, DAC,
-battery, ccs_lump (a lumped axis over 6 CCS-tagged technologies) capacity
-additions, plus net_present_cost. bbo and sampling were each re-run once per
-plugins.mga.normalisation setting -- "relative" (the original per-axis-bounds
-scaling), "units" (raw physical-unit scaling), and "minmax" (each axis's own
-near-optimal [min, max] mapped onto [0, 1]) -- giving six real supf-mode runs
-in total: bbo_relative, bbo_units, bbo_minmax, sampling_relative,
-sampling_units, sampling_minmax. All six solve the same epsilon=0.1
-near-optimal space around the same baseline, so their results still live in
-one shared coordinate system and overlay directly; on disk each saves under
-its own ..._MGA_<mode>_<normalisation>/..._<mode>_summary/ (data/outputs/
+As of the CAPEX-axes switchover (2026-08-20), the design-axis set is a
+13-axis regional CAPEX system: 4 node clusters (north/west/south/east) x 3
+carrier groups (power/hydrogen/carbon) = 12 node_capex_tech axes (each a sum
+of CAPEX over that cluster's technologies in that carrier group -- see each
+run's own polytope.npz axis_meta_json for the exact technology membership
+per group), plus net_present_cost. This replaces an earlier 9-design-axis
+cost-axes system (nuclear, photovoltaics, wind_offshore, wind_onshore,
+electrolysis, DAC, battery, ccs_lump, net_present_cost) whose runs were
+deleted from disk by user request once the CAPEX runs landed -- this script
+now has exactly ONE data source, used by every figure including fig4a/b (an
+earlier version of this script kept fig4a/b on the old cost-axes runs
+specifically; that was reverted the same day once the old runs were
+deleted). If a stale comment or docstring elsewhere in this file still
+describes the old 9-axis system, treat it as historical background on how
+the axis set evolved, not current behaviour.
+
+bbo and sampling were each run once per plugins.mga.normalisation setting --
+"relative" (the original per-axis-bounds scaling), "units" (raw
+physical-unit scaling), and "minmax" (each axis's own near-optimal [min,
+max] mapped onto [0, 1]). Only "units" has been run against the new CAPEX
+axes so far -- per user request, "units" IS the normalisation to use for
+CAPEX (unlike the old cost-axes system, where "units" was explicitly
+excluded and "relative"/"minmax" were the ones plotted instead). So
+SUPF_MODES currently holds exactly two real runs: bbo_units, sampling_units.
+Both solve the same epsilon=0.1 near-optimal space around the same
+baseline, so their results live in one shared coordinate system and overlay
+directly; on disk each saves under its own
+..._MGA_CAPEX_<mode>_<normalisation>/..._<mode>_summary/ (data/outputs/
 euler_outputs_mga/) -- the folder's own name carries the normalisation
 suffix, but the Postprocess subfolder inside it is still named after the
 bare mode ("..._bbo_summary", "..._sampling_summary"), see BASE_MODE.
-bbo_units' and sampling_units' own data is still on disk under data/outputs/
-euler_outputs_mga/, but SUPF_MODES (the single source of truth every figure
-below, plus RUN_DIR/BASE_MODE, iterates over) omits both "units" variants by
-request, so no figure loads or plots either of them any more -- bbo_relative
-and sampling_relative are the ones actually plotted alongside bbo_minmax and
-sampling_minmax.
-
-Two more runs -- batch_bbo_relative and batch_sampling_relative (BATCH_MODES)
--- were added later: same "relative" normalisation and same 9-axis/epsilon=0.1
-near-optimal space, but run through pyoNearOpt's batch harness instead of
-supf_explore (see submit_euler_mga.sh task_ids 6-9), solving batch_size
-directions concurrently per outer iteration via a worker pool instead of one
-at a time. Their on-disk folder suffixes ("_batch4"/"_batch8") are just these
-two runs' own labels, not their actual batch_size -- both runs' polytope.npz
-records batch_size=4. Every figure below that iterates SUPF_MODES also
-iterates ALL_SUPF_MODES = SUPF_MODES + BATCH_MODES; only fig0 (weights-only)
-and the shared-frame selection (still whichever of SUPF_MODES loads first,
-unchanged) stay scoped to the original four.
+CAPEX minmax and batch (BATCH_MODES, both empty for CAPEX right now) runs
+are planned but not downloaded yet -- adding one later is just appending to
+SUPF_MODES/BATCH_MODES/BATCH_RUN_SUFFIX, no other code changes needed, since
+every figure below iterates those tuples rather than hard-coding mode names.
 
 sampling and bbo both run through pyoNearOpt's generic supf_explore harness
 (near_optimal_tools' shared support-function polytope bookkeeping) and only
@@ -43,42 +44,37 @@ differ in how the next direction to query is picked: sampling scores many
 candidate directions and takes the largest observed inner/outer gap; bbo
 searches for that direction with a black-box optimiser (SHADE) instead.
 normalisation is an orthogonal axis (how directions are scaled while
-searching), not a third strategy, hence the 2x3 naming.
+searching), not a third strategy, hence the naming.
 
-This script picks whichever of the four plotted supf-mode runs (SUPF_MODES;
-bbo_units/sampling_units excluded, see above) loads first, in SUPF_MODES
-order, as
-the canonical shared frame for axis names/units/z*/
-scale/offset (used by fig0 and fig1), and prints a sanity check comparing
-every pair of loaded runs' baselines (they solve the same cost-optimal
-model, so z* should agree to full floating-point precision regardless of
-mode or normalisation). For fig2/fig3 -- the ones this project actually
-cares about *comparing* modes on -- each run gets its own inner-hull sample
-and its own panel; see those functions' docstrings.
+This script picks whichever of the plotted supf-mode runs (SUPF_MODES)
+loads first, in SUPF_MODES order, as the canonical shared frame for axis
+names/units/z*/scale/offset (used by fig0 and fig1), and prints a sanity
+check comparing every pair of loaded runs' baselines (they solve the same
+cost-optimal model, so z* should agree to full floating-point precision
+regardless of mode or normalisation). For fig2/fig3 -- the ones this
+project actually cares about *comparing* modes on -- each run gets its own
+inner-hull sample and its own panel; see those functions' docstrings.
 
 weights was re-run fresh alongside the above but was NOT re-scoped to the
-new 9-axis set (config_mga_weights.json still only drives the original 4
+CAPEX axis set (config_mga_weights.json still only drives the original 4
 tech axes: photovoltaics, wind_onshore, wind_offshore, nuclear) as its own
 MGA *directions* -- but each of its solves is still a full ZEN-garden run,
 so every OTHER axis in the shared frame moves too as a side effect (e.g.
-does maximising PV also move electrolysis/battery capacity?). fig0 reads
+does maximising PV also move a node's hydrogen-group CAPEX?). fig0 reads
 each weights point's physical value on every one of poly's axes (see
-point_from_results / load_weights_points, unchanged), so it now plots all
-of them -- one panel per axis, taken from poly.meta["axes"] rather than a
+point_from_results / load_weights_points, unchanged), so it plots all of
+them -- one panel per axis, taken from poly.meta["axes"] rather than a
 hard-coded subset -- not just the 4 weights explicitly targets as
 directions.
 
-oracle has no data under the new 9-axis set at all right now (only an
-archived run against the old 6-axis set exists, under
-data/outputs/euler_outputs_mga/archive/) -- every oracle-touching code path
-below is unchanged from the earlier 3-mode version and degrades to "skip,
-log why" exactly as it always did when ORACLE_DIR doesn't exist, so this is
-a live, ready-to-use path for a future oracle re-run against the new axes,
-not dead code. See the pre-existing docstrings on load_oracle_points and
-load_oracle_native_gap for the full reasoning (best-effort folder
-reconstruction if only a partial polytope survives; fig4 would include
-oracle on max_separation only, via its own certified max_min_distance, once
-such a run exists).
+oracle has no data under the CAPEX axis set at all right now -- every
+oracle-touching code path below degrades to "skip, log why" exactly as it
+always did when ORACLE_DIR doesn't exist, so this is a live, ready-to-use
+path for a future oracle re-run against the CAPEX axes, not dead code. See
+the pre-existing docstrings on load_oracle_points and load_oracle_native_gap
+for the full reasoning (best-effort folder reconstruction if only a partial
+polytope survives; fig4 would include oracle on max_separation only, via its
+own certified max_min_distance, once such a run exists).
 
 Convergence metric (fig4): pyoNearOpt.metrics.fraction_well_explored and
 max_separation (the same machinery behind sampling/bbo/batch's own
@@ -112,17 +108,15 @@ Figures (data/outputs/figures/mga_tests/):
                                  wind_onshore, wind_offshore, nuclear) as its
                                  own exploration directions, but every solve
                                  still moves the whole system, so the other
-                                 axes -- electrolysis/DAC/battery/ccs_lump/
-                                 cost -- show that side effect too).
+                                 axes -- the 12 node/carrier CAPEX groups and
+                                 net_present_cost -- show that side effect
+                                 too).
   fig1_pairwise_points           pairwise projections of every mode/variant's
                                  actual visited points, colour-coded by mode.
   fig2_polytope_samples          One panel per plotted supf-mode run with its
-                                 own polytope (bbo_relative, bbo_minmax,
-                                 batch_bbo_relative, sampling_relative,
-                                 sampling_minmax, batch_sampling_relative, and
-                                 oracle once re-downloaded against the new
-                                 axes; bbo_units/sampling_units excluded, see
-                                 module docstring above):
+                                 own polytope (bbo_units, sampling_units, and
+                                 oracle once re-downloaded against the CAPEX
+                                 axes -- see SUPF_MODES/ALL_SUPF_MODES):
                                  hexbin density of a uniform sample of THAT
                                  run's own INNER approximation
                                  (rejection-sampled from its own outer body --
@@ -133,18 +127,19 @@ Figures (data/outputs/figures/mga_tests/):
                                  mode/variant's actual points (weights + all
                                  loaded supf runs) overlaid on every panel for
                                  context. Side-by-side panels are the actual
-                                 bbo-vs-sampling-vs-normalisation comparison
-                                 this project wants -- weights never builds a
-                                 polytope, so it never gets its own panel.
+                                 bbo-vs-sampling comparison this project
+                                 wants -- weights never builds a polytope, so
+                                 it never gets its own panel.
   fig3_axis_correlations         Same per-run panel layout as fig2, one
-                                 Pearson correlation heatmap of the 9 axes per
-                                 run's own inner-hull sample (Steen2026_Thesis
-                                 Figure 7 analog): which axes substitute
-                                 (negative) or move together (positive) across
-                                 that mode's own near-optimal volume. Pearson r
-                                 is invariant to per-axis affine rescaling
-                                 (verified: physical-unit and normalised draws
-                                 give the same matrix to 1e-14), so this is on
+                                 Pearson correlation heatmap of the 13 axes
+                                 per run's own inner-hull sample
+                                 (Steen2026_Thesis Figure 7 analog): which
+                                 axes substitute (negative) or move together
+                                 (positive) across that mode's own
+                                 near-optimal volume. Pearson r is invariant
+                                 to per-axis affine rescaling (verified:
+                                 physical-unit and normalised draws give the
+                                 same matrix to 1e-14), so this is on
                                  physical units purely for readability --
                                  normalising would not change a single value.
   fig4a/b_query/time_comparison  Two figures, columns are max_separation
@@ -155,21 +150,26 @@ Figures (data/outputs/figures/mga_tests/):
                                  fig4a's x-axis is number of model queries,
                                  fig4b's is cumulative real ZEN-garden
                                  solving time (log). One row: each run's own
-                                 live, evolving approximation -- all six
-                                 plotted supf-mode runs (reference-equivalent
-                                 to near_optimal_tools' docs/examples/
+                                 live, evolving approximation -- every
+                                 plotted supf-mode run (currently bbo_units,
+                                 sampling_units; reference-equivalent to
+                                 near_optimal_tools' docs/examples/
                                  method_comparison.ipynb, see
                                  load_native_outer_at/
                                  load_native_outer_at_batch), oracle on
                                  max_separation only (see
                                  load_oracle_native_gap), weights absent (it
                                  never builds an approximation -- see fig0
-                                 instead). An earlier 2-row version also
-                                 scored every mode against one shared frozen
-                                 initial box; dropped, see the module
-                                 docstring's "Convergence metric" section for
-                                 why. This file's only per-mode convergence
-                                 trace now (an earlier fig1_convergence and
+                                 instead). fig4b's "seconds" axis is
+                                 uncalibrated for both modes right now (see
+                                 REAL_ELAPSED_SECONDS -- add a verified sacct
+                                 total for bbo_units/sampling_units to fix).
+                                 An earlier 2-row version also scored every
+                                 mode against one shared frozen initial box;
+                                 dropped, see the module docstring's
+                                 "Convergence metric" section for why. This
+                                 file's only per-mode convergence trace now
+                                 (an earlier fig1_convergence and
                                  fig2_axis_range_comparison were dropped too:
                                  the former didn't add much beyond this
                                  figure's own max-separation/query panel, and
@@ -217,42 +217,36 @@ FIGURES_DIR = REPO_ROOT / "data" / "outputs" / "figures" / "mga_tests"
 MGA_ROOT = REPO_ROOT / "data" / "outputs" / "euler_outputs_mga"
 
 MODEL = "Crystal_Ball_ind_heat_v8_0_no_flexibility_nodiffusion"
-RUN_PREFIX = f"{MODEL}_2050_1a_5a_interval_5ts_MGA"
+
+# ── CAPEX-axes runs (current, 2026-08-20 -- the only data source now; the
+# earlier cost-axes runs this script used to plot were deleted from disk by
+# user request, so every figure below including fig4a/b now uses this data)
+#
+# Replaces the earlier cost-axes 9-design-axis system (nuclear, photovoltaics,
+# wind_offshore, wind_onshore, electrolysis, DAC, battery, ccs_lump,
+# net_present_cost) with a 13-axis regional CAPEX system: 4 node clusters
+# (north/west/south/east) x 3 carrier groups (power/hydrogen/carbon) = 12
+# node_capex_tech axes, plus net_present_cost -- see each run's own
+# polytope.npz axis_meta_json for the exact technology membership per group.
+# Only "units" normalisation has been re-run against this new axis set so
+# far (per user request, this IS the variant to use for CAPEX axes, unlike
+# the old cost-axes system where "units" was excluded) -- "minmax" and batch
+# runs are planned but not downloaded yet, so SUPF_MODES/BATCH_MODES below
+# only include what actually exists on disk; adding a future
+# "bbo_minmax"/"sampling_minmax"/batch_* CAPEX run is just appending to these
+# tuples, no other code changes needed (BASE_MODE/RUN_DIR/MODE_COLOR/
+# MODE_LABEL all key off these tuples).
+RUN_PREFIX = f"{MODEL}_2050_1a_5a_interval_5ts_MGA_CAPEX"
 WEIGHTS_DIR = MGA_ROOT / f"{RUN_PREFIX}_weights"
 ORACLE_DIR = MGA_ROOT / f"{RUN_PREFIX}_oracle"
 
-# The real supf-mode runs actually plotted (2 direction-selection strategies
-# x 3 normalisation settings, see module docstring, minus bbo_units and
-# sampling_units -- both "units" variants excluded from every figure by
-# request, see module docstring). Each run's OWN folder carries the
-# normalisation suffix, but the Postprocess subfolder it saves internally is
-# still named after the bare mode alone (e.g. "..._bbo_summary" inside
-# bbo_relative/, bbo_units/ and bbo_minmax/) -- BASE_MODE maps a variant key
-# back to that bare-mode folder-naming component.
-SUPF_MODES = ("bbo_relative", "bbo_minmax",
-              "sampling_relative", "sampling_minmax")
+SUPF_MODES = ("bbo_units", "sampling_units")
 
-# Batch-mode runs (strategy_mode="bbo"/"sampling" run through pyoNearOpt's
-# batch harness instead of supf_explore -- see submit_euler_mga.sh task_ids
-# 6-9): each outer iteration solves batch_size directions concurrently via a
-# worker pool instead of one at a time. Folder-name suffixes "_batch4"/
-# "_batch8" are just these two runs' own labels, NOT their batch_size --
-# both runs' polytope.npz run_json actually records batch_size=4 (verified
-# on disk; presumably named after a SLURM array/job identifier rather than
-# the worker count), so batch_size is always read from run.run["batch_size"]
-# below rather than parsed from the folder name. Only "relative"
-# normalisation exists for either so far. Every per-run Postprocess folder
-# saves under one shared "..._batch_summary/" (unlike SUPF_MODES, whose
-# summary folder name still carries the bare mode "bbo"/"sampling" --
-# BASE_MODE below maps both batch variants to the literal string "batch"),
-# and each iteration's batch_size points land in their own
-# "..._iter<N>_<k>/" folder (1-indexed iteration N, 0-indexed worker k) --
-# see load_batch_points.
-BATCH_MODES = ("batch_bbo_relative", "batch_sampling_relative")
-BATCH_RUN_SUFFIX = {
-    "batch_bbo_relative": "batch_bbo_relative_batch4",
-    "batch_sampling_relative": "batch_sampling_relative_batch8",
-}
+# No CAPEX batch runs downloaded yet (planned for later) -- kept as an empty
+# tuple/dict rather than removed so every figure's ALL_SUPF_MODES-based loop
+# keeps working unchanged once entries are added here.
+BATCH_MODES: tuple[str, ...] = ()
+BATCH_RUN_SUFFIX: dict[str, str] = {}
 # Every mode with its own polytope.npz + outer approximation -- the set
 # fig1/fig2/fig3/fig4 iterate over (fig0 is weights-only, see module
 # docstring).
@@ -269,44 +263,28 @@ BASE_MODE.update({m: "batch" for m in BATCH_MODES})
 # corporate swatch: blue, petrol, green, bronze, red, purple, grey), per this
 # project's convention of never inventing a separate palette for print
 # figures -- picked for maximum pairwise contrast (not adjacent palette
-# slots): weights=green, oracle=bronze/brown, and the two bbo/sampling
-# variants form their own colour-family pairs so the relative/minmax split of
-# ONE mode reads as related (bbo=blue-family, sampling=warm-family) while
-# still being distinguishable per variant (bbo_units/sampling_units are
-# excluded from SUPF_MODES by request, see module docstring, so _ETH_PETROL
-# and _ETH_RED are unused here now -- _ETH_RED is still used by fig0's
-# baseline bar colour below). minmax was added after the palette's 6
-# saturated slots were already spoken for (grey is reserved, see
-# SCENARIO_PALETTE's own comment), so each mode's minmax variant reuses its
-# family's base colour via eth_tint (ETH's documented tint system) rather
-# than inventing an off-palette hue.
+# slots): weights=green, oracle=bronze/brown, bbo=blue-family,
+# sampling=warm/purple-family. Only "units" normalisation exists for CAPEX
+# so far (see SUPF_MODES) -- once a CAPEX minmax variant is downloaded, give
+# it eth_tint(_ETH_BLUE/_ETH_PURPLE, 0.5) to match the old relative/minmax
+# tint convention this file used for the (now-removed) cost-axes runs, and
+# once CAPEX batch runs land, _ETH_PETROL/_ETH_RED are free for them.
 _ETH_BLUE, _ETH_PETROL, _ETH_GREEN, _ETH_BRONZE, _ETH_RED, _ETH_PURPLE = (
     SCENARIO_PALETTE[0], SCENARIO_PALETTE[1], SCENARIO_PALETTE[2],
     SCENARIO_PALETTE[3], SCENARIO_PALETTE[4], SCENARIO_PALETTE[5],
 )
 MODE_COLOR = {
     "weights": _ETH_GREEN,
-    "bbo_relative": _ETH_BLUE,
-    "bbo_minmax": eth_tint(_ETH_BLUE, 0.5),
-    # batch variants reuse _ETH_PETROL/_ETH_RED -- both otherwise unused now
-    # that bbo_units/sampling_units are excluded (see module docstring) --
-    # keeping the bbo-family/blue vs. sampling-family/warm split from above.
-    "batch_bbo_relative": _ETH_PETROL,
-    "sampling_relative": _ETH_PURPLE,
-    "sampling_minmax": eth_tint(_ETH_PURPLE, 0.5),
-    "batch_sampling_relative": _ETH_RED,
+    "bbo_units": _ETH_BLUE,
+    "sampling_units": _ETH_PURPLE,
     "oracle": _ETH_BRONZE,
 }
 MODE_LABEL = {
     "weights": "Weights",
     # $\tau$ (mathtext, "cm" fontset) rather than a literal unicode tau --
     # the plain text font (cmr10) has no tau glyph.
-    "bbo_relative": r"BBO relative ($\tau$=0.95)",
-    "bbo_minmax": r"BBO minmax ($\tau$=0.95)",
-    "batch_bbo_relative": r"Batch BBO relative ($\tau$=0.95)",
-    "sampling_relative": r"Sampling relative ($\tau$=0.95)",
-    "sampling_minmax": r"Sampling minmax ($\tau$=0.95)",
-    "batch_sampling_relative": r"Batch Sampling relative ($\tau$=0.95)",
+    "bbo_units": r"BBO units ($\tau$=0.95)",
+    "sampling_units": r"Sampling units ($\tau$=0.95)",
     "oracle": "Oracle",
 }
 MODES = ("weights", *ALL_SUPF_MODES, "oracle")
@@ -364,8 +342,15 @@ def axis_value(r: Results, axis_meta: dict) -> float:
     """One axis's physical value on a solved Results, matching
     zen_garden_plugins.mga.plugin.MGA.axis_value exactly: tech axes sum
     capacity_addition over members at the axis's capacity type; the carrier
-    axis sums annual flow_import over members; the cost axis sums
-    net_present_cost over years."""
+    axis sums annual flow_import over members; node_capex_tech axes (the
+    CAPEX-axes system, see module docstring) sum cost_capex_yearly over
+    member nodes/technologies/years/capacity_types (mirrors
+    MGA._design_axis_terms's _NODE_AGG_CAPEX + ["set_location"] reduction --
+    every dim except set_location is always aggregated away, and
+    set_location is restricted to axis_meta["members"] -- axis.technologies
+    additionally restricts set_technologies when not None, same as
+    _design_axis_terms's `if axis.technologies is not None` branch); the
+    cost axis sums net_present_cost over years."""
     kind, members = axis_meta["kind"], axis_meta["members"]
     if kind == "total_cost":
         return float(r.get_total("net_present_cost").to_numpy().sum())
@@ -378,6 +363,13 @@ def axis_value(r: Results, axis_meta: dict) -> float:
         flow = r.get_total("flow_import")
         vals = flow[flow.index.get_level_values("carrier").isin(members)]
         return float(vals.to_numpy().sum())
+    if kind == "node_capex_tech":
+        capex = r.get_total("cost_capex_yearly")
+        vals = capex[capex.index.get_level_values("location").isin(members)]
+        technologies = axis_meta.get("technologies")
+        if technologies is not None:
+            vals = vals[vals.index.get_level_values("technology").isin(technologies)]
+        return float(vals.to_numpy().sum()) if not vals.empty else 0.0
     raise ValueError(f"unknown axis kind {kind!r}")
 
 
@@ -763,9 +755,7 @@ def rejection_sample_inner(poly: Polytope, n_propose: int, seed: int = 0) -> tup
 # dropped on top. oracle gets a third panel automatically once its own
 # oracle_summary/polytope.npz exists (see try_load_run_polytope); weights
 # never builds a polytope and so never gets a panel here (see fig0 instead).
-_HULL_MODE_ORDER = ("bbo_relative", "bbo_minmax", "batch_bbo_relative",
-                     "sampling_relative", "sampling_minmax", "batch_sampling_relative",
-                     "oracle")
+_HULL_MODE_ORDER = (*ALL_SUPF_MODES, "oracle")
 
 
 def _hull_modes_to_plot(polys: dict[str, Polytope], samples: dict[str, tuple[np.ndarray, float]]) -> list[str]:
@@ -1008,20 +998,13 @@ def _cum_seconds_wallclock(points: list[tuple[str, np.ndarray, float]],
 # mode missing from this dict is left uncalibrated (a printed warning
 # flags it) rather than silently wrong -- but it WILL keep understating its
 # own real elapsed time on fig4b until an entry is added.
-REAL_ELAPSED_SECONDS = {
-    # sacct job 10695450_1 (task_id=1), COMPLETED 2026-08-14T10:31:12 ->
-    # 2026-08-14T23:32:47, Elapsed=13:01:35.
-    "sampling_relative": 46_895,
-    # sacct job 10695450_3 (task_id=3), COMPLETED 2026-08-15T20:34:48 ->
-    # 2026-08-16T13:34:13, Elapsed=16:59:25.
-    "bbo_relative": 61_165,
-    # sacct job 10958308_8 (task_id=8), COMPLETED 2026-08-17T13:50:42 ->
-    # 2026-08-17T23:40:32, Elapsed=09:49:50.
-    "batch_bbo_relative": 35_390,
-    # sacct job 10990305_9 (task_id=9), COMPLETED 2026-08-17T23:40:43 ->
-    # 2026-08-18T07:27:53, Elapsed=07:47:10.
-    "batch_sampling_relative": 28_030,
-}
+# Empty as of the CAPEX-axes switchover (2026-08-20, see SUPF_MODES): the
+# old cost-axes runs' verified entries (sampling_relative/bbo_relative/
+# batch_bbo_relative/batch_sampling_relative) were removed from disk along
+# with the runs themselves, so no verified total exists yet for bbo_units/
+# sampling_units -- fig4b's "seconds" axis will print the uncalibrated
+# warning below until an entry is added for each via the sacct recipe above.
+REAL_ELAPSED_SECONDS: dict[str, int] = {}
 
 
 def _calibrate_cum_seconds(mode: str, cum_seconds: np.ndarray) -> np.ndarray:
@@ -1356,10 +1339,9 @@ def load_oracle_native_gap(run_dir: Path, run_poly: Polytope,
 def _compute_fig4_scores(points: dict[str, list[tuple[str, np.ndarray, float]]],
                          polys: dict[str, Polytope]):
     """Two native (own evolving approximation) scores for every plotted
-    supf-mode run (bbo_relative, bbo_minmax, sampling_relative,
-    sampling_minmax, batch_bbo_relative, batch_sampling_relative -- all six
-    have their own surviving diagnostics.csv; bbo_units/sampling_units
-    excluded from SUPF_MODES, see module docstring): max_separation, actually
+    CAPEX-axes supf-mode run (bbo_units, sampling_units -- see
+    ALL_SUPF_MODES; minmax/batch CAPEX variants will join this set once
+    downloaded, no code change needed here): max_separation, actually
     solved here (MILP, sparse checkpoints -- see query_time_scores), and
     ci_lower, read directly off diagnostics.csv at full density with no
     solving at all (see load_native_ci_history) -- plus oracle's own
@@ -1367,8 +1349,8 @@ def _compute_fig4_scores(points: dict[str, list[tuple[str, np.ndarray, float]]],
     has no representation here at all -- see the module docstring's
     "Convergence metric" section. Shared by both fig4a (vs queries) and
     fig4b (vs time) so the MILP solves only run once."""
-    # 100 rather than the original 10: with 9 axes (vs. the old 6) each
-    # checkpoint's max_separation MILP is markedly slower, and repeated
+    # 100 rather than the original 10: with 13 axes (vs. the original 6, then
+    # 9) each checkpoint's max_separation MILP is markedly slower, and repeated
     # background-run interruptions (see fig4_cache_path's docstring) meant
     # even eval_every=25 didn't reliably finish -- this trades a much
     # coarser convergence curve for a run that actually completes. Only
@@ -1556,11 +1538,11 @@ def main() -> None:
               f"tolerance_prob={oracle_poly.convergence_threshold:g})")
     else:
         print(f"  oracle: no usable polytope.npz under {ORACLE_DIR.relative_to(REPO_ROOT)} "
-              f"(placeholder -- not yet re-run against the new 9-axis set)")
+              f"(placeholder -- not yet re-run against the CAPEX axis set)")
 
     if not any(m in polys for m in SUPF_MODES):
         raise SystemExit(
-            "None of bbo_relative/bbo_minmax/sampling_relative/sampling_minmax has a "
+            "Neither bbo_units nor sampling_units has a "
             "usable polytope -- nothing to build the shared coordinate frame or fig2/fig3 from."
         )
 
