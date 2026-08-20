@@ -7,7 +7,7 @@ These files lie into the `ZEN-models` repo.
 | `run_model.py` | Run, adapted so `my_dataset`, `my_comment`, `config` and all `system_overrides` come from **one row** of a sweep CSV (chosen by `--task_id`; the CSV itself by `--params`, default `parameters.csv`). For any MGA config except `weights`, also merges in the shared `data/config_mga_axes_capex.json` axes definition. Any `system_overrides` key a row's CSV doesn't set falls back to `DEFAULT_SYSTEM_OVERRIDES`. |
 | `parameters.csv` | Normal (non-MGA) sweep table — **one row per run**. Columns = `my_dataset`, `my_comment`, and one column per `system.json` override. No `config` column, so every row runs `data/config.json`. |
 | `submit_euler.sh` | The SLURM **array** job for the normal sweep: one job per row of `parameters.csv`. |
-| `parameters_mga.csv` | MGA sweep table, `task_id` 0-10: `my_dataset`, `my_comment`, `config` (which `data/config_mga_*.json` to run), `normalisation`, `batch_size`/`n_workers`. Covers weights / sampling (units+minmax) / bbo (units+minmax) / batch bbo (units+minmax x batch4/8/16). Oracle, batch-sampling and `relative` normalisation aren't swept right now (add a row back to use them). The TSA/time-horizon `system_overrides` that used to be columns here (`conduct_time_series_aggregation` etc.) now come from `run_model.py`'s `DEFAULT_SYSTEM_OVERRIDES` instead. |
+| `parameters_mga.csv` | MGA sweep table, `task_id` 0-4: `my_dataset`, `my_comment`, `config` (which `data/config_mga_*.json` to run), `normalisation`, `batch_size`/`n_workers`. Covers sampling minmax / bbo minmax / batch bbo minmax x batch4/8/16 only. Weights, the units-normalisation runs, oracle, batch-sampling and `relative` normalisation aren't swept right now (add a row back to use them). The TSA/time-horizon `system_overrides` that used to be columns here (`conduct_time_series_aggregation` etc.) now come from `run_model.py`'s `DEFAULT_SYSTEM_OVERRIDES` instead. |
 | `submit_euler_mga.sh` | The SLURM **array** job for the MGA sweep: one job per row of `parameters_mga.csv`. `#SBATCH` header carries the batch16 resource profile as a safe default; override `--time`/`--cpus-per-task`/`--mem-per-cpu` per `--array` range on the `sbatch` command line for the cheaper modes (see the script's header comment for the exact per-range values). |
 | `data/config_mga_axes_capex.json` | Shared MGA axes for every mode except `weights`: 4 regions x 3 technology groups (power/hydrogen/carbon) of annualised node capex, 12 axes + cost. One file instead of duplicating the block in every `config_mga_*.json`. |
 | `data/config_mga_axes_capacity.json` | The old technology-capacity axes (7 technologies + a CCS lump), kept for reference — not currently merged into any config. |
@@ -116,53 +116,49 @@ bash setup_euler_env.sh
 # since your last setup_euler_env.sh run, pull it by hand:
 #   git -C $HOME/ZEN-garden-plugins pull
 
-# 2. Smoke-test the cheapest mode (weights) on a login node first:
+# 2. Smoke-test the cheapest mode (sampling minmax) on a login node first:
 source .venv/bin/activate
 python run_model.py --task_id 0 --run_on local --params parameters_mga.csv
 ```
 
-`parameters_mga.csv` (`task_id` 0-10) is now:
+`parameters_mga.csv` (`task_id` 0-4 — only the minmax runs are swept) is
+now:
 
 | task_id | mode | normalisation | batch_size/n_workers |
 |---|---|---|---|
-| 0 | weights | — | — |
-| 1 | sampling | units | — |
-| 2 | sampling | minmax | — |
-| 3 | bbo | units | — |
-| 4 | bbo | minmax | — |
-| 5 | batch bbo | units | 4 |
-| 6 | batch bbo | units | 8 |
-| 7 | batch bbo | units | 16 |
-| 8 | batch bbo | minmax | 4 |
-| 9 | batch bbo | minmax | 8 |
-| 10 | batch bbo | minmax | 16 |
+| 0 | sampling | minmax | — |
+| 1 | bbo | minmax | — |
+| 2 | batch bbo | minmax | 4 |
+| 3 | batch bbo | minmax | 8 |
+| 4 | batch bbo | minmax | 16 |
 
-Oracle, batch-sampling and `relative` normalisation aren't in this sweep
-right now — `config_mga_oracle.json`/`config_mga_batch_sampling.json` and
-the `relative` normalisation still work, just add a row for them by hand if
-you need them (see `submit_euler_mga.sh`'s header comment).
+Weights and the units-normalisation runs (former task_ids 0, 1, 3, 5, 6, 7
+in the old 0-10 numbering) are dropped from this sweep for now. Oracle,
+batch-sampling and `relative` normalisation aren't in this sweep either —
+`config_mga_oracle.json`/`config_mga_batch_sampling.json`, the `relative`
+normalisation, and the dropped runs above all still work, just add a row
+for them by hand if you need them (see `submit_euler_mga.sh`'s header
+comment).
 
-`submit_euler_mga.sh`'s `#SBATCH` header carries the batch16 resource
-profile as a safe default for a bare `sbatch submit_euler_mga.sh`. Submit
-each range with its own tighter resource profile instead (from `sacct`
-history on the old axes, padded for the new bigger 12-axis capex problem —
-see the script's header comment for the full reasoning and exact ranges):
+`submit_euler_mga.sh`'s `#SBATCH` header carries the batch16 (task_id 4)
+resource profile as a safe default for a bare `sbatch submit_euler_mga.sh`.
+Submit each range with its own tighter resource profile instead — task_ids
+0/1 (no worker pool) keep 4 cpus-per-task; task_ids 2/3/4 (batch bbo) now
+size cpus-per-task as batch_size x 10 threads-per-worker, at 1G per cpu
+(see the script's header comment for the full reasoning):
 
 ```bash
-sbatch --array=0                                                    \
-       --time=1:00:00  --cpus-per-task=4  --mem-per-cpu=4G  \
-       submit_euler_mga.sh                # weights
-sbatch --array=1-4                                                  \
-       --time=36:00:00 --cpus-per-task=12 --mem-per-cpu=2G  \
-       submit_euler_mga.sh                # sampling + bbo, units + minmax
-sbatch --array=5,8                                                  \
-       --time=24:00:00 --cpus-per-task=16 --mem-per-cpu=4G  \
-       submit_euler_mga.sh                # batch bbo, batch4
-sbatch --array=6,9                                                  \
-       --time=24:00:00 --cpus-per-task=16 --mem-per-cpu=6G  \
-       submit_euler_mga.sh                # batch bbo, batch8
-sbatch --array=7,10                                                 \
-       submit_euler_mga.sh                # batch bbo, batch16 (script default)
+sbatch --array=0,1                                                  \
+       --time=72:00:00 --cpus-per-task=4   --mem-per-cpu=2G  \
+       submit_euler_mga.sh                # sampling + bbo, minmax
+sbatch --array=2                                                    \
+       --time=72:00:00 --cpus-per-task=40  --mem-per-cpu=1G  \
+       submit_euler_mga.sh                # batch bbo minmax, batch4
+sbatch --array=3                                                    \
+       --time=72:00:00 --cpus-per-task=80  --mem-per-cpu=1G  \
+       submit_euler_mga.sh                # batch bbo minmax, batch8
+sbatch --array=4                                                    \
+       submit_euler_mga.sh                # batch bbo minmax, batch16 (script default)
 
 myjobs -j <jobID>                          # check actual time/CPU/RAM used
                                             # against the profile once each
@@ -170,7 +166,7 @@ myjobs -j <jobID>                          # check actual time/CPU/RAM used
                                             # if the padding was off
 
 # Once you trust the resources, submit everything together:
-sbatch --array=0-10 submit_euler_mga.sh
+sbatch --array=0-4 submit_euler_mga.sh
 ```
 
 Results land in the same place as the normal sweep, now tagged `_CAPEX` to
