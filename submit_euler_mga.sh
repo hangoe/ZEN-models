@@ -90,6 +90,27 @@ if [[ ! -f "$VENV/bin/activate" ]]; then
 fi
 source "$VENV/bin/activate"
 
+# task_ids 2-4 (batch bbo) fork/spawn batch_size worker PROCESSES, each with
+# its own dedicated 10 cpus for Gurobi (solver_options["Threads"]=10 already
+# accounts for those). Left unset, numpy/pandas/numexpr inside each worker
+# separately try to size their own BLAS/numexpr thread pools off the
+# allocation's full cpus-per-task (batch_size x 10) rather than the 10 cpus
+# that worker actually owns -- batch_size of them doing that concurrently
+# oversubscribes the node's process/thread budget. Seen on batch8/batch16
+# (11281957_3/_4): repeated "OpenBLAS blas_thread_init: pthread_create
+# failed ... Resource temporarily unavailable", then a worker died mid
+# `import numpy` during pool (re)spawn, and the pool's `close()` ->
+# `executor.shutdown(wait=True)` hung waiting on it -- both runs sat idle
+# for ~3 days until SLURM killed them at --time, having made zero progress
+# past the first outer iteration. batch4 (task_id 2, 4 workers) hit the same
+# warning 3x but had enough headroom to survive and complete normally.
+# Pinning these to 1 removes the oversubscription; Gurobi's own thread count
+# is unaffected since it's set explicitly via solver_options, not these vars.
+export OPENBLAS_NUM_THREADS=1
+export OMP_NUM_THREADS=1
+export NUMEXPR_NUM_THREADS=1
+export MKL_NUM_THREADS=1
+
 # --- 3. Run this array task's parameter row ----------------------------------------
 echo "Starting MGA task_id=${SLURM_ARRAY_TASK_ID} on $(hostname) at $(date)"
 
