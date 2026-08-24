@@ -106,10 +106,21 @@ source "$VENV/bin/activate"
 # warning 3x but had enough headroom to survive and complete normally.
 # Pinning these to 1 removes the oversubscription; Gurobi's own thread count
 # is unaffected since it's set explicitly via solver_options, not these vars.
+#
+# Same issue hit polars (pulled in transitively via linopy, which builds the
+# LP model in each worker) on a batch16 rerun: its Rust async executor sizes
+# its own thread pool off the full cpus-per-task allocation the same way
+# OpenBLAS did, so 16 workers doing that concurrently panicked with
+# "async-executor-N ... WouldBlock: Resource temporarily unavailable", and
+# once enough threads/processes had piled up, even Python's own
+# multiprocessing fork() started failing the same way
+# (BlockingIOError: [Errno 11] Resource temporarily unavailable). Pinned the
+# same way as the BLAS libs above.
 export OPENBLAS_NUM_THREADS=1
 export OMP_NUM_THREADS=1
 export NUMEXPR_NUM_THREADS=1
 export MKL_NUM_THREADS=1
+export POLARS_MAX_THREADS=1
 
 # --- 3. Run this array task's parameter row ----------------------------------------
 echo "Starting MGA task_id=${SLURM_ARRAY_TASK_ID} on $(hostname) at $(date)"
