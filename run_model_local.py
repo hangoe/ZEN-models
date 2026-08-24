@@ -2,7 +2,7 @@ import json
 import tempfile
 from pathlib import Path
 from zen_garden import run, Results
-from run_model import apply_axes_override
+from run_model import AXES_CONFIG_DEFAULT, apply_axes_override
 
 # Which data/*.json config to run with. Available:
 #   config.json                - normal (non-MGA) run
@@ -11,6 +11,12 @@ from run_model import apply_axes_override
 #   config_mga_sampling.json   - MGA, sampling mode
 #   config_mga_bbo.json        - MGA, bbo mode
 config = "config_mga_weights.json"
+
+# Which data/*.json axes file to merge into plugins.mga.axes. None uses
+# run_model.py's default (config_mga_axes_capex.json). Set to
+# "config_mga_axes_capex_periods.json" to test the node_capex_periods axes
+# instead.
+axes_config = None
 
 # Overrides plugins.mga.normalisation ("relative", "units" or "minmax") in a
 # private staged copy of `config` -- the shared data/*.json file is never
@@ -37,7 +43,8 @@ system_overrides = {
 if __name__ == "__main__":
     with open(DATA_DIR_CONFIG / config) as f:
         config_json = json.load(f)
-    apply_axes_override(config_json, config)
+    axes_config_path = DATA_DIR_CONFIG / axes_config if axes_config else AXES_CONFIG_DEFAULT
+    apply_axes_override(config_json, config, axes_config_path)
     mga_cfg = config_json.get("plugins", {}).get("mga")
     if normalisation is not None:
         if mga_cfg is None:

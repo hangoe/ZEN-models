@@ -1,0 +1,12 @@
+{
+  "node_capex_periods": {
+    "nodes": [
+      {"north": ["DK", "EE", "FI", "LT", "LV", "NO", "SE"]},
+      {"west": ["AT", "BE", "CH", "DE", "FR", "IE", "LU", "NL", "UK"]},
+      {"south": ["ES", "EL", "HR", "IT", "PT", "SI"]},
+      {"east": ["BG", "CZ", "HU", "PL", "RO", "SK"]}
+    ],
+    "periods": [[2030, 2039], [2040, 2049]]
+  },
+  "include_cost": true
+}

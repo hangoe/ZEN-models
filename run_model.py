@@ -24,10 +24,12 @@ CHANGES:
     matching keys under plugins.mga.batch (batch mode only) in the same
     private staged copy, the same way `normalisation` does.
   * The `axes` block for every MGA mode except `weights` is no longer
-    duplicated per config file -- it's merged in from the shared
-    data/config_mga_axes_capex.json into the private staged copy, so all five
+    duplicated per config file -- it's merged in from data/config_mga_axes_capex.json
+    (the default) into the private staged copy, so all five
     config_mga_{bbo,sampling,oracle,batch_bbo,batch_sampling}.json files
-    share one axes definition.
+    share one axes definition. A row may set an `axes_config` column (e.g.
+    config_mga_axes_capex_periods.json) to merge in a different axes file
+    instead, without touching the shared default.
   * Any system_overrides key a row's CSV doesn't set falls back to
     DEFAULT_SYSTEM_OVERRIDES, so a sweep whose rows all share the same
     dataset-processing setup (e.g. parameters_mga.csv) doesn't need to repeat
@@ -63,7 +65,7 @@ DATASET_SEARCH_DIRS = [
 
 # Columns in parameters.csv that are NOT system.json overrides.
 # Everything else in a row is applied as a system_overrides key.
-META_COLUMNS = {"my_dataset", "my_comment", "config", "normalisation", "batch_size", "n_workers"}
+META_COLUMNS = {"my_dataset", "my_comment", "config", "normalisation", "batch_size", "n_workers", "axes_config"}
 
 # Fallback system.json overrides, used for any of these keys a CSV row
 # doesn't set as its own column. Lets parameters_mga.csv's 11 rows share one
@@ -84,25 +86,29 @@ DEFAULT_SYSTEM_OVERRIDES = {
 # blank) -- keeps the original non-MGA parameters.csv working unchanged.
 DEFAULT_CONFIG = "config.json"
 
-# Shared axes definition merged into every MGA config except "weights" mode
+# Default axes definition merged into every MGA config except "weights" mode
 # (see apply_axes_override) so the axes block isn't duplicated per config file.
-# data/config_mga_axes_capacity.json holds the old technology-capacity axes
-# (kept for reference/rollback -- not currently wired in here).
-AXES_CONFIG = DATA_DIR_CONFIG / "config_mga_axes_capex.json"
+# A row's own "axes_config" column (see main()) can point at a different
+# axes file instead -- e.g. data/config_mga_axes_capex_periods.json for the
+# node_capex_periods investigation. data/config_mga_axes_capacity.json holds
+# the old technology-capacity axes (kept for reference/rollback -- not
+# currently wired in here).
+AXES_CONFIG_DEFAULT = DATA_DIR_CONFIG / "config_mga_axes_capex.json"
 
 
-def apply_axes_override(config_json: dict, config_name: str) -> None:
-    """Merge in the shared axes definition from AXES_CONFIG, in-place.
+def apply_axes_override(config_json: dict, config_name: str, axes_config_path: Path = AXES_CONFIG_DEFAULT) -> None:
+    """Merge in the axes definition from axes_config_path, in-place.
 
     No-op if plugins.mga is absent (plain config.json runs) or mode is
     "weights" (that mode has no axes block). Otherwise overwrites
-    plugins.mga.axes with the contents of data/config_mga_axes_capex.json, so
-    the 5 per-mode config files no longer each carry their own copy of the axes.
+    plugins.mga.axes with the contents of axes_config_path (defaults to
+    data/config_mga_axes_capex.json), so the per-mode config files don't each
+    carry their own copy of the axes.
     """
     mga_cfg = config_json.get("plugins", {}).get("mga")
     if mga_cfg is None or mga_cfg.get("mode") == "weights":
         return
-    with open(AXES_CONFIG) as f:
+    with open(axes_config_path) as f:
         mga_cfg["axes"] = json.load(f)
 
 
@@ -226,6 +232,9 @@ def main() -> None:
     config_name = DEFAULT_CONFIG
     if "config" in table.columns and pd.notna(row["config"]) and str(row["config"]).strip():
         config_name = str(row["config"]).strip()
+    axes_config_path = AXES_CONFIG_DEFAULT
+    if "axes_config" in table.columns and pd.notna(row["axes_config"]) and str(row["axes_config"]).strip():
+        axes_config_path = DATA_DIR_CONFIG / str(row["axes_config"]).strip()
     normalisation = None
     if "normalisation" in table.columns and pd.notna(row["normalisation"]) and str(row["normalisation"]).strip():
         normalisation = str(row["normalisation"]).strip()
@@ -241,13 +250,13 @@ def main() -> None:
     }
 
     print(f"[run_model] task_id={args.task_id}  dataset={my_dataset}  comment={my_comment}")
-    print(f"[run_model] config={config_name}  normalisation={normalisation}")
+    print(f"[run_model] config={config_name}  axes_config={axes_config_path.name}  normalisation={normalisation}")
     print(f"[run_model] batch_size={batch_size}  n_workers={n_workers}")
     print(f"[run_model] system_overrides={system_overrides}")
 
     with open(DATA_DIR_CONFIG / config_name) as f:
         config_json = json.load(f)
-    apply_axes_override(config_json, config_name)
+    apply_axes_override(config_json, config_name, axes_config_path)
     if normalisation is not None:
         apply_normalisation_override(config_json, config_name, normalisation)
     apply_batch_overrides(config_json, config_name, batch_size, n_workers)
