@@ -23,7 +23,7 @@
   "plugins": {
     "mga": {
       "mode": "oracle",
-      "epsilon": 0.1,
+      "epsilon": 0.01,
       "normalisation": "relative",
       "oracle": {
         "tolerance": 0.1,

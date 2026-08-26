@@ -86,8 +86,8 @@ DEFAULT_SYSTEM_OVERRIDES = {
 # blank) -- keeps the original non-MGA parameters.csv working unchanged.
 DEFAULT_CONFIG = "config.json"
 
-# Default axes definition merged into every MGA config except "weights" mode
-# (see apply_axes_override) so the axes block isn't duplicated per config file.
+# Default axes definition merged into every MGA config (see
+# apply_axes_override) so the axes block isn't duplicated per config file.
 # A row's own "axes_config" column (see main()) can point at a different
 # axes file instead -- e.g. data/config_mga_axes_capex_periods.json for the
 # node_capex_periods investigation. data/config_mga_axes_capacity.json holds
@@ -99,14 +99,15 @@ AXES_CONFIG_DEFAULT = DATA_DIR_CONFIG / "config_mga_axes_capex.json"
 def apply_axes_override(config_json: dict, config_name: str, axes_config_path: Path = AXES_CONFIG_DEFAULT) -> None:
     """Merge in the axes definition from axes_config_path, in-place.
 
-    No-op if plugins.mga is absent (plain config.json runs) or mode is
-    "weights" (that mode has no axes block). Otherwise overwrites
-    plugins.mga.axes with the contents of axes_config_path (defaults to
-    data/config_mga_axes_capex.json), so the per-mode config files don't each
-    carry their own copy of the axes.
+    No-op if plugins.mga is absent (plain config.json runs). Otherwise
+    overwrites plugins.mga.axes with the contents of axes_config_path
+    (defaults to data/config_mga_axes_capex.json), so the per-mode config
+    files don't each carry their own copy of the axes. "weights" mode also
+    needs an axes block now (weight keys reference axis names), so it is no
+    longer skipped here.
     """
     mga_cfg = config_json.get("plugins", {}).get("mga")
-    if mga_cfg is None or mga_cfg.get("mode") == "weights":
+    if mga_cfg is None:
         return
     with open(axes_config_path) as f:
         mga_cfg["axes"] = json.load(f)

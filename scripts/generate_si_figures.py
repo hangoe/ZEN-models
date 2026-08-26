@@ -201,12 +201,12 @@ COMPARISON_YEARS = [2030, 2040, 2048]
 # is reserved for "Crystal Ball (base)" — see the module docstring for why it
 # isn't a 7th entry here.
 SCENARIOS = [
-    ("Crystal_Ball_ind_heat_v8_0_no_flexibility_2020_15a_2a_interval_10ts", "No flexibility"),
-    ("Crystal_Ball_ind_heat_v8_0_2020_15a_2a_interval_10ts", "Full flexibility"),
-    ("Crystal_Ball_ind_heat_v8_0_DSM_pessimistic_2020_15a_2a_interval_10ts", "DSM pessimistic"),
-    ("Crystal_Ball_ind_heat_v8_0_DSM_only_2020_15a_2a_interval_10ts", "DSM only"),
-    ("Crystal_Ball_ind_heat_v8_0_TES_only_2020_15a_2a_interval_10ts", "TES only"),
-    ("Crystal_Ball_ind_heat_v8_0_single_temp_2020_15a_2a_interval_10ts", "Single temperature level"),
+    ("Crystal_Ball_ind_heat_v9_0_no_flexibility_2020_15a_2a_interval_10ts", "No flexibility"),
+    ("Crystal_Ball_ind_heat_v9_0_2020_15a_2a_interval_10ts", "Full flexibility"),
+    ("Crystal_Ball_ind_heat_v9_0_DSM_pessimistic_2020_15a_2a_interval_10ts", "DSM pessimistic"),
+    ("Crystal_Ball_ind_heat_v9_0_DSM_only_2020_15a_2a_interval_10ts", "DSM only"),
+    ("Crystal_Ball_ind_heat_v9_0_TES_only_2020_15a_2a_interval_10ts", "TES only"),
+    ("Crystal_Ball_ind_heat_v9_0_single_temp_2020_15a_2a_interval_10ts", "Single temperature level"),
 ]
 
 # fig0a/fig0b only. Uses SCENARIO_PALETTE slot 6 (grey) — see the comment there.
@@ -795,7 +795,7 @@ def _ccs_captured_by_tech(r, year: int) -> pd.Series:
 
 def fig5_retrofit_ccs_comparison(no_flex_run: Run, base_run: Run) -> None:
     """CO2 actually captured that year (kt CO2eq) by each retrofit-CCS
-    technology, "No flexibility" (v8_0) vs. "Crystal Ball (base)", year YEAR.
+    technology, "No flexibility" (v9_0) vs. "Crystal Ball (base)", year YEAR.
     See RETROFIT_CCS_TECHS above for which technologies count as "retrofit"
     and why DAC/carbon_storage/carbon_pipeline are excluded.
 

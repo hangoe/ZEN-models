@@ -55,17 +55,47 @@ regardless of mode or normalisation). For fig2/fig3 -- the ones this
 project actually cares about *comparing* modes on -- each run gets its own
 inner-hull sample and its own panel; see those functions' docstrings.
 
-weights was re-run fresh alongside the above but was NOT re-scoped to the
-CAPEX axis set (config_mga_weights.json still only drives the original 4
-tech axes: photovoltaics, wind_onshore, wind_offshore, nuclear) as its own
-MGA *directions* -- but each of its solves is still a full ZEN-garden run,
-so every OTHER axis in the shared frame moves too as a side effect (e.g.
-does maximising PV also move a node's hydrogen-group CAPEX?). fig0 reads
-each weights point's physical value on every one of poly's axes (see
-point_from_results / load_weights_points, unchanged), so it plots all of
-them -- one panel per axis, taken from poly.meta["axes"] rather than a
-hard-coded subset -- not just the 4 weights explicitly targets as
-directions.
+As of the batch16 switchover (2026-08-25), MODEL/SUPF_MODES/BATCH_MODES
+below point at Crystal_Ball_ind_heat_v9_0 (not v8_0) and a single "batch16"
+BATCH_MODES entry -- the first batch-mode run downloaded for the CAPEX axis
+set, batch_size=16 (see plugin.py's ForkedBatchSupportFunction). There is no
+weights mode or bbo_units/sampling_units SUPF_MODES run for v9_0 yet, so
+SUPF_MODES=() and the shared coordinate frame (frame_mode, see main()) now
+falls back to BATCH_MODES when SUPF_MODES is empty. "weights" mode support
+(fig0_weights_axis_bars, WEIGHTS_ITERATIONS, load_weights_points, WEIGHTS_DIR)
+was removed entirely rather than left to no-op: it targeted individual
+TECHNOLOGIES (photovoltaics/wind/nuclear via capacity_addition, see
+zen_garden_plugins.mga.plugin.MGA._build_weight_array), not any region or
+CAPEX-money quantity, despite living in a "..._MGA_CAPEX_weights" folder --
+misleading enough that this project retired it in favour of the real
+per-region/per-carrier-group VMM max/min solves that batch16 (and any future
+BATCH_MODES/SUPF_MODES run against config_mga_axes_capex.json) actually
+provides. That real regional-CAPEX view (fig0a/b/c: baseline vs each axis's
+own VMM max/min, and cross-effects on every other axis) lives in
+scripts/plot_mga_batch16_regional_capex.py, not here -- this script no longer
+has a fig0 of its own. The pre-batch16 v8_0 CAPEX-weights/bbo_units/
+sampling_units figures (including the old fig0_weights_axis_bars) were moved
+to data/outputs/figures/mga_tests/archive/ rather than deleted outright.
+
+As of the CAPEX-periods switchover (2026-08-26), RUN_PREFIX/BATCH_MODES
+below point at a NEW axis set -- config_mga_axes_capex_periods.json, not
+config_mga_axes_capex.json -- run against a full 2020-2050 pathway
+("2020_7a_5a_interval_3ts", not the earlier single-2050-year
+"2050_1a_5a_interval_5ts"), batch_size=4 ("batch4", not "batch16"). 4 node
+clusters (north/west/south/east) x 2 calendar-year periods ([2030, 2039],
+[2040, 2049]) = 8 node_capex_period axes, plus net_present_cost -- 9 axes
+total now, not 13 (this file's older comments/docstring prose below still
+say "13-axis"/"regional CAPEX system" describing the batch16 carrier-group
+run; treat those as historical background on how the axis set evolved, same
+as this file already does for the pre-batch16 v8_0 system -- nothing about
+the *methodology* below changed, only which run's polytope.npz is read).
+The old batch16 carrier-group figures live in data/outputs/figures/
+mga_tests/archive_v9_0_capex_regional_batch16_groups/ (fig0a/b/c, per
+carrier group -- see plot_mga_periods_regional_capex.py for this run's own
+fig0a/b, per period, which replace them). axis_value() below has a new
+"node_capex_period" branch (kind == NODE_CAPEX_PERIOD in the plugin) to
+mirror this run's axes; still exactly follows MGA.axis_value/
+_design_axis_terms.
 
 oracle has no data under the CAPEX axis set at all right now -- every
 oracle-touching code path below degrades to "skip, log why" exactly as it
@@ -96,21 +126,9 @@ each building a different real approximation. That row was dropped: scoring
 against a box that never shrinks conflates "coverage of a fixed region" with
 actual convergence, and made every mode look like it stalled well before it
 actually had (each mode's real, evolving approximation kept shrinking
-substantially past the point the frozen-box metric stopped moving). weights
-never builds an outer approximation at all, so it has no representation in
-fig4 any more -- fig0 remains the figure for weights' own behaviour.
+substantially past the point the frozen-box metric stopped moving).
 
 Figures (data/outputs/figures/mga_tests/):
-  fig0_weights_axis_bars        weights-mode capacity ADDITION per axis, per
-                                 iteration, vs baseline (every axis in the
-                                 shared frame, one panel each -- weights only
-                                 ever targets 4 of them (photovoltaics,
-                                 wind_onshore, wind_offshore, nuclear) as its
-                                 own exploration directions, but every solve
-                                 still moves the whole system, so the other
-                                 axes -- the 12 node/carrier CAPEX groups and
-                                 net_present_cost -- show that side effect
-                                 too).
   fig1_pairwise_points           pairwise projections of every mode/variant's
                                  actual visited points, colour-coded by mode.
   fig2_polytope_samples          One panel per plotted supf-mode run with its
@@ -216,40 +234,33 @@ from pyoNearOpt.polytope_approximation.polytope_samples import PolytopeSamples
 FIGURES_DIR = REPO_ROOT / "data" / "outputs" / "figures" / "mga_tests"
 MGA_ROOT = REPO_ROOT / "data" / "outputs" / "euler_outputs_mga"
 
-MODEL = "Crystal_Ball_ind_heat_v8_0_no_flexibility_nodiffusion"
+MODEL = "Crystal_Ball_ind_heat_v9_0_no_flexibility_nodiffusion"
 
-# ── CAPEX-axes runs (current, 2026-08-20 -- the only data source now; the
-# earlier cost-axes runs this script used to plot were deleted from disk by
-# user request, so every figure below including fig4a/b now uses this data)
+# ── CAPEX-PERIODS-axes runs (current, 2026-08-26 -- the periods switchover;
+# see module docstring) -- the earlier batch16 carrier-group CAPEX figures
+# this script used to plot were moved to data/outputs/figures/mga_tests/
+# archive_v9_0_capex_regional_batch16_groups/, not deleted.
 #
-# Replaces the earlier cost-axes 9-design-axis system (nuclear, photovoltaics,
-# wind_offshore, wind_onshore, electrolysis, DAC, battery, ccs_lump,
-# net_present_cost) with a 13-axis regional CAPEX system: 4 node clusters
-# (north/west/south/east) x 3 carrier groups (power/hydrogen/carbon) = 12
-# node_capex_tech axes, plus net_present_cost -- see each run's own
-# polytope.npz axis_meta_json for the exact technology membership per group.
-# Only "units" normalisation has been re-run against this new axis set so
-# far (per user request, this IS the variant to use for CAPEX axes, unlike
-# the old cost-axes system where "units" was excluded) -- "minmax" and batch
-# runs are planned but not downloaded yet, so SUPF_MODES/BATCH_MODES below
-# only include what actually exists on disk; adding a future
-# "bbo_minmax"/"sampling_minmax"/batch_* CAPEX run is just appending to these
-# tuples, no other code changes needed (BASE_MODE/RUN_DIR/MODE_COLOR/
-# MODE_LABEL all key off these tuples).
-RUN_PREFIX = f"{MODEL}_2050_1a_5a_interval_5ts_MGA_CAPEX"
-WEIGHTS_DIR = MGA_ROOT / f"{RUN_PREFIX}_weights"
+# 9-axis regional CAPEX-by-period system: 4 node clusters
+# (north/west/south/east) x 2 calendar-year periods ([2030, 2039],
+# [2040, 2049]) = 8 node_capex_period axes, plus net_present_cost -- see each
+# run's own polytope.npz axis_meta_json for the exact node membership per
+# region and the exact [start, end] per period (config_mga_axes_capex_
+# periods.json). batch4 is the first BATCH_MODES entry for this axis set
+# (batch_size=4, strategy_mode="bbo" per config_mga_batch_bbo.json);
+# SUPF_MODES is empty until a v9_0 bbo_units/sampling_units run against this
+# axis set is downloaded. Adding either later is just appending to
+# SUPF_MODES/BATCH_MODES/BATCH_RUN_SUFFIX, no other code changes needed
+# (BASE_MODE/RUN_DIR/MODE_COLOR/MODE_LABEL all key off these tuples).
+RUN_PREFIX = f"{MODEL}_2020_7a_5a_interval_3ts_MGA_CAPEX_PERIODS"
 ORACLE_DIR = MGA_ROOT / f"{RUN_PREFIX}_oracle"
 
-SUPF_MODES = ("bbo_units", "sampling_units")
+SUPF_MODES: tuple[str, ...] = ()
 
-# No CAPEX batch runs downloaded yet (planned for later) -- kept as an empty
-# tuple/dict rather than removed so every figure's ALL_SUPF_MODES-based loop
-# keeps working unchanged once entries are added here.
-BATCH_MODES: tuple[str, ...] = ()
-BATCH_RUN_SUFFIX: dict[str, str] = {}
+BATCH_MODES: tuple[str, ...] = ("batch4",)
+BATCH_RUN_SUFFIX: dict[str, str] = {"batch4": "batch_bbo_minmax_batch4"}
 # Every mode with its own polytope.npz + outer approximation -- the set
-# fig1/fig2/fig3/fig4 iterate over (fig0 is weights-only, see module
-# docstring).
+# fig1/fig2/fig3/fig4 iterate over.
 ALL_SUPF_MODES = SUPF_MODES + BATCH_MODES
 
 RUN_DIR = {m: MGA_ROOT / f"{RUN_PREFIX}_{m}" for m in SUPF_MODES}
@@ -262,45 +273,21 @@ BASE_MODE.update({m: "batch" for m in BATCH_MODES})
 # Colours reused from figure_settings.SCENARIO_PALETTE (the full 7-color ETH
 # corporate swatch: blue, petrol, green, bronze, red, purple, grey), per this
 # project's convention of never inventing a separate palette for print
-# figures -- picked for maximum pairwise contrast (not adjacent palette
-# slots): weights=green, oracle=bronze/brown, bbo=blue-family,
-# sampling=warm/purple-family. Only "units" normalisation exists for CAPEX
-# so far (see SUPF_MODES) -- once a CAPEX minmax variant is downloaded, give
-# it eth_tint(_ETH_BLUE/_ETH_PURPLE, 0.5) to match the old relative/minmax
-# tint convention this file used for the (now-removed) cost-axes runs, and
-# once CAPEX batch runs land, _ETH_PETROL/_ETH_RED are free for them.
+# figures. _ETH_PETROL was reserved for a future CAPEX batch mode (see the
+# old constants comment, now this one) -- batch4 gets it.
 _ETH_BLUE, _ETH_PETROL, _ETH_GREEN, _ETH_BRONZE, _ETH_RED, _ETH_PURPLE = (
     SCENARIO_PALETTE[0], SCENARIO_PALETTE[1], SCENARIO_PALETTE[2],
     SCENARIO_PALETTE[3], SCENARIO_PALETTE[4], SCENARIO_PALETTE[5],
 )
 MODE_COLOR = {
-    "weights": _ETH_GREEN,
-    "bbo_units": _ETH_BLUE,
-    "sampling_units": _ETH_PURPLE,
+    "batch4": _ETH_PETROL,
     "oracle": _ETH_BRONZE,
 }
 MODE_LABEL = {
-    "weights": "Weights",
-    # $\tau$ (mathtext, "cm" fontset) rather than a literal unicode tau --
-    # the plain text font (cmr10) has no tau glyph.
-    "bbo_units": r"BBO units ($\tau$=0.95)",
-    "sampling_units": r"Sampling units ($\tau$=0.95)",
+    "batch4": "Batch (bbo, batch=4)",
     "oracle": "Oracle",
 }
-MODES = ("weights", *ALL_SUPF_MODES, "oracle")
-
-# config_mga_weights.json's "iterations" list: weight sign, combined with
-# run_iteration's fixed sense="min", determines whether each solve minimises
-# or maximises the axis (weight > 0 -> minimises). Verified against the
-# actual reconstructed capacities (see module docstring).
-WEIGHTS_ITERATIONS = [
-    ("mga_iter_0", "photovoltaics", "min"),
-    ("mga_iter_1", "photovoltaics", "max"),
-    ("mga_iter_2", "wind", "min"),  # wind_onshore + wind_offshore weighted together
-    ("mga_iter_3", "wind", "max"),
-    ("mga_iter_4", "nuclear", "min"),
-    ("mga_iter_5", "nuclear", "max"),
-]
+MODES = (*ALL_SUPF_MODES, "oracle")
 
 UNIT_LABEL = {
     "gigawatt": "GW", "gigawatt * hour": "GWh", "megaEuro": "MEUR",
@@ -309,10 +296,6 @@ UNIT_LABEL = {
     # "unit" field in each polytope.npz's meta.
     "kilotCO2eq / hour": "ktCO$_2$eq/h",
 }
-# fig0's per-iteration bars cycle through the palette minus _ETH_RED, which
-# is reserved for the baseline bar -- otherwise one iteration's colour would
-# be visually indistinguishable from the baseline.
-_ITER_PALETTE = [c for c in SCENARIO_PALETTE if c != _ETH_RED]
 
 
 def savefig(fig: plt.Figure, name: str) -> None:
@@ -369,6 +352,22 @@ def axis_value(r: Results, axis_meta: dict) -> float:
         technologies = axis_meta.get("technologies")
         if technologies is not None:
             vals = vals[vals.index.get_level_values("technology").isin(technologies)]
+        return float(vals.to_numpy().sum()) if not vals.empty else 0.0
+    if kind == "node_capex_period":
+        # CAPEX-PERIODS axis set (config_mga_axes_capex_periods.json, see the
+        # module docstring's periods-switchover note): same node-restriction
+        # as node_capex_tech, but restricted to the axis's own calendar-year
+        # period instead of a technology group -- get_total's DataFrame
+        # columns are real calendar years (verified: compare_models.py/
+        # figures_by_scenario.py both index them as `df[YEAR]` with YEAR an
+        # actual year like 2025), matching MGA._axis_year_indices'
+        # start <= real_year <= end convention (_year_indices_in_period)
+        # exactly, just filtering on the year value directly instead of on
+        # set_time_steps_yearly's index.
+        capex = r.get_total("cost_capex_yearly")
+        vals = capex[capex.index.get_level_values("location").isin(members)]
+        start, end = axis_meta["period"]
+        vals = vals[[c for c in vals.columns if start <= c <= end]]
         return float(vals.to_numpy().sum()) if not vals.empty else 0.0
     raise ValueError(f"unknown axis kind {kind!r}")
 
@@ -466,28 +465,6 @@ def load_batch_points(run_poly: Polytope, run_dir: Path, batch_size: int) -> lis
     return rows
 
 
-# ── Weights mode ─────────────────────────────────────────────────────────
-
-def load_weights_points(poly: Polytope) -> list[tuple[str, np.ndarray, float]]:
-    """[(label, phys_point, solving_time)], baseline first, in solve order.
-    Folders that fail to load are skipped."""
-    base_dir = WEIGHTS_DIR / MODEL
-    base = safe_results(base_dir)
-    if base is None:
-        print(f"  weights: baseline unreadable at {base_dir}; skipping weights mode entirely")
-        return []
-    rows = [("baseline", point_from_results(base, poly), solving_time(base_dir))]
-    for subdir, axis, sense in WEIGHTS_ITERATIONS:
-        folder = WEIGHTS_DIR / f"{MODEL}_{subdir}"
-        r = safe_results(folder)
-        if r is None:
-            continue
-        label = f"{'Max' if sense == 'max' else 'Min'} {axis.replace('_', ' ')}"
-        rows.append((label, point_from_results(r, poly), solving_time(folder)))
-    print(f"  weights: {len(rows) - 1}/{len(WEIGHTS_ITERATIONS)} iterations readable")
-    return rows
-
-
 # ── Oracle mode (best-effort reconstruction, no polytope available) ──────
 #
 # Only used as a fallback when oracle has NO usable polytope.npz at all (see
@@ -538,59 +515,6 @@ def load_oracle_points(poly: Polytope) -> list[tuple[str, np.ndarray, float]] | 
         return None
     return [("z_star", poly.z_star_phys.copy(), float("nan"))] + rows
 
-
-# ── fig0: weights-mode capacity addition per axis, per iteration ────────
-
-def fig0_weights_axis_bars(poly: Polytope, weights_points: list[tuple[str, np.ndarray, float]]) -> None:
-    if len(weights_points) < 2:
-        print("  skipping fig0_weights_axis_bars: no completed iterations")
-        return
-    # Every axis in the shared frame (poly.meta["axes"], driven entirely by
-    # whichever supf-mode run supplied it -- see module docstring), not a
-    # fixed subset: weights_points already carries each solve's physical
-    # value on every one of these (point_from_results loops over
-    # poly.meta["axes"] regardless of mode), so as the frame's axis set
-    # grows/shrinks this figure follows without code changes. One panel per
-    # axis since axes span different physical units (GW/GWh/ktCO2eq per h/
-    # MEUR) that can't share a single y-axis.
-    axes_meta = poly.meta["axes"]
-    names = [a["name"] for a in axes_meta]
-    units = [a["unit"] for a in axes_meta]
-    axis_idx = {name: i for i, name in enumerate(names)}
-    df = pd.DataFrame(
-        {label: [phys[axis_idx[name]] for name in names] for label, phys, _ in weights_points},
-        index=names,
-    )
-
-    n_iter = len(df.columns)
-    ncols = min(3, len(names))
-    nrows = -(-len(names) // ncols)
-    fig, axs = plt.subplots(nrows, ncols, figsize=(4.6 * ncols, 3.4 * nrows), squeeze=False)
-    for k, name in enumerate(names):
-        ax = axs[k // ncols][k % ncols]
-        for i, label in enumerate(df.columns):
-            color = _ETH_RED if label == "baseline" else _ITER_PALETTE[(i - 1) % len(_ITER_PALETTE)]
-            ax.bar(i, df.loc[name, label], color=color, edgecolor="white",
-                   label=label if k == 0 else None)
-        ax.set_xticks(range(n_iter))
-        ax.set_xticklabels(df.columns, rotation=45, ha="right", fontsize=8)
-        ax.set_ylabel(f"[{UNIT_LABEL.get(units[k], units[k] or 'n/a')}]", fontsize=9)
-        ax.set_title(name.replace("_", " "), fontsize=10, fontweight="bold")
-        ax.grid(axis="y", alpha=0.3)
-        ax.tick_params(labelsize=8)
-    for k in range(len(names), nrows * ncols):
-        axs[k // ncols][k % ncols].axis("off")
-
-    fig.suptitle(
-        "MGA Weights-Mode: Capacity Addition per Axis, per Directional Solve\n"
-        "(each iteration minimises or maximises ONE weighted direction; panels show its effect on every shared-frame axis)",
-        fontsize=13, fontweight="bold", y=0.99,
-    )
-    handles, labels = axs[0][0].get_legend_handles_labels()
-    fig.legend(handles, labels, loc="upper center", bbox_to_anchor=(0.5, 0.9),
-               fontsize=9, frameon=False, ncol=min(n_iter, 4))
-    fig.tight_layout(rect=[0, 0, 1, 0.86])
-    savefig(fig, "fig0_weights_axis_bars")
 
 
 # ── fig1: pairwise projections of every mode's actual visited points ────
@@ -1022,7 +946,7 @@ def _calibrate_cum_seconds(mode: str, cum_seconds: np.ndarray) -> np.ndarray:
     return cum_seconds * (REAL_ELAPSED_SECONDS[mode] / cum_seconds[-1])
 
 
-def _gurobi_maxsep_solver(time_limit: float = 30.0):
+def _gurobi_maxsep_solver(time_limit: float = 15.0):
     import pyomo.environ as pyo
     solver = pyo.SolverFactory("gurobi", solver_io="python", manage_env=True)
     solver.set_options(f"MIPGap=0.05 TimeLimit={time_limit} Threads=4 OutputFlag=0")
@@ -1356,8 +1280,21 @@ def _compute_fig4_scores(points: dict[str, list[tuple[str, np.ndarray, float]]],
     # coarser convergence curve for a run that actually completes. Only
     # applies to max_separation -- ci_lower is read at full per-iteration
     # density regardless (see load_native_ci_history), it doesn't need
-    # sparsifying since nothing is solved for it.
-    eval_every = {m: 100 for m in ALL_SUPF_MODES}
+    # sparsifying since nothing is solved for it. BATCH_MODES runs get an
+    # even coarser 300 rather than 100: batch_size points land per outer
+    # iteration (batch16: 16/iteration, 2841 points total vs. the few
+    # hundred a sequential supf mode accumulates over the same wall-clock
+    # budget), so 100 would mean ~29 checkpoints x up to 30s/MILP. This
+    # project hit that directly, twice: a background run of this script was
+    # killed mid-fig4 both times (once at checkpoint ~19/29 with
+    # eval_every=300 and TimeLimit=30, once earlier than that with
+    # eval_every=100) -- this environment appears to cap a single
+    # long-running process well under the ~15min a full batch16 fig4 pass
+    # would otherwise take, independent of whether it's run in the
+    # foreground or backgrounded. 700 cuts batch16's checkpoint count to ~5;
+    # combined with _gurobi_maxsep_solver's TimeLimit (also cut, 30s -> 15s),
+    # a full pass is well under 2 minutes.
+    eval_every = {m: (700 if m in BATCH_MODES else 100) for m in ALL_SUPF_MODES}
 
     # Each supf mode scored against its OWN evolving, cut-refined outer
     # approximation -- i.e. the reference notebook's own score_run
@@ -1540,16 +1477,18 @@ def main() -> None:
         print(f"  oracle: no usable polytope.npz under {ORACLE_DIR.relative_to(REPO_ROOT)} "
               f"(placeholder -- not yet re-run against the CAPEX axis set)")
 
-    if not any(m in polys for m in SUPF_MODES):
+    if not any(m in polys for m in ALL_SUPF_MODES):
         raise SystemExit(
-            "Neither bbo_units nor sampling_units has a "
+            "No SUPF_MODES/BATCH_MODES run has a "
             "usable polytope -- nothing to build the shared coordinate frame or fig2/fig3 from."
         )
 
-    # Shared coordinate frame (axis names/units/z*/scale/offset, used by fig0
-    # and fig1) -- whichever supf-mode run loads first, in SUPF_MODES order.
-    # See module docstring.
-    frame_mode = next(m for m in SUPF_MODES if m in polys)
+    # Shared coordinate frame (axis names/units/z*/scale/offset, used by
+    # fig1) -- whichever SUPF_MODES/BATCH_MODES run loads first, in
+    # ALL_SUPF_MODES order (SUPF_MODES then BATCH_MODES; empty as of the
+    # batch16 switchover, so batch16 itself supplies the frame). See module
+    # docstring.
+    frame_mode = next(m for m in ALL_SUPF_MODES if m in polys)
     poly = polys[frame_mode]
     print(f"Shared frame (from {frame_mode}): axes={poly.names}, epsilon={poly.epsilon:g}, c_star={poly.c_star:,.0f}")
     present = [m for m in ALL_SUPF_MODES if m in polys]
@@ -1562,11 +1501,6 @@ def main() -> None:
             print(f"  sanity check: {a}'s and {b}'s baselines (z*) agree to {z_diff:g} -- same problem, confirmed")
 
     points: dict[str, list[tuple[str, np.ndarray, float]]] = {}
-
-    print("Loading weights mode...")
-    w = load_weights_points(poly)
-    if w:
-        points["weights"] = w
 
     for mode in SUPF_MODES:
         if mode not in polys:
@@ -1599,11 +1533,6 @@ def main() -> None:
 
     print(f"Modes with usable data: {list(points)}")
     print("Generating figures...")
-
-    if "weights" in points:
-        fig0_weights_axis_bars(poly, points["weights"])
-    else:
-        print("  skipping fig0_weights_axis_bars: weights mode unavailable")
 
     fig1_pairwise_points(poly, points)
 

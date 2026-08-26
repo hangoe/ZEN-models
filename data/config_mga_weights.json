@@ -23,14 +23,88 @@
   "plugins": {
     "mga": {
       "mode": "weights",
-      "epsilon": 0.1,
+      "epsilon": 0.01,
       "iterations": [
-        { "weights": { "photovoltaics": 1.0 } },
-        { "weights": { "photovoltaics": -1.0 } },
-        { "weights": { "wind_onshore": 1.0, "wind_offshore": 1.0 } },
-        { "weights": { "wind_onshore": -1.0, "wind_offshore": -1.0 } },
-        { "weights": { "nuclear": 1.0 } },
-        { "weights": { "nuclear": -1.0 } }
+        {
+          "weights": {
+            "north_2030_2039": 1.0
+          }
+        },
+        {
+          "weights": {
+            "north_2030_2039": -1.0
+          }
+        },
+        {
+          "weights": {
+            "north_2040_2049": 1.0
+          }
+        },
+        {
+          "weights": {
+            "north_2040_2049": -1.0
+          }
+        },
+        {
+          "weights": {
+            "west_2030_2039": 1.0
+          }
+        },
+        {
+          "weights": {
+            "west_2030_2039": -1.0
+          }
+        },
+        {
+          "weights": {
+            "west_2040_2049": 1.0
+          }
+        },
+        {
+          "weights": {
+            "west_2040_2049": -1.0
+          }
+        },
+        {
+          "weights": {
+            "south_2030_2039": 1.0
+          }
+        },
+        {
+          "weights": {
+            "south_2030_2039": -1.0
+          }
+        },
+        {
+          "weights": {
+            "south_2040_2049": 1.0
+          }
+        },
+        {
+          "weights": {
+            "south_2040_2049": -1.0
+          }
+        },
+        {
+          "weights": {
+            "east_2030_2039": 1.0
+          }
+        },
+        {
+          "weights": {
+            "east_2030_2039": -1.0
+          }
+        },
+        {
+          "weights": {
+            "east_2040_2049": 1.0
+          }
+        },
+        {
+          "weights": {
+            "east_2040_2049": -1.0
+          }
+        }
       ]
     }
   }

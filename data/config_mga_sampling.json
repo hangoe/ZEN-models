@@ -23,7 +23,7 @@
   "plugins": {
     "mga": {
       "mode": "sampling",
-      "epsilon": 0.1,
+      "epsilon": 0.01,
       "normalisation": "relative",
       "sampling": {
         "tolerance_prob": 0.95,
