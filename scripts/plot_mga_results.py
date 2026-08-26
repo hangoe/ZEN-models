@@ -11,8 +11,8 @@ per group), plus net_present_cost. This replaces an earlier 9-design-axis
 cost-axes system (nuclear, photovoltaics, wind_offshore, wind_onshore,
 electrolysis, DAC, battery, ccs_lump, net_present_cost) whose runs were
 deleted from disk by user request once the CAPEX runs landed -- this script
-now has exactly ONE data source, used by every figure including fig4a/b (an
-earlier version of this script kept fig4a/b on the old cost-axes runs
+now has exactly ONE data source, used by every figure including fig3a/b (an
+earlier version of this script kept fig3a/b on the old cost-axes runs
 specifically; that was reverted the same day once the old runs were
 deleted). If a stale comment or docstring elsewhere in this file still
 describes the old 9-axis system, treat it as historical background on how
@@ -51,9 +51,9 @@ loads first, in SUPF_MODES order, as the canonical shared frame for axis
 names/units/z*/scale/offset (used by fig0 and fig1), and prints a sanity
 check comparing every pair of loaded runs' baselines (they solve the same
 cost-optimal model, so z* should agree to full floating-point precision
-regardless of mode or normalisation). For fig2/fig3 -- the ones this
-project actually cares about *comparing* modes on -- each run gets its own
-inner-hull sample and its own panel; see those functions' docstrings.
+regardless of mode or normalisation). For fig2 -- the one this project
+actually cares about *comparing* modes on -- each run gets its own
+inner-hull sample and its own panel; see that function's docstring.
 
 As of the batch16 switchover (2026-08-25), MODEL/SUPF_MODES/BATCH_MODES
 below point at Crystal_Ball_ind_heat_v9_0 (not v8_0) and a single "batch16"
@@ -103,10 +103,10 @@ always did when ORACLE_DIR doesn't exist, so this is a live, ready-to-use
 path for a future oracle re-run against the CAPEX axes, not dead code. See
 the pre-existing docstrings on load_oracle_points and load_oracle_native_gap
 for the full reasoning (best-effort folder reconstruction if only a partial
-polytope survives; fig4 would include oracle on max_separation only, via its
+polytope survives; fig3 would include oracle on max_separation only, via its
 own certified max_min_distance, once such a run exists).
 
-Convergence metric (fig4): pyoNearOpt.metrics.fraction_well_explored and
+Convergence metric (fig3): pyoNearOpt.metrics.fraction_well_explored and
 max_separation (the same machinery behind sampling/bbo/batch's own
 ci_convergence_metric/batch_oracle convergence check and oracle's own max-min
 distance), evaluated on each mode's growing set of known near-optimal points
@@ -134,39 +134,36 @@ Figures (data/outputs/figures/mga_tests/):
   fig2_polytope_samples          One panel per plotted supf-mode run with its
                                  own polytope (bbo_units, sampling_units, and
                                  oracle once re-downloaded against the CAPEX
-                                 axes -- see SUPF_MODES/ALL_SUPF_MODES):
+                                 axes -- see SUPF_MODES/ALL_SUPF_MODES). Each
+                                 panel is a full n_axes x n_axes grid rather
+                                 than just a lower triangle: lower triangle =
                                  hexbin density of a uniform sample of THAT
                                  run's own INNER approximation
                                  (rejection-sampled from its own outer body --
                                  see rejection_sample_inner's docstring and
-                                 Steen2026_Thesis Sec 3.3), diagonal = per-axis
-                                 marginals, green outline = exact 2D
-                                 projection of that run's inner hull; every
-                                 mode/variant's actual points (weights + all
-                                 loaded supf runs) overlaid on every panel for
-                                 context. Side-by-side panels are the actual
-                                 bbo-vs-sampling comparison this project
-                                 wants -- weights never builds a polytope, so
-                                 it never gets its own panel.
-  fig3_axis_correlations         Same per-run panel layout as fig2, one
-                                 Pearson correlation heatmap of the 13 axes
-                                 per run's own inner-hull sample
-                                 (Steen2026_Thesis Figure 7 analog): which
-                                 axes substitute (negative) or move together
-                                 (positive) across that mode's own
-                                 near-optimal volume. Pearson r is invariant
-                                 to per-axis affine rescaling (verified:
-                                 physical-unit and normalised draws give the
-                                 same matrix to 1e-14), so this is on
-                                 physical units purely for readability --
-                                 normalising would not change a single value.
-  fig4a/b_query/time_comparison  Two figures, columns are max_separation
+                                 Steen2026_Thesis Sec 3.3) with a green outline
+                                 for the exact 2D projection of that run's
+                                 inner hull and every mode/variant's actual
+                                 points overlaid for context; diagonal =
+                                 per-axis marginals; upper triangle = that
+                                 pair's Pearson correlation over the same
+                                 inner-hull sample (Steen2026_Thesis Figure 7
+                                 analog -- which axes substitute (negative) or
+                                 move together (positive) across the
+                                 near-optimal volume; on physical units purely
+                                 for readability, Pearson r is invariant to
+                                 per-axis affine rescaling so this doesn't
+                                 change a single value). Side-by-side panels
+                                 are the actual bbo-vs-sampling comparison
+                                 this project wants -- weights never builds a
+                                 polytope, so it never gets its own panel.
+  fig3a/b_query/time_comparison  Two figures, columns are max_separation
                                  (solved here, sparse checkpoints) and
                                  fraction_well_explored's ci_lower (read
                                  natively off diagnostics.csv, full density,
                                  no solving -- see load_native_ci_history);
-                                 fig4a's x-axis is number of model queries,
-                                 fig4b's is cumulative real ZEN-garden
+                                 fig3a's x-axis is number of model queries,
+                                 fig3b's is cumulative real ZEN-garden
                                  solving time (log). One row: each run's own
                                  live, evolving approximation -- every
                                  plotted supf-mode run (currently bbo_units,
@@ -178,7 +175,7 @@ Figures (data/outputs/figures/mga_tests/):
                                  max_separation only (see
                                  load_oracle_native_gap), weights absent (it
                                  never builds an approximation -- see fig0
-                                 instead). fig4b's "seconds" axis is
+                                 instead). fig3b's "seconds" axis is
                                  uncalibrated for both modes right now (see
                                  REAL_ELAPSED_SECONDS -- add a verified sacct
                                  total for bbo_units/sampling_units to fix).
@@ -260,7 +257,7 @@ SUPF_MODES: tuple[str, ...] = ()
 BATCH_MODES: tuple[str, ...] = ("batch4",)
 BATCH_RUN_SUFFIX: dict[str, str] = {"batch4": "batch_bbo_minmax_batch4"}
 # Every mode with its own polytope.npz + outer approximation -- the set
-# fig1/fig2/fig3/fig4 iterate over.
+# fig1/fig2/fig3 iterate over.
 ALL_SUPF_MODES = SUPF_MODES + BATCH_MODES
 
 RUN_DIR = {m: MGA_ROOT / f"{RUN_PREFIX}_{m}" for m in SUPF_MODES}
@@ -381,7 +378,7 @@ def solving_time(folder: Path) -> float:
     """This solve's real wall time from ZEN-garden's own benchmarking.json,
     or NaN if the file is missing/unreadable (e.g. no real solve behind a
     point, as for the shared frame's z* borrowed for oracle -- see
-    load_oracle_points). Used for fig4's time axis."""
+    load_oracle_points). Used for fig3's time axis."""
     path = folder / "benchmarking.json"
     if not path.exists():
         return float("nan")
@@ -575,7 +572,7 @@ def fig1_pairwise_points(poly: Polytope, points: dict[str, list[tuple[str, np.nd
 # contains volume no cut has excluded yet); the inner approximation I -- the
 # convex hull of certified near-optimal points -- under-covers it, but every
 # point of I is by construction an actual certified near-optimal design (a
-# convex combination of real model solves). A first version of fig4 walked O
+# convex combination of real model solves). A first version of fig3 walked O
 # directly with PolytopeSamples(use="outer"): fast, but most of the resulting
 # cloud is "possibly near-optimal, not yet ruled out" rather than "confirmed
 # near-optimal", and in early-converged runs (few points => O much bigger
@@ -619,7 +616,7 @@ def sampling_cache_path(mode: str) -> Path:
 def cached_rejection_sample_inner(poly: Polytope, mode: str, n_propose: int = 30_000,
                                    seed: int = 0) -> tuple[np.ndarray, float]:
     """rejection_sample_inner, cached to sampling_cache_path(mode): the
-    sampling in fig2/fig3 depends only on that mode's own polytope (fixed
+    sampling in fig2 depends only on that mode's own polytope (fixed
     once the run is done), so redoing it on every script invocation is pure
     waste. Regenerates automatically if the polytope, n_propose, or seed have
     changed since the cache was written."""
@@ -665,20 +662,32 @@ def rejection_sample_inner(poly: Polytope, n_propose: int, seed: int = 0) -> tup
     return accepted, rate
 
 
-# ── fig2/fig3: hexbin density / correlations of each mode's OWN inner hull ──
-# Styled after Steen2026_Thesis Figure 6/7: hexbin density lower triangle, the
-# exact 2D projection of I as a green outline (a linear projection of a convex
-# hull is the hull of the projected vertices, so this is just ConvexHull on
-# poly.X's projected columns -- no extra approximation), per-axis marginal
-# histograms on the diagonal, baseline marked, every mode's actual points
-# overlaid for context. Unlike the old 3-mode script (one shared hull, from
-# "probabilistic"), sampling and bbo each get their OWN hull now -- neither is
-# more "correct" than the other, they're independent runs of different
-# direction-selection strategies over the same space -- so this is genuinely
-# a bbo-vs-sampling comparison, not one hull with the other mode's points
-# dropped on top. oracle gets a third panel automatically once its own
-# oracle_summary/polytope.npz exists (see try_load_run_polytope); weights
-# never builds a polytope and so never gets a panel here (see fig0 instead).
+# ── fig2: hexbin density (lower triangle) + Pearson correlation (upper
+# triangle) of each mode's OWN inner hull ───────────────────────────────────
+# Styled after Steen2026_Thesis Figure 6/7, merged into one n_axes x n_axes
+# grid per mode instead of two separate square figures: the correlation
+# matrix is symmetric (corr(i,j) == corr(j,i)), so the upper triangle would
+# otherwise just duplicate the lower one -- putting the hexbin/hull sample
+# density there instead (lower triangle) and the correlation cell (upper
+# triangle) means every cell in the grid carries distinct information. Lower
+# triangle: exact 2D projection of I as a green outline (a linear projection
+# of a convex hull is the hull of the projected vertices, so this is just
+# ConvexHull on poly.X's projected columns -- no extra approximation),
+# per-axis marginal histograms on the diagonal, baseline marked, every mode's
+# actual points overlaid for context. Upper triangle: that pair's Pearson
+# correlation over the same inner-hull sample (which axes substitute
+# (negative) or move together (positive) across the near-optimal volume; on
+# physical units purely for readability -- Pearson r is invariant to
+# per-axis affine rescaling, verified to agree with normalised draws to
+# 1e-14, so this doesn't change a single value). Unlike the old 3-mode
+# script (one shared hull, from "probabilistic"), sampling and bbo each get
+# their OWN hull now -- neither is more "correct" than the other, they're
+# independent runs of different direction-selection strategies over the same
+# space -- so this is genuinely a bbo-vs-sampling comparison, not one hull
+# with the other mode's points dropped on top. oracle gets a third panel
+# automatically once its own oracle_summary/polytope.npz exists (see
+# try_load_run_polytope); weights never builds a polytope and so never gets
+# a panel here (see fig0 instead).
 _HULL_MODE_ORDER = (*ALL_SUPF_MODES, "oracle")
 
 
@@ -701,7 +710,13 @@ def fig2_polytope_samples(polys: dict[str, Polytope], points: dict[str, list[tup
         return
     overlay_modes = [m for m in MODES if m in points]
 
-    fig = plt.figure(figsize=(3.3 * n_z * len(modes_to_plot) + 1.0, 3.3 * n_z + 0.9))
+    # +1.3in/panel of extra width reserved (via subplots_adjust(right=...)
+    # below) for the correlation colorbar, so it doesn't have to borrow space
+    # from the grid's rightmost column -- borrowing squashed that column's
+    # cells into rectangles instead of squares.
+    colorbar_margin_in = 1.3
+    fig = plt.figure(figsize=(3.3 * n_z * len(modes_to_plot) + 1.0 + colorbar_margin_in * len(modes_to_plot),
+                               3.3 * n_z + 0.9))
     subfigs = fig.subfigures(1, len(modes_to_plot))
     subfigs = np.atleast_1d(subfigs)
     n_panels = len(modes_to_plot)
@@ -709,29 +724,41 @@ def fig2_polytope_samples(polys: dict[str, Polytope], points: dict[str, list[tup
         poly = polys[mode]
         samples_norm, rate = samples[mode]
         samples_phys = poly.to_phys(samples_norm)
-        # Full n_z x n_z triangular grid (unlike _pairwise_grid's (n-1) x
-        # (n-1) off-diagonal-only layout used by fig1): row/col i==j is axis
-        # i's own marginal, so every axis gets one, matching Steen2026_Thesis
-        # Figure 6.
+        corr = pd.DataFrame(samples_phys, columns=poly.names).corr(method="pearson")
+        # Full n_z x n_z grid (unlike _pairwise_grid's (n-1) x (n-1)
+        # off-diagonal-only layout used by fig1): row/col i==j is axis i's
+        # own marginal, matching Steen2026_Thesis Figure 6. Reserve the top
+        # of the subfig for the panel's own suptitle + (on the last panel)
+        # the shared legend, and the right for the correlation colorbar, so
+        # neither has to eat into the grid itself.
         axes = subfig.subplots(n_z, n_z, squeeze=False)
+        panel_width_in = 3.3 * n_z + 1.0 / n_panels + colorbar_margin_in
+        subfig.subplots_adjust(top=0.92, right=1 - colorbar_margin_in / panel_width_in)
         first_legend_done = False
         # Only the rightmost (last) panel keeps its legend -- with one panel
         # per mode, every panel's legend is otherwise identical (same overlay
         # modes/baseline/hull-outline label), so repeating it on every panel
-        # only added clutter and, combined with each panel's own suptitle
-        # sitting right above it, is what caused the title/legend overlap.
+        # only added clutter.
         show_legend = panel_idx == n_panels - 1
+        corr_im = None
         for i in range(n_z):
             for j in range(n_z):
                 ax = axes[i, j]
-                if j > i:
-                    ax.axis("off")
+                if j > i:  # upper triangle: that pair's Pearson correlation, symmetric to (j, i)'s
+                    # panel -- never on the grid's outer border (j>i implies j>=1 and i<=n_z-2), so
+                    # it needs no axis-name labels of its own; those already come from (j, i)'s panel.
+                    v = corr.iloc[i, j]
+                    corr_im = ax.imshow([[v]], cmap="RdBu_r", vmin=-1, vmax=1, aspect="auto")
+                    ax.text(0, 0, f"{v:.2f}", ha="center", va="center", fontsize=15,
+                            color="white" if abs(v) > 0.6 else "black")
+                    ax.set_xticks([])
+                    ax.set_yticks([])
                     continue
                 if j == i:  # diagonal: per-axis marginal of the inner-body sample
                     ax.hist(samples_phys[:, i], bins=25, color="#6b1f5c", alpha=0.8)
                     ax.set_yticks([])
                     ax.tick_params(labelsize=9)
-                else:
+                else:  # lower triangle: hexbin density + exact hull outline
                     ax.hexbin(samples_phys[:, j], samples_phys[:, i], gridsize=22, cmap="magma_r",
                               mincnt=1, linewidths=0.1)
                     proj = poly.X[:, [j, i]]
@@ -761,65 +788,28 @@ def fig2_polytope_samples(polys: dict[str, Polytope], points: dict[str, list[tup
                 else:
                     ax.set_yticklabels([])
                 ax.tick_params(labelsize=9)
+        if corr_im is not None:
+            # Dedicated axis in the right margin reserved above -- not
+            # borrowed from the grid -- so every grid cell stays square.
+            cax = subfig.add_axes((1 - colorbar_margin_in / panel_width_in + 0.015, 0.15, 0.02, 0.55))
+            subfig.colorbar(corr_im, cax=cax, label="Pearson r")
         if show_legend:
             handles, labels = axes[1, 0].get_legend_handles_labels()
             if handles:
-                subfig.legend(handles, labels, loc="upper right", fontsize=11, frameon=False)
+                subfig.legend(handles, labels, loc="upper center", bbox_to_anchor=(0.5, 0.945),
+                              ncol=len(handles), fontsize=10, frameon=False)
         subfig.suptitle(
             f"{MODE_LABEL[mode]} (n={len(samples_norm)}, acceptance {rate:.1%})",
-            fontsize=14, fontweight="bold",
+            fontsize=14, fontweight="bold", y=0.975,
         )
     fig.suptitle(
-        "MGA Near-Optimal Interior: Uniform Samples of Each Mode's Own Inner Approximation\n"
-        "darker hexes = more of that mode's near-optimal volume",
-        fontsize=17, fontweight="bold", y=0.99,
+        "MGA Near-Optimal Interior: Samples (lower) & Axis Correlations (upper)",
+        fontsize=17, fontweight="bold", y=0.995,
     )
     savefig(fig, "fig2_polytope_samples")
 
 
-# ── fig3: pairwise Pearson correlation of the axes over each mode's OWN
-# inner samples. Steen2026_Thesis Figure 7 analog: how the near-optimal
-# *volume* trades axes off against each other (substitution, negative) or
-# moves them together (co-requirement, positive) -- a property of the shape
-# of the space, not of any one design, so it needs the uniform interior
-# sample from fig2, not just the handful of certified vertices. One heatmap
-# per mode, side by side, for the same bbo-vs-sampling comparison as fig2.
-
-def fig3_axis_correlations(polys: dict[str, Polytope], samples: dict[str, tuple[np.ndarray, float]]) -> None:
-    modes_to_plot = _hull_modes_to_plot(polys, samples)
-    if not modes_to_plot:
-        print("  skipping fig3_axis_correlations: no mode has >=20 inner samples")
-        return
-
-    fig, axes = plt.subplots(1, len(modes_to_plot), figsize=(6.5 * len(modes_to_plot) + 1.0, 6.0), squeeze=False)
-    axes = axes[0]
-    im = None
-    for ax, mode in zip(axes, modes_to_plot):
-        poly = polys[mode]
-        samples_norm, rate = samples[mode]
-        df = pd.DataFrame(poly.to_phys(samples_norm), columns=poly.names)
-        corr = df.corr(method="pearson")
-        im = ax.imshow(corr.to_numpy(), cmap="RdBu_r", vmin=-1, vmax=1)
-        ax.set_xticks(range(len(poly.names)))
-        ax.set_yticks(range(len(poly.names)))
-        ax.set_xticklabels(poly.names, rotation=45, ha="right", fontsize=8)
-        ax.set_yticklabels(poly.names, fontsize=8)
-        for i in range(len(poly.names)):
-            for j in range(len(poly.names)):
-                v = corr.to_numpy()[i, j]
-                ax.text(j, i, f"{v:.2f}", ha="center", va="center", fontsize=7,
-                        color="white" if abs(v) > 0.6 else "black")
-        ax.set_title(f"{MODE_LABEL[mode]} (n={len(samples_norm)})", fontsize=10, fontweight="bold")
-    fig.colorbar(im, ax=axes.tolist(), label="Pearson r", shrink=0.85)
-    fig.suptitle(
-        "MGA Pairwise Axis Correlations over Each Mode's Own Near-Optimal Interior\n"
-        "negative = substitution, positive = co-requirement",
-        fontsize=12, fontweight="bold",
-    )
-    savefig(fig, "fig3_axis_correlations")
-
-
-# ── fig4: model-query and time comparison, matching near_optimal_tools' ────
+# ── fig3: model-query and time comparison, matching near_optimal_tools' ────
 # docs/examples/method_comparison.ipynb (2 metrics x 2 x-axes). max_separation
 # is the oracle-style max-min L-inf distance -- needs a MILP per evaluation
 # (query_time_scores), so it's only evaluated at sparse checkpoints, as the
@@ -851,7 +841,7 @@ def _cum_seconds_wallclock(points: list[tuple[str, np.ndarray, float]],
                            batch_size: int | None) -> np.ndarray:
     """Cumulative elapsed wall-clock time after each of `points` (same order
     as the mode's own X/A/b) -- the array query_time_scores/
-    load_native_ci_history index into for fig4b's x-axis.
+    load_native_ci_history index into for fig3b's x-axis.
 
     For a sequential mode (batch_size=None -- SUPF_MODES, oracle), every
     point really was solved one after another, so summing each point's own
@@ -921,12 +911,12 @@ def _cum_seconds_wallclock(points: list[tuple[str, np.ndarray, float]],
 # seconds, and add an entry below with the job ID/dates as a citation. A
 # mode missing from this dict is left uncalibrated (a printed warning
 # flags it) rather than silently wrong -- but it WILL keep understating its
-# own real elapsed time on fig4b until an entry is added.
+# own real elapsed time on fig3b until an entry is added.
 # Empty as of the CAPEX-axes switchover (2026-08-20, see SUPF_MODES): the
 # old cost-axes runs' verified entries (sampling_relative/bbo_relative/
 # batch_bbo_relative/batch_sampling_relative) were removed from disk along
 # with the runs themselves, so no verified total exists yet for bbo_units/
-# sampling_units -- fig4b's "seconds" axis will print the uncalibrated
+# sampling_units -- fig3b's "seconds" axis will print the uncalibrated
 # warning below until an entry is added for each via the sacct recipe above.
 REAL_ELAPSED_SECONDS: dict[str, int] = {}
 
@@ -940,7 +930,7 @@ def _calibrate_cum_seconds(mode: str, cum_seconds: np.ndarray) -> np.ndarray:
     scale against)."""
     if mode not in REAL_ELAPSED_SECONDS or len(cum_seconds) == 0 or cum_seconds[-1] <= 0:
         print(f"  {mode}: WARNING -- no verified real elapsed time in REAL_ELAPSED_SECONDS; "
-              f"fig4b's 'seconds' axis for this mode is uncalibrated and will understate its "
+              f"fig3b's 'seconds' axis for this mode is uncalibrated and will understate its "
               f"real wall-clock time (see _calibrate_cum_seconds's docstring for how to add one).")
         return cum_seconds
     return cum_seconds * (REAL_ELAPSED_SECONDS[mode] / cum_seconds[-1])
@@ -956,7 +946,7 @@ def _gurobi_maxsep_solver(time_limit: float = 15.0):
 def query_time_scores(poly: Polytope, X_norm: np.ndarray, cum_seconds: np.ndarray,
                        eval_every: int, outer_at) -> pd.DataFrame:
     """[n_queries, seconds, max_separation] at sparse checkpoints -- the one
-    fig4 metric that genuinely needs solving here (no run logs an exact
+    fig3 metric that genuinely needs solving here (no run logs an exact
     max-min MILP distance for itself except oracle, see
     load_oracle_native_gap; ci_lower does not belong here any more, see
     load_native_ci_history). outer_at(k) -> (A_k, b_k), the outer
@@ -985,7 +975,7 @@ def query_time_scores(poly: Polytope, X_norm: np.ndarray, cum_seconds: np.ndarra
     return pd.DataFrame(rows)
 
 
-def fig4_cache_path(mode: str) -> Path:
+def fig3_cache_path(mode: str) -> Path:
     """One cache file per supf-mode run, mirroring sampling_cache_path
     (rejection_sample_inner's own cache): query_time_scores is a
     deterministic function of that mode's own polytope + eval_every, and its
@@ -995,12 +985,12 @@ def fig4_cache_path(mode: str) -> Path:
     mid-way twice in a row, likely the host machine sleeping, not a script
     bug). Caching per mode means a re-run after an interruption only redoes
     whichever mode was still in flight, not every mode from zero."""
-    return MGA_ROOT / "mga_inner_sampling" / f"fig4_native_scores_{mode}.npz"
+    return MGA_ROOT / "mga_inner_sampling" / f"fig3_native_scores_{mode}.npz"
 
 
 def cached_query_time_scores(mode: str, poly: Polytope, X_norm: np.ndarray, cum_seconds: np.ndarray,
                              eval_every: int, outer_at) -> pd.DataFrame:
-    """query_time_scores, cached to fig4_cache_path(mode); regenerates
+    """query_time_scores, cached to fig3_cache_path(mode); regenerates
     automatically if the polytope or eval_every have changed since the cache
     was written (same staleness check as cached_rejection_sample_inner).
     "seconds" is deliberately NOT part of what's cached/staleness-checked:
@@ -1013,24 +1003,24 @@ def cached_query_time_scores(mode: str, poly: Polytope, X_norm: np.ndarray, cum_
     accounting logic changed twice in one session (the batch-aware
     parallelism fix, then real-elapsed-time calibration), and a cached
     "seconds" column would have silently kept serving pre-fix values on
-    every subsequent cache hit, since fig4_cache_path's fingerprint is
+    every subsequent cache hit, since fig3_cache_path's fingerprint is
     purely a function of poly.X/A/b, not of how cum_seconds itself is
     computed. Older cache files may still carry now-unused seconds/
     ci_lower/ci_upper columns (from before this and an earlier refactor)
     -- harmless, just ignored on read."""
-    cache = fig4_cache_path(mode)
+    cache = fig3_cache_path(mode)
     fingerprint = _poly_fingerprint(poly)
     if cache.exists():
         cached = np.load(cache)
         if str(cached["fingerprint"]) == fingerprint and int(cached["eval_every"]) == eval_every:
-            print(f"  {mode}: using cached fig4 scores from {cache.relative_to(REPO_ROOT)} "
+            print(f"  {mode}: using cached fig3 scores from {cache.relative_to(REPO_ROOT)} "
                   f"({len(cached['n_queries'])} checkpoints)")
             n_queries = cached["n_queries"]
             return pd.DataFrame({
                 "n_queries": n_queries, "seconds": cum_seconds[n_queries - 1],
                 "max_separation": cached["max_separation"],
             })
-        print(f"  {mode}: cached fig4 scores are stale (polytope/eval_every changed); regenerating")
+        print(f"  {mode}: cached fig3 scores are stale (polytope/eval_every changed); regenerating")
 
     df = query_time_scores(poly, X_norm, cum_seconds, eval_every, outer_at=outer_at)
     cache.parent.mkdir(parents=True, exist_ok=True)
@@ -1039,7 +1029,7 @@ def cached_query_time_scores(mode: str, poly: Polytope, X_norm: np.ndarray, cum_
         n_queries=df["n_queries"].to_numpy(),
         max_separation=df["max_separation"].to_numpy(),
     )
-    print(f"  {mode}: cached fig4 scores to {cache.relative_to(REPO_ROOT)} ({len(df)} checkpoints)")
+    print(f"  {mode}: cached fig3 scores to {cache.relative_to(REPO_ROOT)} ({len(df)} checkpoints)")
     return df
 
 
@@ -1260,7 +1250,7 @@ def load_oracle_native_gap(run_dir: Path, run_poly: Polytope,
     return pd.DataFrame(rows) if rows else None
 
 
-def _compute_fig4_scores(points: dict[str, list[tuple[str, np.ndarray, float]]],
+def _compute_fig3_scores(points: dict[str, list[tuple[str, np.ndarray, float]]],
                          polys: dict[str, Polytope]):
     """Two native (own evolving approximation) scores for every plotted
     CAPEX-axes supf-mode run (bbo_units, sampling_units -- see
@@ -1271,11 +1261,11 @@ def _compute_fig4_scores(points: dict[str, list[tuple[str, np.ndarray, float]]],
     solving at all (see load_native_ci_history) -- plus oracle's own
     certified max_separation-only gap (see load_oracle_native_gap). weights
     has no representation here at all -- see the module docstring's
-    "Convergence metric" section. Shared by both fig4a (vs queries) and
-    fig4b (vs time) so the MILP solves only run once."""
+    "Convergence metric" section. Shared by both fig3a (vs queries) and
+    fig3b (vs time) so the MILP solves only run once."""
     # 100 rather than the original 10: with 13 axes (vs. the original 6, then
     # 9) each checkpoint's max_separation MILP is markedly slower, and repeated
-    # background-run interruptions (see fig4_cache_path's docstring) meant
+    # background-run interruptions (see fig3_cache_path's docstring) meant
     # even eval_every=25 didn't reliably finish -- this trades a much
     # coarser convergence curve for a run that actually completes. Only
     # applies to max_separation -- ci_lower is read at full per-iteration
@@ -1286,10 +1276,10 @@ def _compute_fig4_scores(points: dict[str, list[tuple[str, np.ndarray, float]]],
     # hundred a sequential supf mode accumulates over the same wall-clock
     # budget), so 100 would mean ~29 checkpoints x up to 30s/MILP. This
     # project hit that directly, twice: a background run of this script was
-    # killed mid-fig4 both times (once at checkpoint ~19/29 with
+    # killed mid-fig3 both times (once at checkpoint ~19/29 with
     # eval_every=300 and TimeLimit=30, once earlier than that with
     # eval_every=100) -- this environment appears to cap a single
-    # long-running process well under the ~15min a full batch16 fig4 pass
+    # long-running process well under the ~15min a full batch16 fig3 pass
     # would otherwise take, independent of whether it's run in the
     # foreground or backgrounded. 700 cuts batch16's checkpoint count to ~5;
     # combined with _gurobi_maxsep_solver's TimeLimit (also cut, 30s -> 15s),
@@ -1326,7 +1316,7 @@ def _compute_fig4_scores(points: dict[str, list[tuple[str, np.ndarray, float]]],
         phys = [p for _, p, _ in points[mode]]
         X_norm = run_poly.to_norm(np.vstack(phys))
         cum_seconds = _calibrate_cum_seconds(mode, _cum_seconds_wallclock(points[mode], batch_size))
-        print(f"  fig4: scoring {mode} max_separation ({len(X_norm)} points, "
+        print(f"  fig3: scoring {mode} max_separation ({len(X_norm)} points, "
               f"every {eval_every.get(mode, 5)}th checkpoint, own evolving approximation)...")
         native_sep[mode] = cached_query_time_scores(mode, run_poly, X_norm, cum_seconds, eval_every.get(mode, 5),
                                                      outer_at=outer_at)
@@ -1412,11 +1402,6 @@ def _comparison_figure(x_column: str, x_label: str, name: str, title: str,
     ax_ci.set_title("directions with gap $\\leq$ 0.1, 95% CI lower bound")
     ax_ci.set_ylabel("fraction of well-explored directions")
     ax_ci.set_ylim(-0.03, 1.03)
-    weights_note = "weights not shown here: it never builds an approximation at all."
-    ax_ci.text(
-        0.02, 0.03, weights_note,
-        transform=ax_ci.transAxes, fontsize=6.8, color="#555555", va="bottom",
-    )
 
     for ax in (ax_sep, ax_ci):
         ax.set_xlabel(x_label)
@@ -1428,23 +1413,21 @@ def _comparison_figure(x_column: str, x_label: str, name: str, title: str,
     savefig(fig, name)
 
 
-def fig4_query_time_comparison(points: dict[str, list[tuple[str, np.ndarray, float]]],
+def fig3_query_time_comparison(points: dict[str, list[tuple[str, np.ndarray, float]]],
                                polys: dict[str, Polytope]) -> None:
-    native_sep, native_ci, tolerance_prob, oracle_native_gap, oracle_tol = _compute_fig4_scores(points, polys)
+    native_sep, native_ci, tolerance_prob, oracle_native_gap, oracle_tol = _compute_fig3_scores(points, polys)
     if not native_sep and oracle_native_gap is None:
-        print("  skipping fig4_query_time_comparison: no scored modes")
+        print("  skipping fig3_query_time_comparison: no scored modes")
         return
     _comparison_figure(
-        "n_queries", "number of model queries", "fig4a_query_comparison",
-        "MGA Method Comparison vs. Model Queries\n"
-        "(cf. near_optimal_tools docs/examples/method_comparison.ipynb, method_comparison.png)",
+        "n_queries", "number of model queries", "fig3a_query_comparison",
+        "MGA Method Comparison vs. Model Queries",
         native_sep, native_ci, tolerance_prob, log_x=False,
         oracle_native_gap=oracle_native_gap, oracle_tol=oracle_tol,
     )
     _comparison_figure(
-        "seconds", "cumulative ZEN-garden solving time [s]", "fig4b_time_comparison",
-        "MGA Method Comparison vs. Cumulative Solving Time\n"
-        "(cf. near_optimal_tools docs/examples/method_comparison.ipynb, method_comparison_time.png)",
+        "seconds", "cumulative ZEN-garden solving time [s]", "fig3b_time_comparison",
+        "MGA Method Comparison vs. Cumulative Solving Time",
         native_sep, native_ci, tolerance_prob, log_x=True,
         oracle_native_gap=oracle_native_gap, oracle_tol=oracle_tol,
     )
@@ -1480,7 +1463,7 @@ def main() -> None:
     if not any(m in polys for m in ALL_SUPF_MODES):
         raise SystemExit(
             "No SUPF_MODES/BATCH_MODES run has a "
-            "usable polytope -- nothing to build the shared coordinate frame or fig2/fig3 from."
+            "usable polytope -- nothing to build the shared coordinate frame or fig2 from."
         )
 
     # Shared coordinate frame (axis names/units/z*/scale/offset, used by
@@ -1536,7 +1519,7 @@ def main() -> None:
 
     fig1_pairwise_points(poly, points)
 
-    print("Sampling each mode's own inner approximation for fig2/fig3 (cf. Steen2026_Thesis "
+    print("Sampling each mode's own inner approximation for fig2 (cf. Steen2026_Thesis "
           "Eq. 13 for what each acceptance rate means; this runs locally -- SciPy/LP only, "
           "no HPC resources needed)...")
     samples: dict[str, tuple[np.ndarray, float]] = {}
@@ -1546,11 +1529,10 @@ def main() -> None:
         try:
             samples[mode] = cached_rejection_sample_inner(polys[mode], mode, n_propose=30_000)
         except Exception as exc:
-            print(f"  {mode}: rejection sampling failed ({exc!r}); skipping its fig2/fig3 panel")
+            print(f"  {mode}: rejection sampling failed ({exc!r}); skipping its fig2 panel")
 
     fig2_polytope_samples(polys, points, samples)
-    fig3_axis_correlations(polys, samples)
-    fig4_query_time_comparison(points, polys)
+    fig3_query_time_comparison(points, polys)
 
     print(f"Done. Figures in {FIGURES_DIR.relative_to(REPO_ROOT)}/")
 
