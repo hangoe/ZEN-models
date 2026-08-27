@@ -1050,7 +1050,7 @@ HEAT_DEMAND_BAND_LABELS = {"0_100": r"0-100$^\circ$C", "100_150": r"100-150$^\ci
 # the single "how much fuel, for scale" grey.
 _ETH_GREY = "#6F6F6F"
 FUEL_CARRIER_HATCHES = {"natural_gas": ".", "hard_coal": "x", "oil": "+", "biomass": "/",
-                        "waste": "\\", "hydrogen": "o"}
+                        "waste": "\\", "hydrogen": "o", "fuel_to_process": ""}
 # Denser than FUEL_CARRIER_HATCHES: a legend swatch is a small fraction of a
 # bar segment's area, so the same single-character hatch that reads fine on a
 # bar all but disappears at swatch size — legend patches get their own,
@@ -1058,9 +1058,59 @@ FUEL_CARRIER_HATCHES = {"natural_gas": ".", "hard_coal": "x", "oil": "+", "bioma
 # where the legend is built) purely so the pattern itself stays visible;
 # bars keep the lighter version so labels drawn on top stay readable.
 FUEL_CARRIER_LEGEND_HATCHES = {"natural_gas": "...", "hard_coal": "xxx", "oil": "+++", "biomass": "///",
-                               "waste": "\\\\\\", "hydrogen": "ooo"}
+                               "waste": "\\\\\\", "hydrogen": "ooo", "fuel_to_process": ""}
 FUEL_CARRIER_LABELS = {"natural_gas": "Natural gas", "hard_coal": "Hard coal", "oil": "Oil", "biomass": "Biomass",
-                       "waste": "Waste", "hydrogen": "Hydrogen"}
+                       "waste": "Waste", "hydrogen": "Hydrogen", "fuel_to_process": "Fuel to process"}
+
+
+def _fuel_legend_label(carrier: str) -> str:
+    """"Fuel: {label}" for every real carrier, but "fuel_to_process" already
+    reads as a complete legend entry on its own -- prefixing it too would
+    read as "Fuel: Fuel to process"."""
+    label = FUEL_CARRIER_LABELS[carrier]
+    return label if carrier == "fuel_to_process" else f"Fuel: {label}"
+# fuel_to_kiln (glass/ceramic, ZEN-creator commit 1687533) and fuel_for_cement
+# (cement_kiln's own input_carrier) are both intermediate, blended-fuel hub
+# carriers with no real-world identity of their own -- produced from actual
+# raw fuels by dedicated X_to_kilnfuel/X_to_cement_fuel conversion techs, each
+# with its OWN conversion factor. Splitting THOSE raw fuels back out (as an
+# earlier version of this figure did for cement) either double-counts the
+# blending tech's own efficiency loss, or -- for fig4b's steel bar, where
+# NG_DRI/H2_DRI's natural_gas/hydrogen inputs are real and already correct --
+# just recreates the early-buildout NG-vs-H2 diffusion-limit-artifact
+# confusion documented in this figure's old CAVEAT. User feedback: stop
+# splitting all three by carrier; consolidate into one flat, unhatched grey
+# "Fuel to process" segment instead -- _consolidate_blended_fuel does this for
+# fuel_to_kiln/fuel_for_cement, _merge_dri_fuel for NG_DRI/H2_DRI.
+_BLENDED_FUEL_CARRIERS = ("fuel_to_kiln", "fuel_for_cement", "fuel_to_process")
+
+
+def _consolidate_blended_fuel(fuel_by_carrier: dict) -> dict:
+    """Merges every _BLENDED_FUEL_CARRIERS key present in `fuel_by_carrier`
+    into one shared "fuel_to_process" entry, so the generic per-carrier
+    rendering loop draws (and labels) all of them identically regardless of
+    which blended-fuel hub they came from. No-op if none are present."""
+    present = [c for c in _BLENDED_FUEL_CARRIERS if c in fuel_by_carrier]
+    if not present:
+        return fuel_by_carrier
+    out = {k: v for k, v in fuel_by_carrier.items() if k not in _BLENDED_FUEL_CARRIERS}
+    out["fuel_to_process"] = sum(fuel_by_carrier[c] for c in present)
+    return out
+
+
+def _merge_dri_fuel(fuel_by_carrier: pd.Series) -> pd.Series:
+    """Merges NG_DRI/H2_DRI's natural_gas/hydrogen entries into one
+    "fuel_to_process" entry -- unlike fuel_to_kiln/fuel_for_cement these are
+    real, correctly-computed primary-carrier flows (no blending tech
+    involved), so this is a pure presentation choice, not a conversion-factor
+    fix. BF_BOF's hard_coal is untouched (a real, unambiguous carrier -- see
+    _BLENDED_FUEL_CARRIERS' docstring)."""
+    dri_carriers = [c for c in ("natural_gas", "hydrogen") if c in fuel_by_carrier.index]
+    if not dri_carriers:
+        return fuel_by_carrier
+    out = fuel_by_carrier.drop(index=dri_carriers)
+    out["fuel_to_process"] = fuel_by_carrier[dri_carriers].sum()
+    return out
 # Single-character hatches (sparser than the "xx"/".." used elsewhere in this
 # module) plus a white label backing (below) — a dense hatch under white text
 # was illegible; a light hatch + opaque label background reads cleanly at both
@@ -1090,10 +1140,15 @@ def fig4a_heat_demand_by_sector() -> None:
     sector's full process-energy intensity, not in isolation. Ceramic's fuel
     mix includes "oil" (JRC-IDEES "Other liquids", 15.2% of its 2023 thermal
     FEC) since ZEN-creator commit 1f3f708 added the MODEL_CARRIER_MAP entry —
-    previously that share was dropped entirely rather than shown. A final
-    green segment adds each sector's electricity demand (not temperature-
-    banded, not part of the fuel mix — a separate, fixed input every
-    X_production tech has alongside both).
+    previously that share was dropped entirely rather than shown. Glass/
+    ceramic's fuel mix also includes "Fuel to process" (ZEN-creator commit
+    1687533's fuel_to_kiln carrier, consolidated here via
+    _consolidate_blended_fuel — see _BLENDED_FUEL_CARRIERS' docstring for
+    why this is shown as one flat grey segment rather than split by the
+    fuel_to_kiln-switching techs' own raw carriers). A final green segment
+    adds each sector's electricity demand (not temperature-banded, not part
+    of the fuel mix — a separate, fixed input every X_production tech has
+    alongside both).
 
     All three pieces are demand_volume[sector].sum() (tonproduct/hour) times a
     GW/(tonproduct/hour) conversion factor, from ProcessParametrizationDataset
@@ -1120,6 +1175,8 @@ def fig4a_heat_demand_by_sector() -> None:
     import json
     data = json.loads(HEAT_DEMAND_INPUT_JSON.read_text())
     sectors = list(HEAT_DEMAND_SECTOR_LABELS)
+    for s in sectors:
+        data[s]["fuel_by_carrier"] = _consolidate_blended_fuel(data[s]["fuel_by_carrier"])
     bands = list(HEAT_DEMAND_BAND_TINTS)
     fuel_carriers = [c for c in FUEL_CARRIER_HATCHES if any(c in data[s]["fuel_by_carrier"] for s in sectors)]
 
@@ -1178,7 +1235,7 @@ def fig4a_heat_demand_by_sector() -> None:
                            edgecolor="white", label=f"Heat carrier: {HEAT_DEMAND_BAND_LABELS[b]}") for b in bands]
     fuel_handles = [Patch(facecolor=_ETH_GREY, edgecolor="white", linewidth=0.4,
                            hatch=FUEL_CARRIER_LEGEND_HATCHES[c],
-                           label=f"Fuel: {FUEL_CARRIER_LABELS[c]}") for c in fuel_carriers]
+                           label=_fuel_legend_label(c)) for c in fuel_carriers]
     electricity_handle = [Patch(facecolor=_ELECTRICITY_COLOR, edgecolor="white", label=_ELECTRICITY_LABEL)]
     with plt.rc_context({"hatch.linewidth": 1.3}):
         ax.legend(handles=band_handles + fuel_handles + electricity_handle, fontsize=8.5, frameon=True,
@@ -1203,34 +1260,45 @@ def fig4a_heat_demand_by_sector() -> None:
 # SVGs' own visible structure/values/labels plus direct verification against
 # a solved v8_0 run, rather than left as an unreproducible artifact.
 
-# Cement group is special-cased (techs=None below, handled by
-# _cement_fuel_by_carrier) rather than using _tech_fuel_by_carrier directly
-# on ["cement_kiln"]: cement_kiln's own input_carrier is only
-# ["fuel_for_cement", "electricity"] — "fuel_for_cement" is an intermediate,
-# blended carrier with no real-world identity, produced from the ACTUAL raw
-# fuels by 4 dedicated conversion techs (coal_to_cement_fuel,
-# waste_to_cement_fuel, hydrogen_to_cement_fuel, biomass_to_cement_fuel —
-# confirmed via each tech's attributes.json input_carrier/output_carrier).
-# Reading cement_kiln's own input therefore only ever produced one grey
-# "Fuel for cement (mixed)" segment (previously hatched as a distinct 6th
-# "carrier"), rather than a real per-fuel breakdown — user feedback: "adapt
-# the fuel for cement and use the X to cement carriers ... H2 and NG cannot
-# be differentiated". Reading the 4 X_to_cement_fuel techs' inputs instead
-# (their own input_carrier IS the real fuel: hard_coal/waste/hydrogen/
-# biomass respectively) gives the true per-fuel split directly. Note there is
-# NO natural_gas_to_cement_fuel tech in this dataset at all (confirmed: no
-# such directory under set_conversion_technologies, and no other tech feeds
-# "fuel_for_cement" from natural_gas) — cement genuinely does not burn
-# natural gas here, which is why "H2 and NG cannot be differentiated" simply
-# doesn't arise once the real carriers are plotted: there is no NG segment
-# for cement to confuse with H2's.
-CEMENT_FUEL_CONVERSION_TECHS = [
-    "coal_to_cement_fuel", "waste_to_cement_fuel", "hydrogen_to_cement_fuel", "biomass_to_cement_fuel",
-]
+# Cement/primary-steel each get a post-processing step applied to
+# _tech_fuel_by_carrier's raw per-carrier Series, both towards the same goal
+# as _consolidate_blended_fuel above -- one flat "Fuel to process" segment
+# instead of a per-carrier split -- but for two DIFFERENT underlying reasons:
+#
+# Cement: cement_kiln's own input_carrier is ["fuel_for_cement",
+# "electricity"] -- "fuel_for_cement" is an intermediate, blended carrier
+# with no real-world identity, produced from the ACTUAL raw fuels by 4
+# dedicated conversion techs (coal/waste/hydrogen/biomass_to_cement_fuel),
+# each with its OWN conversion factor. An earlier version of this figure
+# read those 4 techs' own raw-carrier inputs instead of cement_kiln's
+# "fuel_for_cement" directly, to show a real per-fuel split -- but summing
+# raw inputs across techs with different efficiencies doesn't cleanly equal
+# "how much fuel_for_cement cement_kiln actually consumed", i.e. exactly the
+# conversion-factor mismatch _BLENDED_FUEL_CARRIERS' docstring describes.
+# Reading cement_kiln's own input directly (via plain _tech_fuel_by_carrier,
+# then _consolidate_series to rename "fuel_for_cement" -> "fuel_to_process")
+# sidesteps that mismatch entirely.
+#
+# Primary steel: BF_BOF (hard_coal) and NG_DRI/H2_DRI (natural_gas/hydrogen)
+# are three real, alternative primary-steel production pathways grouped into
+# one bar (matching how the original figure grouped "BF-BOF/DRI") -- their
+# carrier flows are each already correct on their own (no blending tech, no
+# conversion-factor issue). But NG_DRI vs H2_DRI's split is a diffusion-limit
+# artifact of early tech buildout, not a genuine fuel preference (both hit
+# the same shared technology-diffusion ceiling from ~zero real-world
+# capacity -- see fig6_diffusion_mechanisms), so showing hydrogen/natural_gas
+# as separate segments invited exactly that ("is that much steel from H2
+# really right?") misreading. _merge_dri_fuel merges the two into
+# "fuel_to_process" too, purely for clarity -- BF_BOF's hard_coal is left
+# untouched (a real, unambiguous segment).
+def _consolidate_series(s: pd.Series) -> pd.Series:
+    return pd.Series(_consolidate_blended_fuel(s.to_dict()))
+
+
 FIG4B_SECTOR_GROUPS = [
-    ("Cement\n(clinker)", None),  # special-cased, see _cement_fuel_by_carrier
-    ("Primary steel\n(BF-BOF/DRI)", ["BF_BOF", "NG_DRI", "H2_DRI"]),
-    ("Secondary steel\n(EAF)", ["EAF"]),
+    ("Cement\n(clinker)", ["cement_kiln"], _consolidate_series),
+    ("Primary steel\n(BF-BOF/DRI)", ["BF_BOF", "NG_DRI", "H2_DRI"], _merge_dri_fuel),
+    ("Secondary steel\n(EAF)", ["EAF"], None),
 ]
 
 
@@ -1256,19 +1324,6 @@ def _tech_fuel_by_carrier(r, techs: list[str], year: int) -> pd.Series:
     return pd.Series(out)
 
 
-def _cement_fuel_by_carrier(r, year: int) -> pd.Series:
-    """Cement's true fuel mix by RAW carrier (hard_coal/waste/hydrogen/
-    biomass, from the 4 X_to_cement_fuel techs) plus cement_kiln's own direct
-    electricity input — see CEMENT_FUEL_CONVERSION_TECHS comment above for why
-    this replaces a naive _tech_fuel_by_carrier(r, ["cement_kiln"], year)
-    (which would only yield the blended "fuel_for_cement" + "electricity")."""
-    fuel = _tech_fuel_by_carrier(r, CEMENT_FUEL_CONVERSION_TECHS, year)
-    electricity = _tech_fuel_by_carrier(r, ["cement_kiln"], year).get("electricity", 0.0)
-    if electricity:
-        fuel = pd.concat([fuel, pd.Series({"electricity": electricity})])
-    return fuel
-
-
 def fig4b_industry_fuel_demand_comparison(runs: list[Run]) -> None:
     """Puts the new sectors' low-temperature heat-demand assumption (fig4a,
     left of the divider — same JSON, same bars) next to the pre-existing
@@ -1277,48 +1332,32 @@ def fig4b_industry_fuel_demand_comparison(runs: list[Run]) -> None:
     in the model before the industry-heat extension.
 
     Cement/steel bars are pulled from a single representative run ("Full
-    flexibility") at the earliest year common across scenarios (year0, same
-    convention as fig0b_emissions_source_comparison) — per project memory,
-    cement_kiln/BF_BOF/EAF/NG_DRI/H2_DRI's flows are scenario-invariant
-    (unaffected by the industry-heat flexibility scenarios), so the choice of
-    run doesn't materially matter here, only which techs/carriers do.
-    Primary steel groups BF_BOF (blast-furnace route, hard_coal only) with
-    NG_DRI/H2_DRI (direct-reduction routes) into one bar, matching how the
-    original figure grouped "BF-BOF/DRI" — all three are alternative primary-
-    steel production pathways, not separate demand sectors. Cement's bar uses
-    _cement_fuel_by_carrier (see its docstring) instead of _tech_fuel_by_carrier
-    directly, to show its real hard_coal/waste/hydrogen/biomass fuel split
-    rather than the blended "fuel_for_cement" intermediate carrier.
+    flexibility") — per project memory, cement_kiln/BF_BOF/EAF/NG_DRI/H2_DRI's
+    flows are scenario-invariant (unaffected by the industry-heat flexibility
+    scenarios), so the choice of run doesn't materially matter here, only
+    which techs/carriers do. Primary steel groups BF_BOF (blast-furnace
+    route, hard_coal only) with NG_DRI/H2_DRI (direct-reduction routes) into
+    one bar, matching how the original figure grouped "BF-BOF/DRI" — all
+    three are alternative primary-steel production pathways, not separate
+    demand sectors.
 
-    Cement/steel are shown at COMPARISON_YEARS (2030/2040/2048, the last one
-    standing in for "2050" — see COMPARISON_YEARS' own comment) side by side
-    per sector, matching fig0b panel A / fig1b's convention, so the shift in
-    fuel mix/scale over the horizon is visible directly, not just a single
-    cross-section.
-
-    CAVEAT on Primary steel's large 2030 "hydrogen" segment (~12 GW, user
-    question: "is that much steel from H2 really right?"): the number itself
-    is correct, but it is a diffusion-limit artifact, not evidence of a
-    genuine hydrogen-DRI preference. Checked directly: H2_DRI and NG_DRI have
-    IDENTICAL capacity and output trajectories through 2028-2030 (e.g. both
-    output exactly 33,652.66 t/h of primary_steel at 2028, both at 46,098.15
-    at 2030) — both start from ~zero real-world existing capacity and hit the
-    SAME shared technology-diffusion ceiling (see fig6_diffusion_mechanisms),
-    so early buildout is deployment-rate-bound and near-identical regardless
-    of which fuel is actually cheaper. By 2040 the two diverge sharply:
-    NG_DRI's output keeps climbing (88,795 t/h) while H2_DRI's collapses to
-    ~0 despite still having ~5 GW of BUILT capacity sitting there — i.e. once
-    the diffusion ceiling stops binding and true economics take over, the
-    model stops running the hydrogen route almost entirely. Read the 2030
-    hydrogen segment as "how much H2-DRI capacity the diffusion floor forced
-    into existence," not "how much hydrogen steelmaking is economically
-    preferred" — the 2040/2048 columns (hydrogen ~0 GW) are the more
-    economically meaningful reading of this technology's real role here.
+    Cement/steel are each shown as ONE bar, at the LATEST year COMPARISON_YEARS
+    (2030/2040/2048, see that constant's own comment) has solved results for —
+    not one bar per year: cement_kiln/BF_BOF/EAF/NG_DRI/H2_DRI's flows do
+    change somewhat year to year, but showing all three years turned this
+    into 9 densely-hatched, per-carrier-split mini-bars — user feedback: too
+    much visual complexity for what these bars are here to do (show
+    new-sector scale against existing-sector scale), not to trace cement/
+    steel's own trajectory (fig1b/fig6 already do that). One representative
+    snapshot, fuel simplified to a single flat segment (see
+    FIG4B_SECTOR_GROUPS' own comment on _consolidate_series/_merge_dri_fuel),
+    keeps the comparison legible.
     """
     run = by_label(runs, "Full flexibility")
     r = run.results
     years_available = get_available_years(r)
     solved_years = [y for y in COMPARISON_YEARS if y in years_available]
+    solved_year = solved_years[-1]
 
     if not HEAT_DEMAND_INPUT_JSON.exists():
         print(f"  skipping fig4b_industry_fuel_demand_comparison: {HEAT_DEMAND_INPUT_JSON.relative_to(REPO_ROOT)} "
@@ -1327,24 +1366,23 @@ def fig4b_industry_fuel_demand_comparison(runs: list[Run]) -> None:
     import json
     data = json.loads(HEAT_DEMAND_INPUT_JSON.read_text())
     new_sectors = list(HEAT_DEMAND_SECTOR_LABELS)
+    for s in new_sectors:
+        data[s]["fuel_by_carrier"] = _consolidate_blended_fuel(data[s]["fuel_by_carrier"])
     bands = list(HEAT_DEMAND_BAND_TINTS)
 
-    solved = {(label, yr): (_cement_fuel_by_carrier(r, yr) if techs is None else _tech_fuel_by_carrier(r, techs, yr))
-              for label, techs in FIG4B_SECTOR_GROUPS for yr in solved_years}
+    solved = {}
+    for label, techs, post in FIG4B_SECTOR_GROUPS:
+        s = _tech_fuel_by_carrier(r, techs, solved_year)
+        solved[label] = post(s) if post is not None else s
     solved_fuel_carriers = [c for c in FUEL_CARRIER_HATCHES
                              if any(c in s.index for s in solved.values()) and c != "electricity"]
 
     new_x = np.arange(len(new_sectors))
-    # len(solved_years) adjacent bars per sector group, group centers spaced
-    # 1 apart same as before; +1 after new_x still leaves the divider gap.
-    solved_group_centers = np.arange(len(FIG4B_SECTOR_GROUPS)) + len(new_sectors) + 1
-    n_solved_yr = len(solved_years)
-    bar_w = 0.6 / n_solved_yr
-    step = bar_w + 0.03
-    year_offset = {yr: (i - (n_solved_yr - 1) / 2) * step for i, yr in enumerate(solved_years)}
-    solved_x = {(gi, yr): center + year_offset[yr]
-                for gi, center in enumerate(solved_group_centers) for yr in solved_years}
-    fig, ax = plt.subplots(figsize=(16, 7))
+    # One bar per sector group now (not one per COMPARISON_YEARS year — see
+    # docstring), so group centers are just evenly spaced same as new_x;
+    # +1 after new_x still leaves the divider gap.
+    solved_x = np.arange(len(FIG4B_SECTOR_GROUPS)) + len(new_sectors) + 1
+    fig, ax = plt.subplots(figsize=(14, 7))
 
     # Left group: identical to fig4a's stacking (heat bands, then fuel-by-
     # carrier, then electricity) — see fig4a_heat_demand_by_sector's docstring.
@@ -1368,50 +1406,42 @@ def fig4b_industry_fuel_demand_comparison(runs: list[Run]) -> None:
     for xi, total in zip(new_x, bottom):
         ax.text(xi, total, f"{total:.2f}", ha="center", va="bottom", fontsize=9, fontweight="bold")
 
-    # Right group: solved-model fuel/electricity input, TWO adjacent bars
-    # (year0, year1) per sector group, same grey-hatched-by-carrier +
-    # green-electricity convention as the left group and as fig4a.
-    solved_x_flat = np.array([solved_x[(gi, yr)] for gi in range(len(FIG4B_SECTOR_GROUPS)) for yr in solved_years])
-    bottom = np.zeros(len(solved_x_flat))
+    # Right group: solved-model fuel/electricity input, ONE bar per sector
+    # group (see docstring) at solved_year, same grey-hatched-by-carrier +
+    # green-electricity convention as the left group and as fig4a — except
+    # the fuel_to_process carrier (cement/steel's consolidated blended fuel,
+    # see FIG4B_SECTOR_GROUPS' comment), which stays a flat, unhatched grey.
+    bottom = np.zeros(len(solved_x))
     with plt.rc_context({"hatch.linewidth": 0.5}):
         for carrier in solved_fuel_carriers:
-            vals = np.array([solved[(label, yr)].get(carrier, 0.0)
-                             for label, _ in FIG4B_SECTOR_GROUPS for yr in solved_years])
-            ax.bar(solved_x_flat, vals, bar_w, bottom=bottom, color=_ETH_GREY, edgecolor="white",
+            vals = np.array([solved[label].get(carrier, 0.0) for label, _, _ in FIG4B_SECTOR_GROUPS])
+            ax.bar(solved_x, vals, 0.6, bottom=bottom, color=_ETH_GREY, edgecolor="white",
                    linewidth=0.5, hatch=FUEL_CARRIER_HATCHES[carrier])
-            for xi, bi, vi in zip(solved_x_flat, bottom, vals):
+            for xi, bi, vi in zip(solved_x, bottom, vals):
                 if vi > 0.5:
-                    ax.text(xi, bi + vi / 2, f"{vi:.2f}", ha="center", va="center", fontsize=7,
+                    ax.text(xi, bi + vi / 2, f"{vi:.2f}", ha="center", va="center", fontsize=8,
                             color="black", bbox=_FUEL_LABEL_BBOX)
             bottom += vals
-    elec_vals = np.array([solved[(label, yr)].get("electricity", 0.0)
-                          for label, _ in FIG4B_SECTOR_GROUPS for yr in solved_years])
-    ax.bar(solved_x_flat, elec_vals, bar_w, bottom=bottom, color=_ELECTRICITY_COLOR, edgecolor="white", linewidth=0.5)
-    for xi, bi, vi in zip(solved_x_flat, bottom, elec_vals):
+    elec_vals = np.array([solved[label].get("electricity", 0.0) for label, _, _ in FIG4B_SECTOR_GROUPS])
+    ax.bar(solved_x, elec_vals, 0.6, bottom=bottom, color=_ELECTRICITY_COLOR, edgecolor="white", linewidth=0.5)
+    for xi, bi, vi in zip(solved_x, bottom, elec_vals):
         if vi > 0.5:
-            ax.text(xi, bi + vi / 2, f"{vi:.2f}", ha="center", va="center", fontsize=7,
+            ax.text(xi, bi + vi / 2, f"{vi:.2f}", ha="center", va="center", fontsize=8,
                     color=_text_color_for_bg(_ELECTRICITY_COLOR))
     bottom += elec_vals
-    for xi, total in zip(solved_x_flat, bottom):
-        ax.text(xi, total, f"{total:.2f}", ha="center", va="bottom", fontsize=8.5, fontweight="bold")
-    # Group label under each cluster, so "these bars are the same sector at
-    # different years" reads clearly without repeating the sector name in
-    # every individual tick label.
-    for gi, (label, _) in enumerate(FIG4B_SECTOR_GROUPS):
-        center = solved_group_centers[gi]
-        ax.text(center, -0.135, label.replace("\n", " "), transform=ax.get_xaxis_transform(),
-                ha="center", va="top", fontsize=9.5)
+    for xi, total in zip(solved_x, bottom):
+        ax.text(xi, total, f"{total:.2f}", ha="center", va="bottom", fontsize=9, fontweight="bold")
 
-    divider_x = (new_x[-1] + solved_x_flat.min()) / 2
+    divider_x = (new_x[-1] + solved_x.min()) / 2
     ax.axvline(divider_x, color="black", linewidth=0.8)
 
-    ax.set_xticks(np.concatenate([new_x, solved_x_flat]))
+    ax.set_xticks(np.concatenate([new_x, solved_x]))
     ax.set_xticklabels([HEAT_DEMAND_SECTOR_LABELS[s] + "\n(2023 assumption)" for s in new_sectors]
-                       + [str(yr) for _ in FIG4B_SECTOR_GROUPS for yr in solved_years], fontsize=9)
+                       + [label.replace("\n", " ") + f"\n({solved_year} solved)" for label, _, _ in FIG4B_SECTOR_GROUPS],
+                       fontsize=9)
     ax.set_ylabel("Heat / fuel / electricity demand [GW]")
-    years_str = ", ".join(str(y) for y in solved_years)
     ax.set_title(f"Industry Fuel & Heat Demand: New Sectors vs. Pre-Existing Cement/Steel\n"
-                 f"(new sectors: ZEN-creator input assumption, 2023; cement/steel: solved model flow, {years_str})",
+                 f"(new sectors: ZEN-creator input assumption, 2023; cement/steel: solved model flow, {solved_year})",
                  fontsize=12, fontweight="bold")
 
     band_handles = [Patch(facecolor=_eth_tint(_ETH_GREY, HEAT_DEMAND_BAND_TINTS[b]),
@@ -1419,7 +1449,7 @@ def fig4b_industry_fuel_demand_comparison(runs: list[Run]) -> None:
     all_fuel_carriers = sorted(set(fuel_vals) | set(solved_fuel_carriers), key=list(FUEL_CARRIER_HATCHES).index)
     fuel_handles = [Patch(facecolor=_ETH_GREY, edgecolor="white", linewidth=0.4,
                            hatch=FUEL_CARRIER_LEGEND_HATCHES[c],
-                           label=f"Fuel: {FUEL_CARRIER_LABELS[c]}") for c in all_fuel_carriers]
+                           label=_fuel_legend_label(c)) for c in all_fuel_carriers]
     electricity_handle = [Patch(facecolor=_ELECTRICITY_COLOR, edgecolor="white", label=_ELECTRICITY_LABEL)]
     with plt.rc_context({"hatch.linewidth": 1.3}):
         ax.legend(handles=band_handles + fuel_handles + electricity_handle, fontsize=8, frameon=True,
@@ -1427,24 +1457,7 @@ def fig4b_industry_fuel_demand_comparison(runs: list[Run]) -> None:
                   handlelength=3.0, handleheight=1.8, columnspacing=1.2)
     ax.grid(axis="y", alpha=0.3)
 
-    # Point directly at Primary steel's 2030 hydrogen segment — see the
-    # docstring's CAVEAT: real model output, but a diffusion-limit artifact
-    # (H2_DRI forced to match NG_DRI's early buildout from a shared zero
-    # real-world base), not a genuine hydrogen-steelmaking preference.
-    primary_steel_label = FIG4B_SECTOR_GROUPS[1][0]
-    if "hydrogen" in solved_fuel_carriers and 2030 in solved_years:
-        h2_val = solved[(primary_steel_label, 2030)].get("hydrogen", 0.0)
-        if h2_val > 0.5:
-            carriers_below_h2 = solved_fuel_carriers[:solved_fuel_carriers.index("hydrogen")]
-            base = sum(solved[(primary_steel_label, 2030)].get(c, 0.0) for c in carriers_below_h2)
-            xpos = solved_x[(1, 2030)]
-            ypos = base + h2_val / 2
-            ax.annotate("diffusion-limit artifact,\nnot real H2 preference\n(see docstring)",
-                        xy=(xpos, ypos), xytext=(xpos + 1.4, ypos + 6),
-                        fontsize=7, ha="left", va="center", color="black",
-                        arrowprops=dict(arrowstyle="->", color="black", linewidth=0.8))
-
-    fig.tight_layout(rect=[0, 0.05, 1, 1])  # bottom margin for the sector-group labels under the year ticks
+    fig.tight_layout()
     savefig(fig, "fig4b_industry_fuel_demand_comparison")
 
 

@@ -30,6 +30,15 @@ i.e. this is not a re-derivation, it calls the same code the model build uses):
     dropped entirely, silently redistributed to natural_gas/hard_coal/biomass
     via renormalized_fuel_shares(), since nothing in MODEL_CARRIER_MAP matched
     it) now gets a 4th, real "oil" entry in self._fuel_shares["ceramic"].
+    As of ZEN-creator commit 1687533 ("first version of glass/ceramic fuel
+    switch"), glass/ceramic's switchable natural_gas share is additionally
+    rerouted through the fuel_to_kiln intermediate carrier by
+    _kiln_fuel_shares() (glass: 100% of its natural_gas share; ceramic:
+    97.4%, the remainder staying a direct natural_gas entry) before this
+    script computes fuel_by_carrier — see that function's docstring. This
+    must be applied here too, not just left to get_production_tech_dict(),
+    or this script's fuel_by_carrier would silently disagree with the real
+    production tech's own input_carrier.
   - "electricity": self._sector_params[sector].cf_elec × demand_volume — every
     X_production technology also has a fixed electricity input (drives,
     auxiliaries, sometimes electric melting/heating), separate from both the
@@ -91,6 +100,7 @@ from zen_creator.datasets.datasets.process_parametrization import (  # noqa: E40
     FEC_YEAR,
     HEAT_TEMP_LEVELS,
     ProcessParametrizationDataset,
+    _kiln_fuel_shares,
 )
 
 OUTPUT_PATH = REPO_ROOT / "data" / "outputs" / "figures" / "SI_results" / "heat_demand_by_sector_input.json"
@@ -110,7 +120,13 @@ def main() -> None:
     for sector, dv in demand_volumes.items():
         heat = {level: dv * ds._heat_cfs[sector][level] for level in HEAT_TEMP_LEVELS}
         fuel_total = dv * ds._sector_params[sector].cf_fuel
-        fuel_by_carrier = {carrier: fuel_total * share for carrier, share in ds._fuel_shares[sector].items()}
+        # _kiln_fuel_shares reroutes glass/ceramic's switchable natural_gas share
+        # through the fuel_to_kiln carrier (see that function's docstring) -- the
+        # same shares get_production_tech_dict() itself applies when building
+        # each sector's real conversion_factor, so this must match, not just use
+        # the raw self._fuel_shares[sector].
+        shares = _kiln_fuel_shares(sector, ds._fuel_shares[sector])
+        fuel_by_carrier = {carrier: fuel_total * share for carrier, share in shares.items()}
         electricity = dv * ds._sector_params[sector].cf_elec
         result[sector] = {
             "demand_ton_hr": dv,

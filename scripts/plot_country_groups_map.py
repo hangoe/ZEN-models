@@ -37,8 +37,8 @@ NATURALEARTH_SHP = NATURALEARTH_DIR / "ne_50m_admin_0_countries.shp"
 # Placeholder region groups -- sorted by rough geography, to be replaced once
 # the user specifies real groups.
 NODE_GROUPS = {
-    "north": ["DK", "EE", "FI", "LT", "LV", "NO", "SE"],
-    "west": ["AT", "BE", "CH", "DE", "FR", "IE", "LU", "NL", "UK"],
+    "north": ["DK", "EE", "FI", "IE", "LT", "LV", "NO", "SE", "UK"],
+    "west": ["AT", "BE", "CH", "DE", "FR", "LU", "NL"],
     "south": ["ES", "EL", "HR", "IT", "PT", "SI"],
     "east": ["BG", "CZ", "HU", "PL", "RO", "SK"],
 }

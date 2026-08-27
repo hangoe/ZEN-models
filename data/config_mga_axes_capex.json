@@ -1,8 +1,8 @@
 {
   "node_capex_by_technology": {
     "nodes": [
-      {"north": ["DK", "EE", "FI", "LT", "LV", "NO", "SE"]},
-      {"west": ["AT", "BE", "CH", "DE", "FR", "IE", "LU", "NL", "UK"]},
+      {"north": ["DK", "EE", "FI", "IE", "LT", "LV", "NO", "SE", "UK"]},
+      {"west": ["AT", "BE", "CH", "DE", "FR", "LU", "NL"]},
       {"south": ["ES", "EL", "HR", "IT", "PT", "SI"]},
       {"east": ["BG", "CZ", "HU", "PL", "RO", "SK"]}
     ],
