@@ -28,7 +28,7 @@ CHANGES:
     (the default) into the private staged copy, so all five
     config_mga_{bbo,sampling,oracle,batch_bbo,batch_sampling}.json files
     share one axes definition. A row may set an `axes_config` column (e.g.
-    config_mga_axes_capex_periods.json) to merge in a different axes file
+    config_mga_axes_capex_cum.json) to merge in a different axes file
     instead, without touching the shared default.
   * Any system_overrides key a row's CSV doesn't set falls back to
     DEFAULT_SYSTEM_OVERRIDES, so a sweep whose rows all share the same
@@ -68,7 +68,7 @@ DATASET_SEARCH_DIRS = [
 META_COLUMNS = {"my_dataset", "my_comment", "config", "normalisation", "batch_size", "n_workers", "axes_config"}
 
 # Fallback system.json overrides, used for any of these keys a CSV row
-# doesn't set as its own column. Lets parameters_mga.csv's 11 rows share one
+# doesn't set as its own column. Lets parameters_mga.csv's rows share one
 # dataset-processing setup without repeating it in every row -- a row can
 # still override any of these by adding that column back, the same way
 # parameters.csv (which sets all of them explicitly, to different values)
@@ -89,9 +89,9 @@ DEFAULT_CONFIG = "config.json"
 # Default axes definition merged into every MGA config (see
 # apply_axes_override) so the axes block isn't duplicated per config file.
 # A row's own "axes_config" column (see main()) can point at a different
-# axes file instead -- e.g. data/config_mga_axes_capex_periods.json for the
-# node_capex_periods investigation. data/config_mga_axes_capacity.json holds
-# the old technology-capacity axes (kept for reference/rollback -- not
+# axes file instead -- e.g. data/config_mga_axes_capex_cum.json for the
+# node_capex_cumulative investigation. data/config_mga_axes_capacity.json
+# holds the old technology-capacity axes (kept for reference/rollback -- not
 # currently wired in here).
 AXES_CONFIG_DEFAULT = DATA_DIR_CONFIG / "config_mga_axes_capex.json"
 

@@ -1,30 +1,24 @@
 #!/bin/bash
 ###############################################################################
-# check_mga_convergence.sh — convergence snapshot for the two currently
-# running MGA batch sweeps (parameters_mga.csv rows, batch_bbo / minmax).
+# check_mga_convergence.sh — convergence snapshot for the historical MGA
+# batch sweep still tracked from parameters_mga.csv (batch_bbo / minmax).
 #
-# Both rows use config_mga_batch_bbo.json (max_iterations: 5000, cap
-# confirmed live in-log — NOT the 800 used by earlier sampling/bbo configs),
-# so both logs report convergence the same way ("CI: [...] | target: 0.95").
-# They differ in axes_config, which is why they're tracked as two distinct
-# runs rather than two tasks of the same array job:
-#   task 3 — row 3: batch_bbo minmax batch8, default axes
-#            (config_mga_axes_capex.json, via run_model.py's
-#            AXES_CONFIG_DEFAULT), 2050_1a_5a_interval_5ts
+# Uses config_mga_batch_bbo.json (max_iterations: 5000, cap confirmed live
+# in-log — NOT the 800 used by earlier sampling/bbo configs), so the log
+# reports convergence as "CI: [...] | target: 0.95".
 #   task 7 — row 7: batch_bbo minmax batch4, axes_config override
 #            (config_mga_axes_capex_periods.json), 2020_7a_5a_interval_3ts
-# Each was submitted as its own single-task sbatch (own JOBID), not as one
-# array spanning both task ids — so each needs its own JOBID.
+#            (historical — left untouched by the 2026-08-27 cum_capex
+#            cleanup; row 3, formerly also tracked here, was removed from
+#            parameters_mga.csv in that cleanup)
 #
-# Usage: ./check_mga_convergence.sh [JOBID_TASK3] [JOBID_TASK7]
-#   Defaults to the job ids currently running as of 2026-08-25:
-#     task 3 -> 11636632   task 7 -> 11644976
-#   Pass overrides positionally if those runs finish and get resubmitted:
-#     ./check_mga_convergence.sh 11636632 11644976
+# Usage: ./check_mga_convergence.sh [JOBID_TASK7]
+#   Defaults to the job id running as of 2026-08-25: task 7 -> 11644976
+#   Pass an override positionally if that run finishes and gets resubmitted:
+#     ./check_mga_convergence.sh 11644976
 ###############################################################################
 
-JOBID_T3="${1:-11636632}"
-JOBID_T7="${2:-11644976}"
+JOBID_T7="${1:-11644976}"
 MAXITER=5000
 
 check_task () {
@@ -53,5 +47,4 @@ check_task () {
   echo
 }
 
-check_task "$JOBID_T3" 3 "batch8, default axes (config_mga_axes_capex.json)"
 check_task "$JOBID_T7" 7 "batch4, axes_config=config_mga_axes_capex_periods.json"

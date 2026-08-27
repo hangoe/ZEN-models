@@ -7,7 +7,7 @@ These files lie into the `ZEN-models` repo.
 | `run_model.py` | Run, adapted so `my_dataset`, `my_comment`, `config` and all `system_overrides` come from **one row** of a sweep CSV (chosen by `--task_id`; the CSV itself by `--params`, default `parameters.csv`). For any MGA config except `weights`, also merges in the shared `data/config_mga_axes_capex.json` axes definition. Any `system_overrides` key a row's CSV doesn't set falls back to `DEFAULT_SYSTEM_OVERRIDES`. |
 | `parameters.csv` | Normal (non-MGA) sweep table — **one row per run**. Columns = `my_dataset`, `my_comment`, and one column per `system.json` override. No `config` column, so every row runs `data/config.json`. |
 | `submit_euler.sh` | The SLURM **array** job for the normal sweep: one job per row of `parameters.csv`. |
-| `parameters_mga.csv` | MGA sweep table, `task_id` 0-4: `my_dataset`, `my_comment`, `config` (which `data/config_mga_*.json` to run), `normalisation`, `batch_size`/`n_workers`. Covers sampling minmax / bbo minmax / batch bbo minmax x batch4/8/16 only. Weights, the units-normalisation runs, oracle, batch-sampling and `relative` normalisation aren't swept right now (add a row back to use them). The TSA/time-horizon `system_overrides` that used to be columns here (`conduct_time_series_aggregation` etc.) now come from `run_model.py`'s `DEFAULT_SYSTEM_OVERRIDES` instead. |
+| `parameters_mga.csv` | MGA sweep table. `task_id` 7: historical CAPEX_PERIODS batch4 minmax run (left untouched, kept for reference — its axes file uses the old, now-superseded `node_capex_periods` schema). `task_id` 9-12: current cum_capex sweep — `config_mga_batch_bbo.json` with `axes_config=config_mga_axes_capex_cum.json` (`node_capex_cumulative`, `until_years=[2040, 2050]`), batch4/batch8 × minmax/share. Plain-CAPEX rows (former task_ids 0-6) and the CAPEX_PERIODS weights row (former task_id 8) were removed as no longer needed. Weights, oracle, batch-sampling and `relative`/`units` normalisation aren't swept right now (add a row back to use them). |
 | `submit_euler_mga.sh` | The SLURM **array** job for the MGA sweep: one job per row of `parameters_mga.csv`. `#SBATCH` header carries the batch16 resource profile as a safe default; override `--time`/`--cpus-per-task`/`--mem-per-cpu` per `--array` range on the `sbatch` command line for the cheaper modes (see the script's header comment for the exact per-range values). |
 | `data/config_mga_axes_capex.json` | Shared MGA axes for every mode except `weights`: 4 regions x 3 technology groups (power/hydrogen/carbon) of annualised node capex, 12 axes + cost. One file instead of duplicating the block in every `config_mga_*.json`. |
 | `data/config_mga_axes_capacity.json` | The old technology-capacity axes (7 technologies + a CCS lump), kept for reference — not currently merged into any config. |
@@ -121,44 +121,40 @@ source .venv/bin/activate
 python run_model.py --task_id 0 --run_on local --params parameters_mga.csv
 ```
 
-`parameters_mga.csv` (`task_id` 0-4 — only the minmax runs are swept) is
-now:
+`parameters_mga.csv` now holds:
 
-| task_id | mode | normalisation | batch_size/n_workers |
-|---|---|---|---|
-| 0 | sampling | minmax | — |
-| 1 | bbo | minmax | — |
-| 2 | batch bbo | minmax | 4 |
-| 3 | batch bbo | minmax | 8 |
-| 4 | batch bbo | minmax | 16 |
+| task_id | mode | normalisation | batch_size/n_workers | axes |
+|---|---|---|---|---|
+| 7 | batch bbo | minmax | 4 | capex_periods (historical, untouched) |
+| 9 | batch bbo | minmax | 4 | capex_cum (until_years 2040/2050) |
+| 10 | batch bbo | share | 4 | capex_cum (until_years 2040/2050) |
+| 11 | batch bbo | minmax | 8 | capex_cum (until_years 2040/2050) |
+| 12 | batch bbo | share | 8 | capex_cum (until_years 2040/2050) |
 
-Weights and the units-normalisation runs (former task_ids 0, 1, 3, 5, 6, 7
-in the old 0-10 numbering) are dropped from this sweep for now. Oracle,
-batch-sampling and `relative` normalisation aren't in this sweep either —
-`config_mga_oracle.json`/`config_mga_batch_sampling.json`, the `relative`
-normalisation, and the dropped runs above all still work, just add a row
-for them by hand if you need them (see `submit_euler_mga.sh`'s header
-comment).
+Task 7 is kept as-is from before the plugin's periods→cumulative rename;
+don't resubmit it without first updating `config_mga_axes_capex_periods.json`
+to the new `node_capex_cumulative` schema (the plugin no longer recognizes
+`node_capex_periods`). Tasks 9-12 are the current cum_capex sweep, covering
+both new normalisation modes (`minmax`, `share`) at batch4 and batch8.
+Weights, oracle, batch-sampling and `relative`/`units` normalisation aren't
+in this sweep either — `config_mga_weights.json`/`config_mga_oracle.json`/
+`config_mga_batch_sampling.json` and those normalisation modes still work,
+just add a row for them by hand if you need them (see
+`submit_euler_mga.sh`'s header comment).
 
-`submit_euler_mga.sh`'s `#SBATCH` header carries the batch16 (task_id 4)
+`submit_euler_mga.sh`'s `#SBATCH` header carries the batch8 (task_id 11/12)
 resource profile as a safe default for a bare `sbatch submit_euler_mga.sh`.
 Submit each range with its own tighter resource profile instead — task_ids
-0/1 (no worker pool) keep 4 cpus-per-task; task_ids 2/3/4 (batch bbo) now
-size cpus-per-task as batch_size x 10 threads-per-worker, at 1G per cpu
-(see the script's header comment for the full reasoning):
+9/10 (batch4) at `cpus-per-task=40`; task_ids 11/12 (batch8) at
+`cpus-per-task=80` (batch_size x 10 threads-per-worker, at 1G per cpu; see
+the script's header comment for the full reasoning):
 
 ```bash
-sbatch --array=0,1                                                  \
-       --time=72:00:00 --cpus-per-task=4   --mem-per-cpu=2G  \
-       submit_euler_mga.sh                # sampling + bbo, minmax
-sbatch --array=2                                                    \
+sbatch --array=9,10                                                 \
        --time=72:00:00 --cpus-per-task=40  --mem-per-cpu=1G  \
-       submit_euler_mga.sh                # batch bbo minmax, batch4
-sbatch --array=3                                                    \
-       --time=72:00:00 --cpus-per-task=80  --mem-per-cpu=1G  \
-       submit_euler_mga.sh                # batch bbo minmax, batch8
-sbatch --array=4                                                    \
-       submit_euler_mga.sh                # batch bbo minmax, batch16 (script default)
+       submit_euler_mga.sh                # cum_capex batch4, minmax + share
+sbatch --array=11,12                                                \
+       submit_euler_mga.sh                # cum_capex batch8, minmax + share (script default)
 
 myjobs -j <jobID>                          # check actual time/CPU/RAM used
                                             # against the profile once each
@@ -166,13 +162,13 @@ myjobs -j <jobID>                          # check actual time/CPU/RAM used
                                             # if the padding was off
 
 # Once you trust the resources, submit everything together:
-sbatch --array=0-4 submit_euler_mga.sh
+sbatch --array=9-12 submit_euler_mga.sh
 ```
 
-Results land in the same place as the normal sweep, now tagged `_CAPEX` to
-mark the new region x tech-group capex axes:
+Results land tagged `_CAPEX_CUM_<mode>_batch<N>` to mark the new cumulative
+capex axes:
 ```
-$SCRATCH/zen_runs/outputs/Crystal_Ball_ind_heat_v8_0_no_flexibility_nodiffusion_2050_1a_5a_interval_5ts_MGA_CAPEX_<mode>/
+$SCRATCH/zen_runs/outputs/Crystal_Ball_ind_heat_v9_0_no_flexibility_nodiffusion_2020_7a_5a_interval_3ts_MGA_CAPEX_CUM_batch_bbo_<mode>_batch<N>/
 ```
 Download before scratch is purged (~2 weeks) — see "Results go to scratch" above.
 

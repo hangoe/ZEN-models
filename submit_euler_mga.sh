@@ -3,72 +3,56 @@
 # submit_euler_mga.sh — run run_model.py against parameters_mga.csv as a
 # SLURM array sweep on Euler (the MGA counterpart of submit_euler.sh).
 #
-# Only the minmax runs are swept right now, renumbered to a contiguous
-# 0-4 range. One array task = one row of parameters_mga.csv (selected by
+# One array task = one row of parameters_mga.csv (selected by
 # SLURM_ARRAY_TASK_ID; the row's own task_id value, NOT its position in the
-# file):
-#   task_id 0  = sampling minmax  (LP-only, iterative; formerly called
-#                                   "probabilistic"; each axis's own
-#                                   near-optimal [min, max] is mapped onto
-#                                   [0, 1])
-#   task_id 1  = bbo minmax       (LP-only support-function pipeline like
-#                                   sampling, but directions come from a
-#                                   black-box optimiser; needs pyoNearOpt's
-#                                   "bbo" extra, see setup_euler_env.sh)
-#   task_id 2  = batch bbo minmax batch4   (batch mode, strategy_mode="bbo";
-#                                            solves batch_size directions
-#                                            concurrently per iteration via a
-#                                            worker pool; batch_size=
-#                                            n_workers=4)
-#   task_id 3  = batch bbo minmax batch8   (same, batch_size=n_workers=8)
-#   task_id 4  = batch bbo minmax batch16  (same, batch_size=n_workers=16)
+# file). Current rows:
+#   task_id 7  = batch bbo minmax batch4, capex_periods axes (historical --
+#                left over from before the MGA plugin's periods->cumulative
+#                axis rename; kept as-is, don't resubmit without first
+#                updating config_mga_axes_capex_periods.json to the new
+#                node_capex_cumulative schema)
+#   task_id 9  = batch bbo minmax batch4, capex_cum axes (node_capex_cumulative,
+#                until_years=[2040, 2050]; batch_size=n_workers=4)
+#   task_id 10 = batch bbo share  batch4, capex_cum axes (same axes, "share"
+#                normalisation instead of "minmax")
+#   task_id 11 = batch bbo minmax batch8, capex_cum axes (batch_size=n_workers=8)
+#   task_id 12 = batch bbo share  batch8, capex_cum axes
 #
-# weights and the units-normalisation runs (former task_ids 0, 1, 3, 5, 6, 7
-# in the old 0-10 numbering) are deliberately dropped from this sweep for
-# now -- add rows back to parameters_mga.csv (and re-add their #SBATCH
-# profile below) if you need them again. oracle mode and "relative"
-# normalisation are also not swept (oracle: too slow to calibrate walltime
-# for yet; relative: superseded by minmax for these runs) --
-# config_mga_oracle.json and the "relative" normalisation still work if you
-# add a row back manually. batch sampling (strategy_mode="sampling") is not
-# swept either for now; use config_mga_batch_sampling.json the same way as
-# config_mga_batch_bbo.json if you want it back.
+# The old plain-CAPEX rows (former task_ids 0-6: sampling/bbo/batch_bbo
+# minmax over the region x tech-group capex axes) and the CAPEX_PERIODS
+# weights row (former task_id 8) were removed -- no longer needed. weights,
+# oracle mode, "relative"/"units" normalisation and batch sampling
+# (strategy_mode="sampling") aren't swept here either -- add a row to
+# parameters_mga.csv (and a matching #SBATCH profile below) if you need any
+# of them.
 #
 # Requires the MGA install step in setup_euler_env.sh to have been run once
 # (clones + installs ZEN-garden-plugins and near_optimal_tools/pyoNearOpt,
-# incl. the "bbo" extra for task_ids 1-4).
+# incl. the "bbo" extra needed by batch bbo mode).
 #
-# Resource profile per range. task_ids 0 and 1 (sampling/bbo, no worker
-# pool) keep the original 4 cpus-per-task / 2G-per-cpu profile (8GB total).
-# task_ids 2-4 (batch bbo) now size cpus-per-task as batch_size x 10, since
-# each worker's solver requests Threads=10 (unchanged, see git history) --
-# so the worker pool actually gets dedicated cores per worker instead of
-# batch_size workers dividing a flat core count. mem-per-cpu is dropped to
-# 1G for these (memory scales with cpus-per-task instead). --time is padded
-# to 72h flat across all five task_ids for headroom. The #SBATCH block below
-# is the batch16 profile (task_id 4), i.e. the safe default for a bare
-# `sbatch submit_euler_mga.sh`; override per range on the command line (CLI
-# flags win over #SBATCH) for the cheaper ranges instead of running
-# everything at the batch16 profile:
-#   sbatch --array=0,1                                                    \
-#          --time=72:00:00 --cpus-per-task=4   --mem-per-cpu=2G  \
-#          submit_euler_mga.sh                # sampling + bbo, minmax
-#   sbatch --array=2                                                      \
+# Resource profile per range. task_ids 9/10 (batch4) and 11/12 (batch8) size
+# cpus-per-task as batch_size x 10, since each worker's solver requests
+# Threads=10 -- so the worker pool actually gets dedicated cores per worker
+# instead of batch_size workers dividing a flat core count. mem-per-cpu is
+# 1G (memory scales with cpus-per-task instead). --time is padded to 72h
+# flat for headroom. The #SBATCH block below is the batch8 profile (task_id
+# 11/12), i.e. the safe default for a bare `sbatch submit_euler_mga.sh`;
+# override per range on the command line (CLI flags win over #SBATCH) for
+# the cheaper batch4 range instead of running everything at the batch8
+# profile:
+#   sbatch --array=9,10                                                   \
 #          --time=72:00:00 --cpus-per-task=40  --mem-per-cpu=1G  \
-#          submit_euler_mga.sh                # batch bbo minmax, batch4
-#   sbatch --array=3                                                      \
-#          --time=72:00:00 --cpus-per-task=80  --mem-per-cpu=1G  \
-#          submit_euler_mga.sh                # batch bbo minmax, batch8
-#   sbatch --array=4                                                      \
-#          submit_euler_mga.sh                # batch bbo minmax, batch16 (script default)
-#   sbatch --array=0-4 submit_euler_mga.sh     # once you trust the walltime per range
+#          submit_euler_mga.sh                # cum_capex batch4, minmax + share
+#   sbatch --array=11,12                                                  \
+#          submit_euler_mga.sh                # cum_capex batch8, minmax + share (script default)
+#   sbatch --array=9-12 submit_euler_mga.sh    # once you trust the walltime per range
 ###############################################################################
 
 #SBATCH --job-name=zen_run_mga
-#SBATCH --time=72:00:00              # TUNABLE: batch16 profile; override per range, see above
+#SBATCH --time=72:00:00              # TUNABLE: batch8 profile; override per range, see above
 #SBATCH --ntasks=1                   # one process per array task -> keep at 1
-#SBATCH --cpus-per-task=160          # TUNABLE: batch16 profile (16 workers x 10 threads); override per range, see above
-#SBATCH --mem-per-cpu=1G              # TUNABLE: batch16 profile (~160GB total); override per range, see above
+#SBATCH --cpus-per-task=80           # TUNABLE: batch8 profile (8 workers x 10 threads); override per range, see above
+#SBATCH --mem-per-cpu=1G              # TUNABLE: batch8 profile (~80GB total); override per range, see above
 #SBATCH --output=zen_run_mga_%A_%a.out   # %A = array id, %a = task id
 #SBATCH --error=zen_run_mga_%A_%a.err
 #SBATCH --mail-type=END,FAIL         # email when a task ends/fails (ETH address)

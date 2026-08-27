@@ -1,0 +1,12 @@
+{
+  "node_capex_cumulative": {
+    "nodes": [
+      {"north": ["DK", "EE", "FI", "IE", "LT", "LV", "NO", "SE", "UK"]},
+      {"west": ["AT", "BE", "CH", "DE", "FR", "LU", "NL"]},
+      {"south": ["ES", "EL", "HR", "IT", "PT", "SI"]},
+      {"east": ["BG", "CZ", "HU", "PL", "RO", "SK"]}
+    ],
+    "until_years": [2040, 2050]
+  },
+  "include_cost": true
+}
