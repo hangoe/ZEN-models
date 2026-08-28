@@ -91,11 +91,43 @@ as this file already does for the pre-batch16 v8_0 system -- nothing about
 the *methodology* below changed, only which run's polytope.npz is read).
 The old batch16 carrier-group figures live in data/outputs/figures/
 mga_tests/archive_v9_0_capex_regional_batch16_groups/ (fig0a/b/c, per
-carrier group -- see plot_mga_periods_regional_capex.py for this run's own
-fig0a/b, per period, which replace them). axis_value() below has a new
+carrier group -- that run's own fig0a/b, per period, which replaced them,
+were deleted outright once fig4a/b superseded them in turn -- see the next
+switchover paragraph below). axis_value() below has a new
 "node_capex_period" branch (kind == NODE_CAPEX_PERIOD in the plugin) to
 mirror this run's axes; still exactly follows MGA.axis_value/
 _design_axis_terms.
+
+As of the CAPEX-cumulative/share switchover (2026-08-28), RUN_PREFIX/
+BATCH_MODES below point at YET ANOTHER new axis set -- config_mga_axes_
+capex_cum.json's node_capex_cumulative, not config_mga_axes_capex_
+periods.json's node_capex_period -- run with normalisation="share" (see
+polytope_io.py's module docstring: one fixed reference total shared by
+every node_capex_cumulative axis, rather than each axis's own near-optimal
+[min, max] range; this only affects how the solver's search directions
+were scaled while exploring, not any physical value plotted here, since
+everything below reads poly.to_phys()). Same 4 node clusters
+(north/west/south/east), but now x 2 CUMULATIVE horizons (until_year in
+[2040, 2050], each summing that region's cost_capex_yearly over every
+model year up to and including its own until_year, not a disjoint calendar
+period) = 8 node_capex_cumulative axes, plus net_present_cost -- still 9
+axes total, batch_size=4 ("batch4"). The old CAPEX-PERIODS batch4 (minmax
+normalisation) fig1/fig2/fig3a/fig3b live in data/outputs/figures/
+mga_tests/archive_v9_0_capex_periods_batch4_minmax/ -- that run's own
+crosseffects figure (fig4a/b, from the now-deleted plot_mga_periods_
+regional_capex.py) was deleted outright rather than archived once
+plot_mga_cum_regional_capex.py's fig10 (own-axis flexibility + cross-effects
+for both until_years merged into one matrix -- an intermediate fig9a/b
+split version was itself deleted once fig10 superseded it too) superseded
+it; the shared run-loading infra that script also provided now lives in
+mga_capex_periods_common.py (still used by plot_mga_regional_investment.py's
+fig7/8 and plot_mga_investment_map.py, both independent of fig4's
+existence). axis_value()
+below has a new "node_capex_cumulative" branch (kind ==
+NODE_CAPEX_CUMULATIVE in the plugin, period=(None, until_year)) alongside
+the still-present "node_capex_period" branch (kept for historical/
+reference use, not exercised by this run); both exactly follow
+MGA.axis_value/_design_axis_terms.
 
 oracle has no data under the CAPEX axis set at all right now -- every
 oracle-touching code path below degrades to "skip, log why" exactly as it
@@ -157,6 +189,20 @@ Figures (data/outputs/figures/mga_tests/):
                                  are the actual bbo-vs-sampling comparison
                                  this project wants -- weights never builds a
                                  polytope, so it never gets its own panel.
+                                 A mode with too few accepted rejection
+                                 samples (<20, see _hull_modes_to_plot) --
+                                 e.g. an early-stage/few-iteration run whose
+                                 inner hull is still a sliver relative to its
+                                 outer approximation, so proposals essentially
+                                 never land inside it -- falls back to
+                                 plotting its own ACTUAL visited points
+                                 directly instead (plain scatter, not hexbin;
+                                 no overlay of itself in the lower triangle
+                                 since that would just duplicate the primary
+                                 scatter): see PANEL_DATA/_hull_panel_data.
+                                 Real points, just sparser and noisier than a
+                                 dense synthetic sample -- the panel title
+                                 says which kind it is.
   fig3a/b_query/time_comparison  Two figures, columns are max_separation
                                  (solved here, sparse checkpoints) and
                                  fraction_well_explored's ci_lower (read
@@ -233,29 +279,30 @@ MGA_ROOT = REPO_ROOT / "data" / "outputs" / "euler_outputs_mga"
 
 MODEL = "Crystal_Ball_ind_heat_v9_0_no_flexibility_nodiffusion"
 
-# ── CAPEX-PERIODS-axes runs (current, 2026-08-26 -- the periods switchover;
-# see module docstring) -- the earlier batch16 carrier-group CAPEX figures
-# this script used to plot were moved to data/outputs/figures/mga_tests/
-# archive_v9_0_capex_regional_batch16_groups/, not deleted.
+# ── CAPEX-CUMULATIVE-axes run, share normalisation (current, 2026-08-28 --
+# the cumulative/share switchover; see module docstring) -- the earlier
+# CAPEX-PERIODS batch4 (minmax) fig1/fig2/fig3a/fig3b this script used to
+# plot were moved to data/outputs/figures/mga_tests/
+# archive_v9_0_capex_periods_batch4_minmax/, not deleted.
 #
-# 9-axis regional CAPEX-by-period system: 4 node clusters
-# (north/west/south/east) x 2 calendar-year periods ([2030, 2039],
-# [2040, 2049]) = 8 node_capex_period axes, plus net_present_cost -- see each
-# run's own polytope.npz axis_meta_json for the exact node membership per
-# region and the exact [start, end] per period (config_mga_axes_capex_
-# periods.json). batch4 is the first BATCH_MODES entry for this axis set
-# (batch_size=4, strategy_mode="bbo" per config_mga_batch_bbo.json);
-# SUPF_MODES is empty until a v9_0 bbo_units/sampling_units run against this
-# axis set is downloaded. Adding either later is just appending to
-# SUPF_MODES/BATCH_MODES/BATCH_RUN_SUFFIX, no other code changes needed
-# (BASE_MODE/RUN_DIR/MODE_COLOR/MODE_LABEL all key off these tuples).
-RUN_PREFIX = f"{MODEL}_2020_7a_5a_interval_3ts_MGA_CAPEX_PERIODS"
+# 9-axis regional cumulative-CAPEX system: 4 node clusters
+# (north/west/south/east) x 2 cumulative horizons (until_year in
+# [2040, 2050]) = 8 node_capex_cumulative axes, plus net_present_cost -- see
+# each run's own polytope.npz axis_meta_json for the exact node membership
+# per region (config_mga_axes_capex_cum.json). batch4_share is the
+# BATCH_MODES entry for this axis set (batch_size=4, strategy_mode="bbo" per
+# config_mga_batch_bbo.json, normalisation="share"); SUPF_MODES is empty
+# until a v9_0 bbo_units/sampling_units run against this axis set is
+# downloaded. Adding either later is just appending to SUPF_MODES/
+# BATCH_MODES/BATCH_RUN_SUFFIX, no other code changes needed (BASE_MODE/
+# RUN_DIR/MODE_COLOR/MODE_LABEL all key off these tuples).
+RUN_PREFIX = f"{MODEL}_2020_7a_5a_interval_3ts_MGA_CAPEX_CUM"
 ORACLE_DIR = MGA_ROOT / f"{RUN_PREFIX}_oracle"
 
 SUPF_MODES: tuple[str, ...] = ()
 
-BATCH_MODES: tuple[str, ...] = ("batch4",)
-BATCH_RUN_SUFFIX: dict[str, str] = {"batch4": "batch_bbo_minmax_batch4"}
+BATCH_MODES: tuple[str, ...] = ("batch4_share",)
+BATCH_RUN_SUFFIX: dict[str, str] = {"batch4_share": "batch_bbo_share_batch4"}
 # Every mode with its own polytope.npz + outer approximation -- the set
 # fig1/fig2/fig3 iterate over.
 ALL_SUPF_MODES = SUPF_MODES + BATCH_MODES
@@ -271,17 +318,17 @@ BASE_MODE.update({m: "batch" for m in BATCH_MODES})
 # corporate swatch: blue, petrol, green, bronze, red, purple, grey), per this
 # project's convention of never inventing a separate palette for print
 # figures. _ETH_PETROL was reserved for a future CAPEX batch mode (see the
-# old constants comment, now this one) -- batch4 gets it.
+# old constants comment, now this one) -- batch4_share gets it.
 _ETH_BLUE, _ETH_PETROL, _ETH_GREEN, _ETH_BRONZE, _ETH_RED, _ETH_PURPLE = (
     SCENARIO_PALETTE[0], SCENARIO_PALETTE[1], SCENARIO_PALETTE[2],
     SCENARIO_PALETTE[3], SCENARIO_PALETTE[4], SCENARIO_PALETTE[5],
 )
 MODE_COLOR = {
-    "batch4": _ETH_PETROL,
+    "batch4_share": _ETH_PETROL,
     "oracle": _ETH_BRONZE,
 }
 MODE_LABEL = {
-    "batch4": "Batch (bbo, batch=4)",
+    "batch4_share": "Batch (bbo, batch=4, share)",
     "oracle": "Oracle",
 }
 MODES = (*ALL_SUPF_MODES, "oracle")
@@ -365,6 +412,18 @@ def axis_value(r: Results, axis_meta: dict) -> float:
         vals = capex[capex.index.get_level_values("location").isin(members)]
         start, end = axis_meta["period"]
         vals = vals[[c for c in vals.columns if start <= c <= end]]
+        return float(vals.to_numpy().sum()) if not vals.empty else 0.0
+    if kind == "node_capex_cumulative":
+        # CAPEX-CUM axis set (config_mga_axes_capex_cum.json, see the module
+        # docstring's cumulative/share-switchover note): same node-restriction
+        # as node_capex_tech/node_capex_period, but summed over every model
+        # year UP TO AND INCLUDING the axis's own until_year (axis_meta
+        # ["period"] == (None, until_year) -- see plugin.py) rather than a
+        # disjoint [start, end] calendar period.
+        capex = r.get_total("cost_capex_yearly")
+        vals = capex[capex.index.get_level_values("location").isin(members)]
+        _, until_year = axis_meta["period"]
+        vals = vals[[c for c in vals.columns if c <= until_year]]
         return float(vals.to_numpy().sum()) if not vals.empty else 0.0
     raise ValueError(f"unknown axis kind {kind!r}")
 
@@ -691,15 +750,45 @@ def rejection_sample_inner(poly: Polytope, n_propose: int, seed: int = 0) -> tup
 _HULL_MODE_ORDER = (*ALL_SUPF_MODES, "oracle")
 
 
-def _hull_modes_to_plot(polys: dict[str, Polytope], samples: dict[str, tuple[np.ndarray, float]]) -> list[str]:
-    return [m for m in _HULL_MODE_ORDER if m in polys and m in samples and len(samples[m][0]) >= 20]
+# Minimum real points for the actual-points fallback panel (see
+# _hull_panel_data): below this a scatter/histogram/correlation panel is too
+# thin to say anything -- 5 is enough for a (very rough) Pearson estimate on
+# a handful of axes, not a hard statistical threshold.
+_MIN_ACTUAL_POINTS = 5
+
+
+def _hull_panel_data(mode: str, polys: dict[str, Polytope], points: dict[str, list[tuple[str, np.ndarray, float]]],
+                      samples: dict[str, tuple[np.ndarray, float]]):
+    """(samples_phys, kind, rate_or_None) for one mode's fig2 panel: prefer
+    the accepted rejection-sampled inner hull (kind="inner sample", >=20
+    accepted -- see rejection_sample_inner); fall back to the mode's own
+    actual visited points (kind="actual points", baseline + VMM + iterates,
+    >=_MIN_ACTUAL_POINTS of them) when too few inner samples were accepted --
+    e.g. an early-stage/few-iteration run whose inner hull (convex combo of
+    only a handful of points) is still a sliver relative to its outer
+    approximation, so rejection proposals essentially never land inside it
+    (verified directly for one such run: 0/130,000 proposals accepted).
+    Returns None if neither is usable for this mode."""
+    if mode in samples and len(samples[mode][0]) >= 20:
+        samples_norm, rate = samples[mode]
+        return polys[mode].to_phys(samples_norm), "inner sample", rate
+    if mode in points and len(points[mode]) >= _MIN_ACTUAL_POINTS:
+        return np.vstack([p for _, p, _ in points[mode]]), "actual points", None
+    return None
+
+
+def _hull_modes_to_plot(polys: dict[str, Polytope], points: dict[str, list[tuple[str, np.ndarray, float]]],
+                         samples: dict[str, tuple[np.ndarray, float]]) -> list[str]:
+    return [m for m in _HULL_MODE_ORDER
+            if m in polys and _hull_panel_data(m, polys, points, samples) is not None]
 
 
 def fig2_polytope_samples(polys: dict[str, Polytope], points: dict[str, list[tuple[str, np.ndarray, float]]],
                            samples: dict[str, tuple[np.ndarray, float]]) -> None:
-    modes_to_plot = _hull_modes_to_plot(polys, samples)
+    modes_to_plot = _hull_modes_to_plot(polys, points, samples)
     if not modes_to_plot:
-        print("  skipping fig2_polytope_samples: no mode has >=20 accepted inner samples")
+        print(f"  skipping fig2_polytope_samples: no mode has >=20 accepted inner samples "
+              f"or >={_MIN_ACTUAL_POINTS} actual points")
         return
 
     from scipy.spatial import ConvexHull
@@ -722,8 +811,8 @@ def fig2_polytope_samples(polys: dict[str, Polytope], points: dict[str, list[tup
     n_panels = len(modes_to_plot)
     for panel_idx, (subfig, mode) in enumerate(zip(subfigs, modes_to_plot)):
         poly = polys[mode]
-        samples_norm, rate = samples[mode]
-        samples_phys = poly.to_phys(samples_norm)
+        samples_phys, kind, rate = _hull_panel_data(mode, polys, points, samples)
+        is_actual = kind == "actual points"
         corr = pd.DataFrame(samples_phys, columns=poly.names).corr(method="pearson")
         # Full n_z x n_z grid (unlike _pairwise_grid's (n-1) x (n-1)
         # off-diagonal-only layout used by fig1): row/col i==j is axis i's
@@ -755,12 +844,20 @@ def fig2_polytope_samples(polys: dict[str, Polytope], points: dict[str, list[tup
                     ax.set_yticks([])
                     continue
                 if j == i:  # diagonal: per-axis marginal of the inner-body sample
-                    ax.hist(samples_phys[:, i], bins=25, color="#6b1f5c", alpha=0.8)
+                    n_bins = 25 if not is_actual else max(5, min(25, len(samples_phys) // 3))
+                    ax.hist(samples_phys[:, i], bins=n_bins, color="#6b1f5c", alpha=0.8)
                     ax.set_yticks([])
                     ax.tick_params(labelsize=9)
-                else:  # lower triangle: hexbin density + exact hull outline
-                    ax.hexbin(samples_phys[:, j], samples_phys[:, i], gridsize=22, cmap="magma_r",
-                              mincnt=1, linewidths=0.1)
+                else:  # lower triangle: hexbin density (or, for the actual-points
+                    # fallback, a plain scatter -- a hexbin of a few dozen real
+                    # points is misleadingly sparse, see _hull_panel_data) + exact
+                    # hull outline
+                    if is_actual:
+                        ax.scatter(samples_phys[:, j], samples_phys[:, i], s=18, color="#6b1f5c",
+                                   alpha=0.85, edgecolor="white", linewidth=0.3)
+                    else:
+                        ax.hexbin(samples_phys[:, j], samples_phys[:, i], gridsize=22, cmap="magma_r",
+                                  mincnt=1, linewidths=0.1)
                     proj = poly.X[:, [j, i]]
                     try:
                         hull = ConvexHull(proj)
@@ -771,7 +868,12 @@ def fig2_polytope_samples(polys: dict[str, Polytope], points: dict[str, list[tup
                                 label="exact 2D projection of this mode's inner hull" if not first_legend_done else None)
                     except Exception:
                         pass  # degenerate projection (e.g. collinear points); skip the outline
+                    # Skip overlaying this panel's OWN mode when it's already the
+                    # primary (actual-points) scatter above -- would just draw the
+                    # same points twice.
                     for m in overlay_modes:
+                        if is_actual and m == mode:
+                            continue
                         phys = np.vstack([p for _, p, _ in points[m]])
                         ax.scatter(phys[:, j], phys[:, i], s=14, color=MODE_COLOR[m], alpha=0.8,
                                    edgecolor="white", linewidth=0.3,
@@ -798,8 +900,10 @@ def fig2_polytope_samples(polys: dict[str, Polytope], points: dict[str, list[tup
             if handles:
                 subfig.legend(handles, labels, loc="upper center", bbox_to_anchor=(0.5, 0.945),
                               ncol=len(handles), fontsize=10, frameon=False)
+        subtitle = (f"n={len(samples_phys)} actual points, no inner sample -- see script docstring" if is_actual
+                    else f"n={len(samples_phys)}, acceptance {rate:.1%}")
         subfig.suptitle(
-            f"{MODE_LABEL[mode]} (n={len(samples_norm)}, acceptance {rate:.1%})",
+            f"{MODE_LABEL[mode]} ({subtitle})",
             fontsize=14, fontweight="bold", y=0.975,
         )
     fig.suptitle(
