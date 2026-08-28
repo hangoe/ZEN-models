@@ -20,9 +20,12 @@ CHANGES:
     copy of the chosen config -- the shared data/*.json config is never
     touched, so one config_mga_bbo.json / config_mga_sampling.json covers
     all normalisation modes instead of needing a config file per mode.
-  * Rows may also set `batch_size` / `n_workers` columns that overwrite the
-    matching keys under plugins.mga.batch (batch mode only) in the same
-    private staged copy, the same way `normalisation` does.
+  * Rows may also set `batch_size` / `n_workers` / `tolerance_explore`
+    columns that overwrite the matching keys under plugins.mga.batch (batch
+    mode only) in the same private staged copy, the same way `normalisation`
+    does -- e.g. a row using normalisation="share" can set its own
+    tolerance_explore without changing the shared config file's value for
+    the other (minmax) rows that also point at it.
   * The `axes` block for every MGA mode except `weights` is no longer
     duplicated per config file -- it's merged in from data/config_mga_axes_capex.json
     (the default) into the private staged copy, so all five
@@ -65,7 +68,10 @@ DATASET_SEARCH_DIRS = [
 
 # Columns in parameters.csv that are NOT system.json overrides.
 # Everything else in a row is applied as a system_overrides key.
-META_COLUMNS = {"my_dataset", "my_comment", "config", "normalisation", "batch_size", "n_workers", "axes_config"}
+META_COLUMNS = {
+    "my_dataset", "my_comment", "config", "normalisation", "batch_size",
+    "n_workers", "axes_config", "tolerance_explore",
+}
 
 # Fallback system.json overrides, used for any of these keys a CSV row
 # doesn't set as its own column. Lets parameters_mga.csv's rows share one
@@ -130,25 +136,31 @@ def apply_normalisation_override(config_json: dict, config_name: str, normalisat
     mga_cfg["normalisation"] = normalisation
 
 
-def apply_batch_overrides(config_json: dict, config_name: str, batch_size, n_workers) -> None:
-    """Overwrite plugins.mga.batch.{batch_size,n_workers} in-place with the CSV row's values.
+def apply_batch_overrides(config_json: dict, config_name: str, batch_size, n_workers, tolerance_explore) -> None:
+    """Overwrite plugins.mga.batch.{batch_size,n_workers,tolerance_explore} in-place with the CSV row's values.
 
     Same private-staged-copy pattern as apply_normalisation_override(): lets
-    one config_mga_batch_*.json be swept over different batch_size/n_workers
-    values from parameters.csv without touching the shared data/*.json file.
+    one config_mga_batch_*.json be swept over different batch_size/n_workers/
+    tolerance_explore values from parameters.csv without touching the shared
+    data/*.json file. tolerance_explore is normalisation-dependent (see the
+    MGA plugin's docs): under "share" it trades off how much exploration
+    effort larger vs. smaller axes/regions get, so a row may need its own
+    value distinct from other rows sharing the same config file.
     """
-    if batch_size is None and n_workers is None:
+    if batch_size is None and n_workers is None and tolerance_explore is None:
         return
     batch_cfg = config_json.get("plugins", {}).get("mga", {}).get("batch")
     if batch_cfg is None:
         raise SystemExit(
-            f"[run_model] row sets batch_size/n_workers but "
+            f"[run_model] row sets batch_size/n_workers/tolerance_explore but "
             f"{config_name} has no plugins.mga.batch block to apply them to."
         )
     if batch_size is not None:
         batch_cfg["batch_size"] = batch_size
     if n_workers is not None:
         batch_cfg["n_workers"] = n_workers
+    if tolerance_explore is not None:
+        batch_cfg["tolerance_explore"] = tolerance_explore
 
 
 def validate_plugin_config(config_json: dict, config_name: str) -> None:
@@ -245,6 +257,9 @@ def main() -> None:
     n_workers = None
     if "n_workers" in table.columns and pd.notna(row["n_workers"]) and str(row["n_workers"]).strip():
         n_workers = to_native(row["n_workers"])
+    tolerance_explore = None
+    if "tolerance_explore" in table.columns and pd.notna(row["tolerance_explore"]) and str(row["tolerance_explore"]).strip():
+        tolerance_explore = to_native(row["tolerance_explore"])
     system_overrides = {
         **DEFAULT_SYSTEM_OVERRIDES,
         **{col: to_native(row[col]) for col in table.columns if col not in META_COLUMNS},
@@ -252,7 +267,7 @@ def main() -> None:
 
     print(f"[run_model] task_id={args.task_id}  dataset={my_dataset}  comment={my_comment}")
     print(f"[run_model] config={config_name}  axes_config={axes_config_path.name}  normalisation={normalisation}")
-    print(f"[run_model] batch_size={batch_size}  n_workers={n_workers}")
+    print(f"[run_model] batch_size={batch_size}  n_workers={n_workers}  tolerance_explore={tolerance_explore}")
     print(f"[run_model] system_overrides={system_overrides}")
 
     with open(DATA_DIR_CONFIG / config_name) as f:
@@ -260,7 +275,7 @@ def main() -> None:
     apply_axes_override(config_json, config_name, axes_config_path)
     if normalisation is not None:
         apply_normalisation_override(config_json, config_name, normalisation)
-    apply_batch_overrides(config_json, config_name, batch_size, n_workers)
+    apply_batch_overrides(config_json, config_name, batch_size, n_workers, tolerance_explore)
     validate_plugin_config(config_json, config_name)
 
     # --- 2. Stage a PRIVATE copy of the dataset (safe for parallel array tasks) --
