@@ -25,7 +25,7 @@ sys.path.insert(0, str(REPO_ROOT / "scripts"))
 import matplotlib.pyplot as plt
 import pandas as pd
 
-from figure_settings import (
+from plots.figure_settings import (
     EULER_ROOT,
     SCENARIO_PALETTE,
     Run,
@@ -39,7 +39,7 @@ from figure_settings import (
 # consistency with the rest of SI_results/ — toggle FONT_MODE there to switch
 # every figure script in this repo (report/Computer Modern vs. presentation/Arial) at once.
 apply_font_mode()
-from figures_by_scenario import _annual_series, get_emissions_by_carrier
+from plots.figures_by_scenario import _annual_series, get_emissions_by_carrier
 
 FIGURES_DIR = REPO_ROOT / "data" / "outputs" / "figures" / "SI_results" / "archive"
 

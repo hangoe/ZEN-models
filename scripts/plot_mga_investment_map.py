@@ -53,16 +53,14 @@ previously only visible as separate bar charts:
    "what can this region's investment do, and why" summary instead of
    needing fig7/fig8 side by side.
 
-Country polygons/extent/ISO-code handling follow plot_country_groups_map.py
-exactly (same Natural Earth 50m source, same EL/UK override, same cache dir).
+Country polygons/extent/ISO-code handling share plots/natural_earth.py with
+plot_country_groups_map.py (same Natural Earth 50m source, same EL/UK
+override, same cache dir).
 
 Usage:
     python scripts/plot_mga_investment_map.py
 """
 
-import io
-import urllib.request
-import zipfile
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).parent.parent
@@ -74,12 +72,13 @@ import pandas as pd
 from matplotlib.lines import Line2D
 from matplotlib.path import Path as MplPath
 
-from figure_settings import apply_font_mode, eth_tint
+from plots.figure_settings import apply_font_mode, eth_tint
+from plots.natural_earth import EUROPE_EXTENT, ISO_A2_EH_OVERRIDES, ensure_naturalearth_data
 
 # See figure_settings.FONT_MODE for the rationale and for the one-flag
 # toggle that switches every figure script in this repo at once.
 apply_font_mode()
-from mga_capex_periods_common import PERIODS, REGION_COLOR, REGIONS, RUN_DIR, load_batch4_data
+from plots.mga_capex_periods_common import PERIODS, REGION_COLOR, REGIONS, RUN_DIR, load_batch4_data
 from plot_mga_regional_investment import REGION_NODES
 from zen_garden import Results
 
@@ -219,24 +218,7 @@ NODES_CSV = REPO_ROOT / "data" / "Crystal_Ball" / "energy_system" / "set_nodes.c
 EDGES_CSV = REPO_ROOT / "data" / "Crystal_Ball" / "energy_system" / "set_edges.csv"
 MODEL = "Crystal_Ball_ind_heat_v9_0_no_flexibility_nodiffusion"
 
-NATURALEARTH_DIR = REPO_ROOT / "data" / "naturalearth"
-NATURALEARTH_URL = "https://naciscdn.org/naturalearth/50m/cultural/ne_50m_admin_0_countries.zip"
-NATURALEARTH_SHP = NATURALEARTH_DIR / "ne_50m_admin_0_countries.shp"
-ISO_A2_EH_OVERRIDES = {"EL": "GR", "UK": "GB"}
-EUROPE_EXTENT = {"lon": (-25, 45), "lat": (34, 72)}
-
 NODE_TO_REGION = {n: r for r, nodes in REGION_NODES.items() for n in nodes}
-
-
-def ensure_naturalearth_data() -> Path:
-    if NATURALEARTH_SHP.exists():
-        return NATURALEARTH_SHP
-    NATURALEARTH_DIR.mkdir(parents=True, exist_ok=True)
-    with urllib.request.urlopen(NATURALEARTH_URL) as response:
-        zip_bytes = response.read()
-    with zipfile.ZipFile(io.BytesIO(zip_bytes)) as zf:
-        zf.extractall(NATURALEARTH_DIR)
-    return NATURALEARTH_SHP
 
 
 def _node_coords() -> pd.DataFrame:

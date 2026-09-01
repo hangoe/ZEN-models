@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 from zen_garden import Results
 
-OUTPUT_DIR = Path(__file__).parent.parent / "data" / "outputs"
+OUTPUT_DIR = Path(__file__).parent.parent.parent / "data" / "outputs"
 LOCAL_ROOT = OUTPUT_DIR / "local_outputs"
 EULER_ROOT = OUTPUT_DIR / "euler_outputs"
 HOURS_PER_YEAR = 8760
@@ -120,177 +120,219 @@ def eth_tint(hex_color: str, pct: float) -> str:
     return f"#{int(round(r * 255)):02x}{int(round(g * 255)):02x}{int(round(b * 255)):02x}"
 
 
-# ── Merged color palette ──────────────────────────────────────────────────────
-# Base: compare_models.py (system-wide coverage)
-# Added: analyze_model.py entries not present in base (industry heat carriers,
-#        temp conversion, TES, DSM)
+# ── ETH color families ──────────────────────────────────────────────────────
+# The 7 SCENARIO_PALETTE hues, named for readability below. COLOR_MAP (further
+# below) assigns one base hue per physical/fuel family and shades sub-variants
+# with eth_tint -- same mechanism generate_si_figures.py's local
+# HEAT_SUPPLY_COLOR_MAP/PRODUCTION_COLOR_MAP already use (reused verbatim here
+# for the techs that also appear there, e.g. the industry heat pump/boiler
+# water-vs-waste-heat-source and per-fuel hue choices). Where several techs of
+# the same family appear as adjacent bars in ONE chart (e.g. compare_models.py's
+# 16-tech "industry process costs" figure, or the emissions carrier/technology
+# panels), each gets a genuinely DIFFERENT hue rather than a tint of the same
+# one -- tints of one hue read as near-identical at print size (user feedback
+# on an earlier fossil-boiler palette: "coal, oil and NG look very similar,
+# and waste and biomass aswell"), so same-hue tints below are reserved for
+# variants that are unlikely to share an axis (e.g. different pipeline/storage/
+# conversion steps of the same fuel).
+_ETH_BLUE, _ETH_PETROL, _ETH_GREEN, _ETH_BRONZE, _ETH_RED, _ETH_PURPLE, _ETH_GREY = SCENARIO_PALETTE
+
+# ── Merged, ETH-only color palette ──────────────────────────────────────────
+# This is the ONE color map used everywhere outside the SI print figures
+# (which define their own local ETH-derived palettes instead -- see
+# generate_si_figures.py's HEAT_SUPPLY_COLOR_MAP etc.): the Streamlit
+# dashboard and analyze_model.py/compare_models.py. Replaces the old
+# arbitrary-hex COLOR_MAP entirely -- no off-brand colors remain.
 COLOR_MAP = {
-    # Industry heat carriers
-    "heat_industry_0_100": "#1a237e",
-    "heat_industry_100_150": "#64b5f6",
-    "heat_industry_150_200": "#ff7043",
-    "heat_industry_temp_conversion_150": "#ffab91",
-    "heat_industry_temp_conversion_100": "#ffcc80",
-    # TES
-    "industry_TES_water_0_100": "#5aacff",
-    "industry_TES_water_100_150": "#6495ed",
-    "industry_TES_steam_100_150": "#ff7043",
-    "industry_TES_steam_150_200": "#ef5350",
-    # DSM — 10 mutually distinguishable hues, loosely tied to each product's
-    # colour where one exists (steel=blue, glass/ceramic=purple, food=warm).
-    "ammonia_DSM": "#00897b",          # teal (H2/ammonia family)
-    "ceramic_DSM": "#ab47bc",          # violet (ceramic_production is purple)
-    "clinker_DSM": "#757575",          # grey (cement/clinker)
-    "food_DSM": "#ff8f00",             # amber (food = warm)
-    "glass_DSM": "#7e57c2",            # deep purple (glass_production is purple)
-    "methanol_DSM": "#8d6e63",         # brown (chemicals)
-    "olefin_DSM": "#afb42b",           # olive-lime (chemicals, distinct from methanol)
-    "paper_DSM": "#d81b60",            # rose-pink
-    "primary_steel_DSM": "#1565c0",    # strong blue (steel)
-    "secondary_steel_DSM": "#4fc3f7",  # light blue (steel)
-    # Carriers (emissions plot)
-    "crude_oil (carrier)": "#a0795c",
-    "natural_gas (carrier)": "#d4a017",
-    "hard_coal (carrier)": "#8b6e5a",
-    "lng (carrier)": "#e8a838",
-    "lignite (carrier)": "#a89070",
-    "waste (carrier)": "#a0a0a0",
-    # Technologies (emissions plot)
-    "cement_kiln (tech)": "#a0a0a0",
-    "BF_BOF (tech)": "#4682b4",
-    "EAF (tech)": "#87ceeb",
-    "NG_DRI (tech)": "#b0c4de",
-    "glass_production (tech)": "#9370db",
-    # Fossil / fuel technologies
-    "natural_gas_boiler": "#d4a017",
-    "natural_gas_boiler_DH": "#c49000",
-    "natural_gas_boiler_industry": "#b8860b",
-    "natural_gas_turbine": "#ffd700",
-    "natural_gas_turbine_CCS": "#e6c200",
-    "natural_gas_pipeline": "#f0e68c",
-    "natural_gas_storage": "#eee8aa",
-    "SMR": "#cd853f",
-    "SMR_CCS": "#d2a679",
-    "methanol_from_natural_gas": "#c9a96e",
-    "methanation": "#bdb76b",
-    "hard_coal_plant": "#5d4037",
-    "hard_coal_boiler_DH": "#9c7f6b",
-    "lignite_coal_plant": "#a1887f",
-    "coal_to_cement_fuel": "#9a8070",
-    "lng_terminal": "#e8a838",
-    "oil_boiler": "#b8956e",
-    "oil_boiler_DH": "#c4a07a",
-    "oil_boiler_industry": "#8d6a42",
-    "oil_plant": "#3e2723",
-    "oil_pipeline": "#b08a6e",
-    "oil_storage": "#c0a080",
-    "oil_to_diesel_conversion": "#b89878",
-    "oil_to_gasoline_conversion": "#c4a488",
-    "oil_to_kerosene_conversion": "#d0b098",
-    "oil_to_naphtha_conversion": "#d8bca0",
-    "refining": "#b08a6e",
-    "crude_oil": "#a0795c",
-    "waste_boiler_DH": "#a0a0a0",
-    "waste_plant": "#b0b0b0",
-    "waste_to_cement_fuel": "#909090",
-    # Renewables
-    "photovoltaics": "#f0c040",        # solar yellow
-    "wind_onshore": "#4ca6a8",         # teal
-    "wind_offshore": "#1b7e9a",        # deep blue-teal (distinct from onshore)
-    "reservoir_hydro": "#1e88e5",      # blue
-    "run-of-river_hydro": "#64b5f6",   # light blue
-    "pumped_hydro": "#0d47a1",         # navy (storage)
-    # Nuclear
-    "nuclear": "#c850c0",
-    # Biomass
-    "biomass_plant": "#4caf50",
-    "biomass_plant_CCS": "#43a047",
-    "biomass_boiler": "#56b870",
-    "biomass_boiler_DH": "#3cb371",
-    "biomass_boiler_industry": "#4caf50",
-    "biomass_to_cement_fuel": "#7cb342",
-    "biomethane_conversion": "#76c76e",
-    "anaerobic_digestion": "#8fbc8f",
-    "methanol_from_biomass": "#9ccc65",
-    "gasification": "#8bc34a",
-    "pyrolysis": "#7cb342",
-    # Hydrogen
-    "electrolysis": "#00bcd4",
-    "hydrogen_pipeline": "#4dd0e1",
-    "fuel_cell": "#26c6da",
-    "haber_bosch": "#00acc1",
-    "hydrogen_to_cement_fuel": "#00acc1",
-    "hydrogen_FC_ship": "#0288d1",
-    "salt_cavern_storage": "#4dd0e1",
-    "H2_DRI": "#26c6da",
-    # Electric / heat pump
-    "electrode_boiler": "#ff7043",
-    "electrode_boiler_DH": "#f4511e",
-    "electrode_boiler_industry": "#e64a19",
-    "heat_pump": "#e91e63",
-    "heat_pump_DH": "#c2185b",
-    # Old model names (v2: generic industry, v3/v4_0: temp-level only)
-    "heat_pump_industry": "#f06292",
-    "heat_pump_industry_0_100": "#f06292",
-    "heat_pump_industry_100_150": "#ec407a",
-    "heat_pump_industry_150_200": "#c2185b",
-    # New model names (v4_6+: temp + source)
-    "heat_pump_industry_0_100_waste_heat": "#f06292",
-    "heat_pump_industry_0_100_water": "#f8bbd0",
-    "heat_pump_industry_100_150_waste_heat": "#ec407a",
-    "heat_pump_industry_100_150_water": "#f48fb1",
-    "heat_pump_industry_150_200_waste_heat": "#c2185b",
-    "heat_pump_industry_150_200_water": "#e91e63",
-    "battery": "#7e57c2",
-    "power_line": "#9575cd",
-    "district_heating_grid": "#ef5350",
-    # Transport
-    "BEV": "#558b2f",
-    "ICE_petrol": "#bdbdbd",
-    "ICE_diesel": "#9e9e9e",
-    "HDT_diesel": "#9e9e9e",
-    "HDT_BET": "#66bb6a",
-    "HDT_FCEV": "#26a69a",
-    "ammonia_ICE_ship": "#5c6bc0",
-    "methanol_ICE_ship": "#7986cb",
-    "diesel_ICE_ship": "#9e9e9e",
-    # Steel
-    "BF_BOF": "#4682b4",
-    "BF_BOF_CCS": "#6a9fc8",
-    "EAF": "#87ceeb",
-    "NG_DRI": "#b0c4de",
-    "NG_DRI_CCS": "#9ab0c8",
-    "industrial_gas_consumer": "#d4a017",
-    # Carbon
-    "DAC": "#b39ddb",
-    "carbon_pipeline": "#90a4ae",
-    "carbon_storage": "#78909c",
-    "cement_post_comb": "#90a4ae",
-    "glass_post_comb": "#a99bc2",
-    "ceramic_post_comb": "#b98bc2",
-    # Very old model names (v1_0: "industrial_" prefix instead of "_industry" suffix)
-    "industrial_biomass_boiler": "#4caf50",
-    "industrial_coal_boiler": "#8b6e5a",
-    "industrial_electrode_boiler": "#e64a19",
-    "industrial_natural_gas_boiler": "#b8860b",
-    "industrial_oil_boiler": "#b8956e",
-    # Cement & industry
-    "cement_kiln": "#a0a0a0",
-    "glass_production": "#9370db",
-    "ceramic_production": "#ba68c8",
-    "paper_production": "#ce93d8",
-    "food_production": "#f48fb1",
-    # Supply / imports
-    "natural_gas import": "#d4a017",
-    "lng import": "#e8a838",
-    "hard_coal import": "#8b6e5a",
-    "waste import": "#a0a0a0",
-    "crude_oil import": "#a0795c",
+    # Industry heat carriers -- same water(blue)/waste-heat(petrol) source
+    # convention as HEAT_SUPPLY_COLOR_MAP, darker at higher temperature.
+    "heat_industry_0_100": eth_tint(_ETH_BLUE, 0.55),
+    "heat_industry_100_150": eth_tint(_ETH_BLUE, 0.3),
+    "heat_industry_150_200": _ETH_BLUE,
+    "heat_industry_temp_conversion_150": eth_tint(_ETH_PETROL, 0.3),
+    "heat_industry_temp_conversion_100": eth_tint(_ETH_PETROL, 0.55),
+    # TES -- same family/band as the carrier it stores.
+    "industry_TES_water_0_100": eth_tint(_ETH_BLUE, 0.55),
+    "industry_TES_water_100_150": eth_tint(_ETH_BLUE, 0.3),
+    "industry_TES_steam_100_150": eth_tint(_ETH_PETROL, 0.3),
+    "industry_TES_steam_150_200": _ETH_PETROL,
+    # DSM -- 10 mutually distinguishable hue/tint pairs, loosely tied to each
+    # product's own color where one exists (steel=blue, ammonia/paper=petrol,
+    # food=green, ceramic=bronze, clinker/glass=grey, methanol/olefin=red);
+    # HATCH_MAP's "xx" already flags "this is a DSM bar" on top.
+    "ammonia_DSM": _ETH_PETROL,
+    "ceramic_DSM": _ETH_BRONZE,
+    "clinker_DSM": _ETH_GREY,
+    "food_DSM": _ETH_GREEN,
+    "glass_DSM": eth_tint(_ETH_GREY, 0.4),
+    "methanol_DSM": eth_tint(_ETH_RED, 0.3),
+    "olefin_DSM": _ETH_RED,
+    "paper_DSM": eth_tint(_ETH_PETROL, 0.4),
+    "primary_steel_DSM": _ETH_BLUE,
+    "secondary_steel_DSM": eth_tint(_ETH_BLUE, 0.4),
+    # Carriers (emissions-by-carrier panel) -- 6 mutually distinct hues, all
+    # bars in one chart.
+    "crude_oil (carrier)": _ETH_BRONZE,
+    "natural_gas (carrier)": _ETH_RED,
+    "hard_coal (carrier)": _ETH_GREY,
+    "lng (carrier)": _ETH_PETROL,
+    "lignite (carrier)": _ETH_GREEN,
+    "waste (carrier)": _ETH_PURPLE,
+    # Technologies (emissions-by-technology panel) -- own 5-way distinct set,
+    # separate panel from the carriers above so no cross-panel collision risk.
+    "cement_kiln (tech)": _ETH_GREY,
+    "BF_BOF (tech)": eth_tint(_ETH_GREY, 0.35),
+    "EAF (tech)": _ETH_BLUE,
+    "NG_DRI (tech)": _ETH_RED,
+    "glass_production (tech)": _ETH_PURPLE,
+    # Fossil / fuel technologies -- one hue per fuel (natural_gas=red,
+    # coal=grey, oil=bronze), tint shades context (plant/boiler/pipeline/
+    # storage/conversion) within a fuel -- these rarely share an axis.
+    "natural_gas_boiler": _ETH_RED,
+    "natural_gas_boiler_DH": eth_tint(_ETH_RED, 0.2),
+    "natural_gas_boiler_industry": _ETH_RED,
+    "natural_gas_turbine": eth_tint(_ETH_RED, 0.35),
+    "natural_gas_turbine_CCS": eth_tint(_ETH_RED, 0.5),
+    "natural_gas_pipeline": eth_tint(_ETH_RED, 0.65),
+    "natural_gas_storage": eth_tint(_ETH_RED, 0.75),
+    "SMR": eth_tint(_ETH_RED, 0.4),
+    "SMR_CCS": eth_tint(_ETH_RED, 0.55),
+    "methanol_from_natural_gas": eth_tint(_ETH_RED, 0.6),
+    "methanation": eth_tint(_ETH_RED, 0.7),
+    "hard_coal_plant": _ETH_GREY,
+    "hard_coal_boiler_DH": eth_tint(_ETH_GREY, 0.2),
+    "lignite_coal_plant": eth_tint(_ETH_GREY, 0.35),
+    "coal_to_cement_fuel": eth_tint(_ETH_GREY, 0.6),
+    "lng_terminal": eth_tint(_ETH_PETROL, 0.2),
+    "oil_boiler": _ETH_BRONZE,
+    "oil_boiler_DH": eth_tint(_ETH_BRONZE, 0.2),
+    "oil_boiler_industry": _ETH_BRONZE,
+    "oil_plant": eth_tint(_ETH_BRONZE, 0.35),
+    "oil_pipeline": eth_tint(_ETH_BRONZE, 0.5),
+    "oil_storage": eth_tint(_ETH_BRONZE, 0.6),
+    "oil_to_diesel_conversion": eth_tint(_ETH_BRONZE, 0.45),
+    "oil_to_gasoline_conversion": eth_tint(_ETH_BRONZE, 0.55),
+    "oil_to_kerosene_conversion": eth_tint(_ETH_BRONZE, 0.65),
+    "oil_to_naphtha_conversion": eth_tint(_ETH_BRONZE, 0.75),
+    "refining": eth_tint(_ETH_BRONZE, 0.5),
+    "crude_oil": _ETH_BRONZE,
+    "waste_boiler_DH": _ETH_PURPLE,
+    "waste_boiler_industry": _ETH_PURPLE,
+    "waste_plant": eth_tint(_ETH_PURPLE, 0.2),
+    "waste_to_cement_fuel": eth_tint(_ETH_PURPLE, 0.35),
+    # Renewables -- hydro (blue family, 3 distinct tints), wind (petrol
+    # family, 2 tints), solar (bronze, warm-ish without a true ETH yellow).
+    "photovoltaics": _ETH_BRONZE,
+    "wind_onshore": eth_tint(_ETH_PETROL, 0.35),
+    "wind_offshore": _ETH_PETROL,
+    "reservoir_hydro": _ETH_BLUE,
+    "run-of-river_hydro": eth_tint(_ETH_BLUE, 0.35),
+    "pumped_hydro": eth_tint(_ETH_BLUE, 0.6),
+    # Nuclear -- singleton, purple tint (rarely shares an axis with waste/CCS).
+    "nuclear": eth_tint(_ETH_PURPLE, 0.55),
+    # Biomass -- green family; boilers reuse HEAT_SUPPLY_COLOR_MAP's exact
+    # tint+hatch convention (same hue as electrode, lighter + hatched).
+    "biomass_plant": _ETH_GREEN,
+    "biomass_plant_CCS": eth_tint(_ETH_GREEN, 0.2),
+    "biomass_boiler": eth_tint(_ETH_GREEN, 0.55),
+    "biomass_boiler_DH": eth_tint(_ETH_GREEN, 0.55),
+    "biomass_boiler_industry": eth_tint(_ETH_GREEN, 0.55),
+    "biomass_to_cement_fuel": eth_tint(_ETH_GREEN, 0.35),
+    "biomethane_conversion": eth_tint(_ETH_GREEN, 0.45),
+    "anaerobic_digestion": eth_tint(_ETH_GREEN, 0.65),
+    "methanol_from_biomass": eth_tint(_ETH_GREEN, 0.7),
+    "gasification": eth_tint(_ETH_GREEN, 0.5),
+    "pyrolysis": eth_tint(_ETH_GREEN, 0.4),
+    # Hydrogen -- petrol family.
+    "electrolysis": _ETH_PETROL,
+    "hydrogen_pipeline": eth_tint(_ETH_PETROL, 0.35),
+    "fuel_cell": eth_tint(_ETH_PETROL, 0.2),
+    "haber_bosch": eth_tint(_ETH_PETROL, 0.5),
+    "hydrogen_to_cement_fuel": eth_tint(_ETH_PETROL, 0.65),
+    "hydrogen_FC_ship": eth_tint(_ETH_PETROL, 0.6),
+    "salt_cavern_storage": eth_tint(_ETH_PETROL, 0.35),
+    "H2_DRI": eth_tint(_ETH_PETROL, 0.15),
+    # Electric / heat pump -- grid/electricity = blue, electrode boilers =
+    # green (matches HEAT_SUPPLY_COLOR_MAP; "both are the non-fossil boilers").
+    "electrode_boiler": _ETH_GREEN,
+    "electrode_boiler_DH": eth_tint(_ETH_GREEN, 0.15),
+    "electrode_boiler_industry": _ETH_GREEN,
+    "coal_boiler_industry": _ETH_GREY,
+    "heat_pump": _ETH_BLUE,
+    "heat_pump_DH": eth_tint(_ETH_BLUE, 0.2),
+    # Old model names (v2: generic industry, v3/v4_0: temp-level only) -- no
+    # water/waste_heat split yet, default to the water(blue) convention.
+    "heat_pump_industry": eth_tint(_ETH_BLUE, 0.4),
+    "heat_pump_industry_0_100": eth_tint(_ETH_BLUE, 0.55),
+    "heat_pump_industry_100_150": eth_tint(_ETH_BLUE, 0.3),
+    "heat_pump_industry_150_200": _ETH_BLUE,
+    # New model names (v4_6+: temp + source) -- matches HEAT_SUPPLY_COLOR_MAP
+    # exactly: water source = blue, waste heat source = petrol, darker at
+    # higher temperature.
+    "heat_pump_industry_0_100_waste_heat": eth_tint(_ETH_PETROL, 0.55),
+    "heat_pump_industry_0_100_water": eth_tint(_ETH_BLUE, 0.55),
+    "heat_pump_industry_100_150_waste_heat": eth_tint(_ETH_PETROL, 0.3),
+    "heat_pump_industry_100_150_water": eth_tint(_ETH_BLUE, 0.3),
+    "heat_pump_industry_150_200_waste_heat": _ETH_PETROL,
+    "heat_pump_industry_150_200_water": _ETH_BLUE,
+    "battery": eth_tint(_ETH_BLUE, 0.45),
+    "power_line": eth_tint(_ETH_BLUE, 0.6),
+    "district_heating_grid": _ETH_GREY,
+    # Transport -- energy source sets the hue (electric=blue, H2=petrol,
+    # oil-derived=bronze, methanol=red).
+    "BEV": eth_tint(_ETH_BLUE, 0.25),
+    "ICE_petrol": _ETH_BRONZE,
+    "ICE_diesel": eth_tint(_ETH_BRONZE, 0.2),
+    "HDT_diesel": eth_tint(_ETH_BRONZE, 0.35),
+    "HDT_BET": eth_tint(_ETH_BLUE, 0.45),
+    "HDT_FCEV": eth_tint(_ETH_PETROL, 0.25),
+    "ammonia_ICE_ship": eth_tint(_ETH_PETROL, 0.45),
+    "methanol_ICE_ship": eth_tint(_ETH_RED, 0.45),
+    "diesel_ICE_ship": eth_tint(_ETH_BRONZE, 0.5),
+    # Steel -- colored by energy input (BF_BOF=coal/grey, EAF=electric/blue,
+    # NG_DRI=gas/red, H2_DRI=hydrogen/petrol above), matching the physical
+    # fuel logic used everywhere else in this map.
+    "BF_BOF": eth_tint(_ETH_GREY, 0.35),
+    "BF_BOF_CCS": eth_tint(_ETH_GREY, 0.5),
+    "EAF": _ETH_BLUE,
+    "NG_DRI": _ETH_RED,
+    "NG_DRI_CCS": eth_tint(_ETH_RED, 0.3),
+    "industrial_gas_consumer": eth_tint(_ETH_RED, 0.35),
+    # Carbon -- purple/CCS family.
+    "DAC": _ETH_PURPLE,
+    "carbon_pipeline": eth_tint(_ETH_PURPLE, 0.3),
+    "carbon_storage": eth_tint(_ETH_PURPLE, 0.45),
+    "cement_post_comb": eth_tint(_ETH_PURPLE, 0.15),
+    "glass_post_comb": eth_tint(_ETH_PURPLE, 0.55),
+    "ceramic_post_comb": eth_tint(_ETH_PURPLE, 0.65),
+    # Very old model names (v1_0: "industrial_" prefix instead of "_industry"
+    # suffix) -- mirror their current-name counterpart exactly.
+    "industrial_biomass_boiler": eth_tint(_ETH_GREEN, 0.55),
+    "industrial_coal_boiler": _ETH_GREY,
+    "industrial_electrode_boiler": _ETH_GREEN,
+    "industrial_natural_gas_boiler": _ETH_RED,
+    "industrial_oil_boiler": _ETH_BRONZE,
+    # Cement & industry -- these 5 plus the 6 steel/DRI/carbon-fuel entries
+    # above all appear together in compare_models.py's 16-tech "industry
+    # process costs" chart, so glass_production here deliberately does NOT
+    # reuse PRODUCTION_COLOR_MAP's grey (that would collide with cement_kiln/
+    # BF_BOF/coal_to_cement_fuel's grey cluster in that same chart).
+    "cement_kiln": _ETH_GREY,
+    "glass_production": eth_tint(_ETH_PURPLE, 0.7),
+    "ceramic_production": _ETH_BRONZE,
+    "paper_production": eth_tint(_ETH_PETROL, 0.4),
+    "food_production": _ETH_GREEN,
+    # Supply / imports -- same hue as the matching carrier/plain entry above.
+    "natural_gas import": _ETH_RED,
+    "lng import": _ETH_PETROL,
+    "hard_coal import": _ETH_GREY,
+    "waste import": _ETH_PURPLE,
+    "crude_oil import": _ETH_BRONZE,
     # Chemicals
-    "fischer_tropsch": "#8d6e63",
-    "olefin_from_naphtha": "#a1887f",
-    "olefin_from_methanol": "#bcaaa4",
-    "methanol_from_hydrogen": "#80cbc4",
+    "fischer_tropsch": eth_tint(_ETH_BRONZE, 0.4),
+    "olefin_from_naphtha": eth_tint(_ETH_BRONZE, 0.55),
+    "olefin_from_methanol": eth_tint(_ETH_RED, 0.5),
+    "methanol_from_hydrogen": eth_tint(_ETH_PETROL, 0.45),
 }
 
 # ── Hatch map ─────────────────────────────────────────────────────────────────
@@ -361,7 +403,16 @@ for _name in COLOR_MAP:
     elif "electrode" in _name:
         HATCH_MAP[_name] = "**"
 
-FALLBACK_COLORS = plt.cm.tab20.colors + plt.cm.tab20b.colors + plt.cm.tab20c.colors
+# ETH-only fallback for any tech missing from COLOR_MAP above (replaces
+# matplotlib's tab20/tab20b/tab20c, which aren't ETH colors): cycle through
+# all 7 hues at 5 tint levels (35 combinations) rather than repeating a
+# tech-family's own tints, so a fallback color never collides with the same
+# family's real COLOR_MAP entries.
+FALLBACK_COLORS = tuple(
+    eth_tint(hue, pct)
+    for pct in (0.0, 0.2, 0.4, 0.55, 0.7)
+    for hue in SCENARIO_PALETTE
+)
 
 
 def _get_color(name: str, fallback_idx: int) -> str | tuple:

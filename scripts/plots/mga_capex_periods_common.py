@@ -18,12 +18,12 @@ whether fig4's own ratio-based crosseffects view exists.
 
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).parent.parent
+REPO_ROOT = Path(__file__).parent.parent.parent
 
 import matplotlib.pyplot as plt
 import numpy as np
 
-from figure_settings import SCENARIO_PALETTE
+from .figure_settings import SCENARIO_PALETTE
 from zen_garden_plugins.mga.polytope_io import load_polytope
 
 FIGURES_DIR = REPO_ROOT / "data" / "outputs" / "figures" / "mga_tests"

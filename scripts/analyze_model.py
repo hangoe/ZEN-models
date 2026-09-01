@@ -24,6 +24,18 @@ import matplotlib.pyplot as plt
 import pandas as pd
 from zen_garden import Results
 
+from plots.figure_settings import (
+    add_price_line,
+    apply_font_mode,
+    load_results as _load_results,
+    plot_stacked_bars_years,
+)
+
+# Match the rest of the figure scripts' font -- see figure_settings.FONT_MODE
+# for the rationale and for the one-flag toggle that switches every figure
+# script in this repo at once.
+apply_font_mode()
+
 OUTPUT_DIR = Path(__file__).parent.parent / "data" / "outputs"
 FIGURES_DIR = OUTPUT_DIR / "figures"
 DEFAULT_MODEL = "Crystal_Ball_HG_v4_6_2025_6a_5a_interval_10ts/Crystal_Ball_HG_v4_6"
@@ -81,94 +93,14 @@ INDUSTRY_DSM_TECHS = [
     "food_DSM",
 ]
 
-COLOR_MAP = {
-    "heat_industry_0_100": "#1a237e",
-    "heat_industry_100_150": "#64b5f6",
-    "heat_industry_150_200": "#ff7043",
-    "natural_gas_boiler_industry": "#b8860b",
-    "biomass_boiler_industry": "#4caf50",
-    "electrode_boiler_industry": "#e64a19",
-    "heat_pump_industry_0_100_waste_heat": "#f06292",
-    "heat_pump_industry_0_100_water":      "#f8bbd0",
-    "heat_pump_industry_100_150_waste_heat": "#ec407a",
-    "heat_pump_industry_100_150_water":      "#f48fb1",
-    "heat_pump_industry_150_200_waste_heat": "#c2185b",
-    "heat_pump_industry_150_200_water":      "#e91e63",
-    "heat_industry_temp_conversion_150": "#ffab91",
-    "heat_industry_temp_conversion_100": "#ffcc80",
-    "glass_production": "#9370db",
-    "ceramic_production": "#ba68c8",
-    "paper_production": "#ce93d8",
-    "food_production": "#e91e63",
-    "industry_TES_water_0_100": "#5aacff",
-    "industry_TES_water_100_150": "#6495ed",
-    "industry_TES_steam_100_150": "#ff7043",
-    "industry_TES_steam_150_200": "#ef5350",
-    "glass_DSM": "#2e7d32",
-    "ceramic_DSM": "#66bb6a",
-    "paper_DSM": "#a5d6a7",
-    "food_DSM": "#ff8f00",
-    # Cross-sector storage
-    "battery":      "#7e57c2",
-    "pumped_hydro": "#6495ed",
-}
-
-HATCH_MAP = {
-    "natural_gas_boiler_industry": "//",
-    "biomass_boiler_industry": "//",
-    "electrode_boiler_industry": "**",
-    "heat_pump_industry_0_100_waste_heat": "\\\\",
-    "heat_pump_industry_0_100_water":      "//",
-    "heat_pump_industry_100_150_waste_heat": "\\\\",
-    "heat_pump_industry_100_150_water":      "//",
-    "heat_pump_industry_150_200_waste_heat": "\\\\",
-    "heat_pump_industry_150_200_water":      "//",
-    "heat_industry_temp_conversion_150": "||",
-    "heat_industry_temp_conversion_100": "||",
-    "glass_production": "oo",
-    "ceramic_production": "oo",
-    "paper_production": "oo",
-    "food_production": "oo",
-    "industry_TES_water_0_100": "--",
-    "industry_TES_water_100_150": "--",
-    "industry_TES_steam_100_150": "--",
-    "industry_TES_steam_150_200": "--",
-    "glass_DSM": "xx",
-    "ceramic_DSM": "xx",
-    "paper_DSM": "xx",
-    "food_DSM": "xx",
-    "battery":      "..",
-    "pumped_hydro": "//",
-}
-
-FALLBACK_COLORS = plt.cm.tab20.colors + plt.cm.tab20b.colors + plt.cm.tab20c.colors
-
 # get_total('price_import') sums over all 8760 h/year; divide + ×1000 → EUR/MWh
 HOURS_PER_YEAR = 8760
-
-
-def _get_color(name: str, fallback_idx: int) -> str | tuple:
-    return COLOR_MAP.get(name, FALLBACK_COLORS[fallback_idx % len(FALLBACK_COLORS)])
-
-
-def _get_hatch(name: str) -> str:
-    return HATCH_MAP.get(name, "")
-
-
-def _text_color_for_bg(bg_color) -> str:
-    from matplotlib.colors import to_rgb
-    r, g, b = to_rgb(bg_color)
-    luminance = 0.299 * r + 0.587 * g + 0.114 * b
-    return "white" if luminance < 0.45 else "black"
 
 
 # -- Data helpers -------------------------------------------------------------
 
 def load_results(model_name: str) -> Results:
-    path = OUTPUT_DIR / model_name
-    if not path.exists():
-        raise FileNotFoundError(f"Model output not found: {path}")
-    return Results(path=str(path))
+    return _load_results(OUTPUT_DIR, model_name)
 
 
 def get_carrier_production(r: Results, carrier: str) -> pd.DataFrame:
@@ -249,77 +181,6 @@ def get_import_price_eur_per_mwh(r: Results, carrier: str) -> pd.Series:
     return pi.xs(carrier, level="carrier").mean() / HOURS_PER_YEAR * 1000
 
 
-# -- Core bar-plot helper -----------------------------------------------------
-
-def plot_stacked_bars_years(
-    df: pd.DataFrame,
-    title: str,
-    unit: str,
-    ax: plt.Axes,
-    show_legend: bool = True,
-    show_segment_labels: bool = False,
-):
-    if df.empty:
-        ax.set_title(title, fontsize=11, fontweight="bold")
-        ax.text(0.5, 0.5, "No data", ha="center", va="center", transform=ax.transAxes)
-        return
-
-    years = df.columns.tolist()
-    techs = df.index.tolist()
-    bar_width = 0.6
-    labeled = set()
-
-    for year_idx, year in enumerate(years):
-        bottom = 0.0
-        for tech_idx, tech in enumerate(techs):
-            val = df.loc[tech, year]
-            if val < 1e-6:
-                continue
-            color = _get_color(tech, tech_idx)
-            hatch = _get_hatch(tech)
-            add_label = tech not in labeled
-            ax.bar(
-                year_idx, val, bar_width, bottom=bottom,
-                color=color, label=tech if add_label else None,
-                edgecolor="white", linewidth=0.5, hatch=hatch,
-            )
-            if show_segment_labels and val > 0:
-                mid = bottom + val / 2
-                ax.text(year_idx, mid, f"{val:,.0f}",
-                        ha="center", va="center", fontsize=5,
-                        color=_text_color_for_bg(color))
-            bottom += val
-            labeled.add(tech)
-
-        ax.text(year_idx, bottom, f"{bottom:,.0f}",
-                ha="center", va="bottom", fontsize=7, fontweight="bold")
-
-    ax.set_xticks(range(len(years)))
-    ax.set_xticklabels([str(y) for y in years], fontsize=9)
-    ax.set_ylabel(unit, fontsize=10)
-    ax.set_title(title, fontsize=11, fontweight="bold")
-    ax.axhline(0, color="black", linewidth=0.5)
-
-    if show_legend:
-        handles, labels = ax.get_legend_handles_labels()
-        if handles:
-            ax.legend(handles[::-1], labels[::-1],
-                      bbox_to_anchor=(1.02, 1), loc="upper left",
-                      fontsize=7, frameon=False)
-
-
-def _add_price_line(ax: plt.Axes, price_series: pd.Series, label: str, color: str):
-    if price_series.empty or (price_series.abs() < 1e-9).all():
-        return
-    x = list(range(len(price_series)))
-    ax2 = ax.twinx()
-    ax2.plot(x, price_series.values, color=color, linewidth=2,
-             marker="o", markersize=5, label=label, zorder=5)
-    ax2.set_ylabel(label, fontsize=9, color=color)
-    ax2.tick_params(axis="y", labelcolor=color)
-    ax2.legend(loc="upper right", fontsize=7, frameon=False)
-
-
 # -- Figure functions ---------------------------------------------------------
 
 def fig_carrier_energy_all(r: Results, model_name: str, save_path: Path):
@@ -381,7 +242,7 @@ def fig_boiler_hp_production(r: Results, model_name: str, save_path: Path):
             prod = prod[(prod.abs() > 1e-3).any(axis=1)]
         label = carrier.replace("_", " ").title()
         plot_stacked_bars_years(prod, label, "GWh", ax, show_segment_labels=True)
-        _add_price_line(ax, ng_price, "NG import [EUR/MWh]", "#8b0000")
+        add_price_line(ax, ng_price, "NG import [EUR/MWh]", "#8b0000")
     fig.tight_layout(rect=[0, 0, 1, 0.90])
     fig.savefig(save_path, dpi=150, bbox_inches="tight")
     print(f"  Saved: {save_path.name}")

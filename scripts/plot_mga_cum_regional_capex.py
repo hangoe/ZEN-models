@@ -80,15 +80,15 @@ import numpy as np
 from matplotlib.colors import TwoSlopeNorm
 from matplotlib.patches import Patch
 
-from figure_settings import SCENARIO_PALETTE, apply_font_mode, eth_tint
+from plots.figure_settings import SCENARIO_PALETTE, apply_font_mode, eth_tint
 
 # Match the rest of the MGA scripts / MT_report_HG's font -- see
 # figure_settings.FONT_MODE for the rationale and for the one-flag toggle
 # that switches every figure script in this repo at once.
 apply_font_mode()
+from plots.mga_capex_periods_common import FIGURES_DIR, savefig
 from zen_garden_plugins.mga.polytope_io import load_polytope
 
-FIGURES_DIR = REPO_ROOT / "data" / "outputs" / "figures" / "mga_tests"
 RUN_DIR = (
     REPO_ROOT / "data" / "outputs" / "euler_outputs_mga"
     / "Crystal_Ball_ind_heat_v9_0_no_flexibility_nodiffusion_2020_7a_5a_interval_3ts_MGA_CAPEX_CUM_batch_bbo_share_batch4"
@@ -99,14 +99,6 @@ POLY_PATH = RUN_DIR / f"{MODEL}_batch_summary" / "polytope.npz"
 REGIONS = ["north", "west", "south", "east"]
 UNTIL_YEARS = ["until_2040", "until_2050"]
 REGION_COLOR = dict(zip(REGIONS, SCENARIO_PALETTE))
-
-
-def savefig(fig: plt.Figure, name: str) -> None:
-    FIGURES_DIR.mkdir(parents=True, exist_ok=True)
-    path = FIGURES_DIR / f"{name}.svg"
-    fig.savefig(path, bbox_inches="tight")
-    plt.close(fig)
-    print(f"  wrote {path.relative_to(REPO_ROOT)}")
 
 
 def load_batch4_data():

@@ -33,7 +33,7 @@ from zen_garden import Results
 # being dashboard-only. This app is UI/orchestration only.
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 
-from figures_by_run import (
+from plots.figures_by_run import (
     fig_boiler_hp_production,
     fig_capacity_heat_supply,
     fig_capacity_production,
@@ -50,7 +50,7 @@ from figures_by_run import (
     fig_tes_capacity_addition,
     fig_tes_charge_discharge,
 )
-from figures_by_scenario import (
+from plots.figures_by_scenario import (
     fig_carbon_costs_over_time,
     fig_carrier_costs_over_time,
     fig_costs_flexibility,
@@ -64,7 +64,7 @@ from figures_by_scenario import (
     fig_natural_gas_balance,
     get_summary_metrics,
 )
-from figure_settings import (
+from plots.figure_settings import (
     EULER_ROOT,
     LOCAL_ROOT,
     Run,

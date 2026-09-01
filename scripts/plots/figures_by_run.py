@@ -15,7 +15,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 from zen_garden import Results
 
-from figure_settings import (
+from .figure_settings import (
     COLOR_MAP,
     HOURS_PER_YEAR,
     Run,

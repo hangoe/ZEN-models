@@ -232,7 +232,7 @@ from matplotlib.patches import FancyBboxPatch, Patch, Polygon, Rectangle, Wedge
 from matplotlib.path import Path as MplPath
 from matplotlib.lines import Line2D
 
-from figures_by_run import (
+from plots.figures_by_run import (
     BULK_STORAGE_TECHS,
     INDUSTRY_DSM_TECHS,
     INDUSTRY_HEAT_CARRIERS_ENERGY,
@@ -244,7 +244,7 @@ from figures_by_run import (
     get_carrier_production,
     get_storage_flows,
 )
-from figures_by_scenario import (
+from plots.figures_by_scenario import (
     _annual_series,
     build_comparison_df,
     get_annual_cost,
@@ -253,7 +253,7 @@ from figures_by_scenario import (
     get_emissions_by_technology,
     plot_stacked_bars,
 )
-from figure_settings import (
+from plots.figure_settings import (
     EULER_ROOT,
     HOURS_PER_YEAR,
     Run,

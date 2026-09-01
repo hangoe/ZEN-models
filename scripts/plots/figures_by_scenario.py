@@ -14,7 +14,7 @@ import numpy as np
 import pandas as pd
 from zen_garden import Results
 
-from figure_settings import SCENARIO_PALETTE, Run, get_available_years, plot_stacked_bars
+from .figure_settings import SCENARIO_PALETTE, Run, get_available_years, plot_stacked_bars
 
 INDUSTRY_TES_TECHS = [
     "industry_TES_water_0_100",

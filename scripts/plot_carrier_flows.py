@@ -120,7 +120,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 from matplotlib.patches import Patch
 
-from figure_settings import SCENARIO_PALETTE, apply_font_mode, eth_tint
+from plots.figure_settings import SCENARIO_PALETTE, apply_font_mode, eth_tint
 from zen_garden import Results
 
 # See figure_settings.FONT_MODE for the rationale and for the one-flag

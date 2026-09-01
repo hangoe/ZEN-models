@@ -63,7 +63,7 @@ from matplotlib.patches import Rectangle
 from matplotlib.patheffects import withStroke
 from matplotlib.ticker import FuncFormatter
 
-from figure_settings import apply_font_mode
+from plots.figure_settings import apply_font_mode
 
 # See figure_settings.FONT_MODE for the rationale and for the one-flag
 # toggle that switches every figure script in this repo at once.

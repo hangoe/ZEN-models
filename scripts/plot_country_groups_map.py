@@ -14,9 +14,6 @@ Usage:
     python scripts/plot_country_groups_map.py
 """
 
-import io
-import zipfile
-import urllib.request
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).parent.parent
@@ -25,7 +22,8 @@ import geopandas as gpd
 import matplotlib.pyplot as plt
 import pandas as pd
 
-from figure_settings import SCENARIO_PALETTE, apply_font_mode
+from plots.figure_settings import SCENARIO_PALETTE, apply_font_mode
+from plots.natural_earth import EUROPE_EXTENT, ISO_A2_EH_OVERRIDES, ensure_naturalearth_data
 
 # See figure_settings.FONT_MODE for the rationale and for the one-flag
 # toggle that switches every figure script in this repo at once.
@@ -33,10 +31,6 @@ apply_font_mode()
 
 NODES_CSV = REPO_ROOT / "data" / "Crystal_Ball" / "energy_system" / "set_nodes.csv"
 FIGURES_DIR = REPO_ROOT / "data" / "outputs" / "figures" / "mga_investment"
-
-NATURALEARTH_DIR = REPO_ROOT / "data" / "naturalearth"
-NATURALEARTH_URL = "https://naciscdn.org/naturalearth/50m/cultural/ne_50m_admin_0_countries.zip"
-NATURALEARTH_SHP = NATURALEARTH_DIR / "ne_50m_admin_0_countries.shp"
 
 # Placeholder region groups -- sorted by rough geography, to be replaced once
 # the user specifies real groups.
@@ -47,23 +41,6 @@ NODE_GROUPS = {
     "east": ["BG", "CZ", "HU", "PL", "RO", "SK"],
 }
 GROUP_COLORS = dict(zip(NODE_GROUPS, SCENARIO_PALETTE))
-
-# set_nodes.csv follows the EU statistical convention (EL, UK), which differs
-# from Natural Earth's ISO_A2_EH codes (GR, GB) for those two.
-ISO_A2_EH_OVERRIDES = {"EL": "GR", "UK": "GB"}
-
-EUROPE_EXTENT = {"lon": (-25, 45), "lat": (34, 72)}
-
-
-def ensure_naturalearth_data() -> Path:
-    if NATURALEARTH_SHP.exists():
-        return NATURALEARTH_SHP
-    NATURALEARTH_DIR.mkdir(parents=True, exist_ok=True)
-    with urllib.request.urlopen(NATURALEARTH_URL) as response:
-        zip_bytes = response.read()
-    with zipfile.ZipFile(io.BytesIO(zip_bytes)) as zf:
-        zf.extractall(NATURALEARTH_DIR)
-    return NATURALEARTH_SHP
 
 
 def load_node_groups() -> pd.DataFrame:

@@ -257,7 +257,7 @@ import pandas as pd
 
 from scipy.optimize import linprog
 
-from figure_settings import SCENARIO_PALETTE, apply_font_mode, eth_tint
+from plots.figure_settings import SCENARIO_PALETTE, apply_font_mode, eth_tint
 
 # Match MT_report_HG's font -- see figure_settings.FONT_MODE for the
 # rationale and for the one-flag toggle that switches every figure script in
