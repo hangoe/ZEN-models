@@ -9,19 +9,121 @@ TES only, Single temperature level, DSM pessimistic) plus the unmodified
 `Crystal_Ball_HG_v7_0` prefix, staged from data/Crystal_Ball, see
 run_model.py):
 
-  0a. fig0a_cost_composition            — CAPEX/OPEX/carrier/carbon-cost breakdown of each v7_0
+Figure organization (as of the SI_results/method split): every figure below
+that shows actual model RESULTS is written straight into SI_results/,
+renumbered fig1..fig10 in the same relative order the old fig0a..fig10
+numbering had. Every figure that is purely METHODOLOGICAL — no solved
+model results, either hand-typeset/illustrative or plotting input
+assumptions/context data rather than model output — is written into
+SI_results/method/ instead, renumbered fig1..fig7 within that subfolder.
+Function names below keep their OLD fig-N labels (fig11_mga_method,
+fig4a_heat_demand_by_sector, etc.) purely as stable internal identifiers
+for cross-referencing in comments throughout this file; only the actual
+output filename/folder (the savefig() call at the end of each function)
+uses the new per-folder numbering — see each entry's "-> " below for where
+it actually lands on disk.
+
+SI_results/ (results, renumbered fig1-fig10):
+  fig1_cost_composition (was fig0a)            — CAPEX/OPEX/carrier/carbon-cost breakdown of each v7_0
                                           scenario's cost increase vs Crystal Ball base
-  0b. fig0b_emissions_source_comparison — Full flex vs Crystal Ball base, year 2025: where the
+  fig2_emissions_source_comparison (was fig0b) — Full flex vs Crystal Ball base, year 2025: where the
                                           emissions increase comes from vs. only a modest cost delta
-  1a. fig1a_cost_delta                — discounted system cost delta vs Full flexibility
-  1b. fig1b_industry_capacity         — industry heat-supply & production capacity, 2050
-  2.  fig2_dsm_cycles_by_product      — DSM utilization (cycles/yr) by product: optimistic vs pessimistic
-  3b. fig3b_heat_pathway              — direct vs temp-conversion heat production, 2050
-  4a. fig4a_heat_demand_by_sector     — low-temp input heat demand by sector/band, +high-temp fuel by carrier (2023)
-  4b. fig4b_industry_fuel_demand_comparison — new-sector heat/fuel demand vs. pre-existing cement/steel fuel mix
-  5.  fig5_retrofit_ccs_comparison    — CO2 captured by retrofit-CCS technology, No flexibility vs Crystal Ball base
-  6.  fig6_diffusion_mechanisms       — ZEN-garden technology-diffusion/learning mechanisms compared
-  7.  fig7_heat_supply_trajectory     — No flexibility heat-supply capacity, every modeled year 2020-2048
+  fig3_cost_delta (was fig1a)          — discounted system cost delta vs Full flexibility
+  fig4_industry_capacity (was fig1b)   — industry heat-supply & production capacity, 2050
+  fig5_dsm_cycles_by_product (was fig2) — DSM utilization (cycles/yr) by product: optimistic vs pessimistic
+  fig6_heat_pathway (was fig3b)        — direct vs temp-conversion heat production, 2050
+  fig7_retrofit_ccs_comparison (was fig5) — CO2 captured by retrofit-CCS technology, No flexibility vs Crystal Ball base
+  fig8_diffusion_mechanisms (was fig6) — ZEN-garden technology-diffusion/learning mechanisms compared
+  fig9_heat_supply_trajectory_no_flexibility (was fig7) — No flexibility heat-supply capacity, every modeled year 2020-2048
+  fig10_power_and_storage_impact (unchanged) — power generation capacity (top row) & storage annual energy
+                                          discharged (bottom row), Crystal Ball base / No flexibility /
+                                          Full flexibility, 3 snapshot years — generation fleet SCALES UP
+                                          with mix barely shifting; storage capacity stays near-identical
+                                          across scenarios but discharge (utilization) doesn't
+
+SI_results/method/ (no results — methodological/context only, fig1-fig7):
+  fig1_heat_demand_by_sector (was fig4a) — low-temp input heat demand by sector/band, +high-temp fuel by carrier (2023):
+                                          an exogenous INPUT ASSUMPTION, not a solved-model result (see below)
+  fig2_industry_fuel_demand_comparison (was fig4b) — new-sector heat/fuel demand vs. pre-existing cement/steel fuel mix
+  fig3_industry_sector_emissions_context (was fig8) — European industry CO2 emissions by
+                                          subsector (JRC-IDEES-2023), colored by Crystal Ball scope
+  fig4_model_scope_coverage (was fig9)  — Crystal Ball's (+ its industry-heat extension's) share of
+                                          total European direct CO2 emissions (Mannhardt 2026 + UNFCCC CRF)
+  fig5_mga_method (was fig11)           — conceptual, non-data schematic of the Modeling-to-Generate-
+                                          Alternatives (MGA) method: (left) feasible region, objective
+                                          direction, optimum z*, near-optimality slack ε and the
+                                          resulting near-optimal space; (right) that space explored via
+                                          inner (IO) / outer (AO) polytope approximations refined by
+                                          directional solves
+  fig6_lp_formulation (was fig12)       — energy system optimization as an LP: the general cost-min
+                                          capacity-expansion formulation (left) next to this work's
+                                          actual "No flexibility" model's size and ZEN-garden-specific
+                                          formulation details (right), read from that run's
+                                          benchmarking.json/system.json/solver.json
+  fig7_mga_axis_construction (was fig13) — conceptual, non-data schematic of how the NUMBER of
+                                          candidate MGA axes grows as dimensions are crossed, left to
+                                          right: (1) 3 technology-group axes alone; (2) x 4 regions
+                                          (the real north/west/south/east map) = 12 axes; (3) x 3
+                                          cumulative-CAPEX horizons too, all three dimensions crossed
+                                          on one chart = 36 axes
+
+fig4a/fig4b (now method/fig1, method/fig2), fig8/fig9 (now method/fig3,
+method/fig4) moved into method/ because none of them plot a SOLVED MODEL
+RESULT: fig4a is the exogenous heat-demand ASSUMPTION fed into the model
+(see its own docstring below), fig4b is largely the same kind of
+input-vs-context comparison, and fig8/fig9 plot external JRC-IDEES-2023/
+UNFCCC input data establishing Crystal Ball's scope — none of the 4 touch
+EULER_ROOT run output. fig11/fig12/fig13 (now method/fig5-7) were already
+method figures by construction (see below).
+
+fig11 (method/fig5) is a pure method illustration: hand-picked, unitless 2D
+geometry (no model run, no external data at all), generated unconditionally
+in main() like fig8/fig9. It intentionally uses a toy feasible region (not
+the model's actual 6-D MGA exploration space plotted in
+data/outputs/figures/mga_tests/) so both axes can be labeled generically
+("Variable A/B") for a textbook-style explainer, independent of which
+specific technologies the real MGA runs explored.
+
+fig12's (method/fig6) left side (the general LP formulation) is likewise
+hand-typeset, not derived from anything solvable. Its right side, unlike
+fig11, IS real: the variable/constraint counts and solver stats are read
+directly from the "No flexibility" scenario's own
+benchmarking.json/system.json/solver.json (found via _search_var_dict under
+SCENARIOS[0], the same lookup load_results() uses) rather than hardcoded,
+so they can't silently drift from that run. Generated unconditionally in
+main(); skipped gracefully (like fig10) if that scenario isn't under
+EULER_ROOT yet.
+
+fig13 (method/fig7), like fig11, is a pure method illustration with no
+solved points — but deliberately does NOT use 2D coordinate frames (an
+earlier version did; per user feedback that read as "the near-optimal-space
+plot" and was confusing, since that's fig11's job, not this figure's).
+Instead it just COUNTS candidate axes as dimensions are crossed: panel 1 is
+3 pictogram boxes (power/hydrogen/carbon technology groups); panel 2 is the
+real north/west/south/east map crossed with a 4x3 grid of colored cells
+(regions x technology groups); panel 3 crosses all three dimensions at once
+on a single region x group x horizon chart (12 curves, 3 markers each = 36
+points/axes). Region identity is always color, technology-group identity is
+always a pictogram (lightning = power, "H2" = hydrogen, "C" = carbon) —
+consistent across all 3 panels. Every count is read directly off this
+repo's real MGA axis configs rather than invented — see the constant block
+above fig13_mga_axis_construction() for exactly which config_mga_axes_*.json
+file each panel's number comes from. Unlike fig11/fig12, fig13's map DOES
+pull in a new dependency (geopandas + the cached Natural Earth shapefile in
+data/naturalearth/) per user request for the real geography instead of an
+abstract icon — it falls back to a hand-drawn 4-wedge compass if geopandas
+or the shapefile aren't available, so it still generates unconditionally in
+main() either way.
+
+fig8 and fig9, like fig4a, plot real-world INPUT data (JRC-IDEES-2023 subsector
+emissions; Mannhardt's documented 90.0% sector-coverage figure plus UNFCCC CRF
+data via sector_emissions_2022.csv), not solved-model results — generated
+unconditionally in main(), independent of which Euler runs are loaded. fig8's
+JSON is produced by extract_industry_sector_emissions.py (run under
+zen-creator-env, same env-split reason as extract_heat_demand_by_sector.py);
+fig9 reads sector_emissions_2022.csv directly (a plain CSV, no openpyxl
+needed) from the sibling ZEN-creator repo, the same cross-repo convention
+plot_carrier_flows.py uses for ZEN-creator's outputs/.
 
 fig4a is the odd one out: unlike every other figure here, it does NOT come from
 a solved model run. It plots the exogenous low-temperature heat-demand
@@ -118,6 +220,7 @@ Usage:
     python scripts/generate_si_figures.py
 """
 
+import json
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).parent.parent
@@ -125,24 +228,12 @@ REPO_ROOT = Path(__file__).parent.parent
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from matplotlib.patches import Patch
-
-# Match MT_report_HG's font: 00_Preamble.sty loads no font package, so the
-# report is plain LaTeX default (Computer Modern). "cmr10" ships inside
-# matplotlib itself (no system LaTeX/font install needed, so this is portable
-# to Euler too) and is Computer Modern Roman — the same face. Its bundled
-# Type-1 file has no linked bold companion, so fontweight="bold" requests
-# below silently render at regular weight rather than a mismatched fallback
-# font; that's an acceptable trade-off for font consistency with the report.
-plt.rcParams.update({
-    "font.family": "serif",
-    "font.serif": ["cmr10"],
-    "mathtext.fontset": "cm",
-    "axes.formatter.use_mathtext": True,
-    "axes.unicode_minus": False,
-})
+from matplotlib.patches import FancyBboxPatch, Patch, Polygon, Rectangle, Wedge
+from matplotlib.path import Path as MplPath
+from matplotlib.lines import Line2D
 
 from figures_by_run import (
+    BULK_STORAGE_TECHS,
     INDUSTRY_DSM_TECHS,
     INDUSTRY_HEAT_CARRIERS_ENERGY,
     INDUSTRY_HEAT_TECHS_BOILERS_HP,
@@ -168,11 +259,19 @@ from figure_settings import (
     Run,
     SCENARIO_PALETTE,
     _apply_shared_ylim,
+    _search_var_dict,
     _text_color_for_bg,
+    apply_font_mode,
     eth_tint,
     get_available_years,
     load_results,
 )
+
+# Font family (Arial for presentations vs. cmr10/Computer Modern matching
+# MT_report_HG's LaTeX, for the report) is toggled in ONE place for every
+# figure script in this repo — see figure_settings.FONT_MODE. Figure-specific
+# fontsize=N calls throughout this file are unaffected by this toggle either way.
+apply_font_mode()
 
 FIGURES_DIR = REPO_ROOT / "data" / "outputs" / "figures" / "SI_results"
 # Single-year snapshot used throughout (horizon totals used where noted).
@@ -263,9 +362,14 @@ def by_label(runs: list[Run], label: str) -> Run:
     return next(r for r in runs if r.label == label)
 
 
-def savefig(fig: plt.Figure, name: str) -> None:
-    FIGURES_DIR.mkdir(parents=True, exist_ok=True)
-    path = FIGURES_DIR / f"{name}.svg"
+def savefig(fig: plt.Figure, name: str, subdir: str | None = None) -> None:
+    """subdir=None writes straight into FIGURES_DIR (SI_results/) as before;
+    subdir="method" (or "archive") writes into that subfolder instead — see
+    the module docstring's "Figure organization" note for which figures use
+    which."""
+    directory = FIGURES_DIR / subdir if subdir else FIGURES_DIR
+    directory.mkdir(parents=True, exist_ok=True)
+    path = directory / f"{name}.svg"
     fig.savefig(path, bbox_inches="tight")
     plt.close(fig)
     print(f"  wrote {path.relative_to(REPO_ROOT)}")
@@ -391,7 +495,7 @@ def fig0a_cost_composition(components_with_base: pd.DataFrame) -> None:
     ax.legend(fontsize=9, frameon=True, facecolor="white", framealpha=0.9, loc="upper center", ncol=3)
     ax.grid(axis="y", alpha=0.3)
     fig.tight_layout()
-    savefig(fig, "fig0a_cost_composition")
+    savefig(fig, "fig1_cost_composition")
 
 
 # ── 1a: Cost delta vs Full flexibility ─────────────────────────────────────
@@ -415,7 +519,7 @@ def fig1a_cost_delta(metrics: pd.DataFrame) -> None:
                   fontsize=12, fontweight="bold")
     plt.setp(ax.get_xticklabels(), rotation=20, ha="right")
     fig.tight_layout()
-    savefig(fig, "fig1a_cost_delta")
+    savefig(fig, "fig3_cost_delta")
 
 
 # ── 1b: Industry capacity, 2050 ─────────────────────────────────────────────
@@ -490,11 +594,16 @@ HEAT_SUPPLY_STACK_ORDER = [
     "heat_pump_industry_150_200_waste_heat",
 ]
 # Production techs: solid ETH colors only, no hatching (hatch_map={} below).
+# Reassigned off blue/petrol/bronze/purple (user request) once electricity
+# switched to ETH blue (_ELECTRICITY_COLOR below) — glass_production sat in
+# the same fig4a/fig4b stacked bars as the electricity segment and shared its
+# hue, so glass moved to grey and the other 3 sectors shifted to keep all 4
+# mutually distinct.
 PRODUCTION_COLOR_MAP = {
-    "glass_production": "#215CAF",    # ETH blue
-    "ceramic_production": "#007894",  # ETH petrol
-    "paper_production": "#8E6713",    # ETH bronze
-    "food_production": "#A7117A",     # ETH purple
+    "glass_production": "#6F6F6F",    # ETH grey
+    "ceramic_production": "#8E6713",  # ETH bronze
+    "paper_production": "#007894",    # ETH petrol/turquoise
+    "food_production": "#627313",     # ETH green
 }
 
 
@@ -583,7 +692,7 @@ def fig1b_industry_capacity(runs: list[Run]) -> None:
              "replacement investment - not a demand decline (Production row is flat). See docstring.",
              ha="center", va="bottom", fontsize=8, style="italic", color="#555555")
     fig.tight_layout(rect=[0, 0.02, 1, 0.95])
-    savefig(fig, "fig1b_industry_capacity")
+    savefig(fig, "fig4_industry_capacity")
 
 
 # ── 7: Heat-supply capacity trajectory, No flexibility, full horizon ───────
@@ -725,19 +834,19 @@ def fig7_heat_supply_trajectory(runs: list[Run]) -> None:
 
     fig, axes = plt.subplots(3, 1, figsize=(0.8 * len(heat_df.columns) + 3, 16))
     with plt.rc_context({"hatch.linewidth": 0.5}):
+        plot_stacked_bars(output_df, "Industry heat supply (avg GW)",
+                          "avg GW delivered", axes[0], show_segment_labels=False, show_legend=True,
+                          color_map=HEAT_SUPPLY_COLOR_MAP, hatch_map=HEAT_SUPPLY_HATCH_MAP)
         plot_stacked_bars(heat_df, "Industry Heat Supply Capacity (stock) - No Flexibility",
-                          "GW", axes[0], show_segment_labels=False, show_legend=True,
+                          "GW", axes[1], show_segment_labels=False, show_legend=False,
                           color_map=HEAT_SUPPLY_COLOR_MAP, hatch_map=HEAT_SUPPLY_HATCH_MAP)
         plot_stacked_bars(add_df, "Industry Heat Supply Capacity Additions (new builds/period) - No Flexibility",
-                          "GW added", axes[1], show_segment_labels=False, show_legend=False,
-                          color_map=HEAT_SUPPLY_COLOR_MAP, hatch_map=HEAT_SUPPLY_HATCH_MAP)
-        plot_stacked_bars(output_df, "Industry Heat Supply Actual Operated Output (avg GW) - No Flexibility",
-                          "avg GW delivered", axes[2], show_segment_labels=False, show_legend=False,
+                          "GW added", axes[2], show_segment_labels=False, show_legend=False,
                           color_map=HEAT_SUPPLY_COLOR_MAP, hatch_map=HEAT_SUPPLY_HATCH_MAP)
     for ax in axes:
         plt.setp(ax.get_xticklabels(), rotation=0)
     fig.tight_layout()
-    savefig(fig, "fig7_heat_supply_trajectory_no_flexibility")
+    savefig(fig, "fig9_heat_supply_trajectory_no_flexibility")
 
 
 # ── 5: Retrofit carbon-capture tech usage, No flexibility vs. base ─────────
@@ -864,7 +973,7 @@ def fig5_retrofit_ccs_comparison(no_flex_run: Run, base_run: Run) -> None:
              "real-world base, and 2 of 8 techs cost literally $0 to build in this dataset - see docstring.",
              transform=ax.transAxes, ha="center", va="top", fontsize=7.5, style="italic", color="#555555")
     fig.tight_layout(rect=[0, 0, 1, 0.95])
-    savefig(fig, "fig5_retrofit_ccs_comparison")
+    savefig(fig, "fig7_retrofit_ccs_comparison")
 
 
 # ── 2: DSM cycles by product, 2050 ──────────────────────────────────────────
@@ -934,7 +1043,7 @@ def fig2_dsm_cycles_by_product(runs: list[Run]) -> None:
              fontsize=9, frameon=False)
     ax.grid(axis="y", alpha=0.3)
     fig.tight_layout()
-    savefig(fig, "fig2_dsm_cycles_by_product")
+    savefig(fig, "fig5_dsm_cycles_by_product")
 
 
 # ── 3b: Direct vs temperature-conversion heat pathway, 2050 ─────────────────
@@ -1023,7 +1132,7 @@ def fig3b_heat_pathway(runs: list[Run]) -> None:
     ax.legend(fontsize=9, frameon=False, loc="lower right")
     ax.grid(axis="x", alpha=0.3)
     fig.tight_layout()
-    savefig(fig, "fig3b_heat_pathway")
+    savefig(fig, "fig6_heat_pathway")
 
 
 # ── 4: Low-temperature input heat demand by sector and temperature band ────
@@ -1119,11 +1228,12 @@ _FUEL_LABEL_BBOX = dict(facecolor="white", edgecolor="none", alpha=0.75, pad=1.5
 
 # Electricity: not temperature-banded and not part of the >200°C fuel mix —
 # every X_production tech has a fixed electricity input alongside both (SectorParams.
-# cf_elec). Reuses _ETH_GREEN, the same color electrode_boiler_industry (the
-# other electricity-driven technology in these SI figures) gets in
-# HEAT_SUPPLY_COLOR_MAP, so "green = electricity" reads consistently across
-# fig1b and fig4a.
-_ELECTRICITY_COLOR = _ETH_GREEN
+# cf_elec). ETH blue, matching drawio's system-overview diagrams (user
+# request) — this is the CARRIER's color, deliberately independent of
+# electrode_boiler_industry's own green in HEAT_SUPPLY_COLOR_MAP (that map
+# colors boiler/heat-pump IDENTITY, not the carrier they consume; see that
+# section's own header comment).
+_ELECTRICITY_COLOR = _ETH_BLUE
 _ELECTRICITY_LABEL = "Electricity"
 
 
@@ -1243,7 +1353,7 @@ def fig4a_heat_demand_by_sector() -> None:
                   handlelength=3.0, handleheight=1.8, columnspacing=1.2)
     ax.grid(axis="y", alpha=0.3)
     fig.tight_layout()
-    savefig(fig, "fig4a_heat_demand_by_sector")
+    savefig(fig, "fig1_heat_demand_by_sector", subdir="method")
 
 
 # ── 4b: New-sector heat demand vs. pre-existing cement/steel fuel mix ──────
@@ -1458,7 +1568,7 @@ def fig4b_industry_fuel_demand_comparison(runs: list[Run]) -> None:
     ax.grid(axis="y", alpha=0.3)
 
     fig.tight_layout()
-    savefig(fig, "fig4b_industry_fuel_demand_comparison")
+    savefig(fig, "fig2_industry_fuel_demand_comparison", subdir="method")
 
 
 # ── 6: Technology-diffusion / capacity-growth mechanisms ───────────────────
@@ -1743,7 +1853,7 @@ def fig6_diffusion_mechanisms(runs: list[Run]) -> None:
              "magnitude, not an exact/always-binding ceiling) - see _knowledge_history_term's docstring.",
              ha="center", va="bottom", fontsize=8, style="italic", color="#555555")
     fig.tight_layout(rect=[0, 0.02, 1, 0.93])
-    savefig(fig, "fig6_diffusion_mechanisms")
+    savefig(fig, "fig8_diffusion_mechanisms")
 
 
 # ── 0b: Emissions-source comparison, Full flexibility vs Crystal Ball base ──
@@ -1754,8 +1864,11 @@ def fig6_diffusion_mechanisms(runs: list[Run]) -> None:
 # else in these SI figures (SCENARIO_PALETTE, COST_COMPONENT_COLORS,
 # HEAT_SUPPLY_COLOR_MAP/PRODUCTION_COLOR_MAP above) rather than the generic,
 # off-brand hues COLOR_MAP happens to hold for some of these same categories
-# (e.g. a plain purple for glass_production). glass_production keeps
-# PRODUCTION_COLOR_MAP's ETH blue for cross-figure consistency with fig1b.
+# (e.g. a plain purple for glass_production). glass_production keeps ETH
+# blue here — NOT the same as its current PRODUCTION_COLOR_MAP entry (grey,
+# since fig4a/fig4b's electricity segment moved to blue) — blue is otherwise
+# unused among this map's carriers, and fig0b never plots electricity, so no
+# in-chart clash results from the two figures disagreeing on glass's color.
 # Carriers (the larger, primary stacked segments) each get one solid base
 # hue; technologies (smaller, secondary segments) get a lighter tint of a
 # related hue via _eth_tint (defined above, fig1b's section) — the tint
@@ -1964,50 +2077,17 @@ def fig0b_emissions_source_comparison(full_run: Run, base_run: Run) -> None:
     # edge (early years), where the rising cumulative-emissions lines are
     # still well clear of both dashed budget lines.
     delta_budget = budget_full - budget_base
-    pct_budget = delta_budget / budget_base * 100
     sign = "+" if delta_budget >= 0 else ""
     bracket_x = years[0] + 0.03 * (years[-1] - years[0])  # far left, where both cumulative-emissions lines are still near 0
     ax2.annotate("", xy=(bracket_x, budget_full), xytext=(bracket_x, budget_base),
                  arrowprops=dict(arrowstyle="<->", color="black", linewidth=1.0))
     ax2.text(bracket_x + 0.015 * (years[-1] - years[0]), (budget_full + budget_base) / 2,
-             f"$\\Delta$ budget = {sign}{delta_budget:,.0f} Mton ({sign}{pct_budget:.1f}%)",
+             f"$\\Delta$ budget = {sign}{delta_budget:,.0f} Mton",
              ha="left", va="center", fontsize=8.5, fontweight="bold")
-
-    # The only gap that actually costs money: the final-year shortfall.
-    # As of the shortened (2025-2050) horizon, BOTH runs land mid-overshoot at
-    # the final modeled year — neither has reached its late-horizon
-    # net-negative repayment swing yet (see docstring). Carbon cost is pulled
-    # directly from the solved model rather than hardcoded, since it depends
-    # on which year happens to be "final" for a given horizon.
-    final_year = years[-1]
-    overshoot_full = cum_full[final_year] - budget_full
-    overshoot_base = cum_base[final_year] - budget_base
-    cost_full = float(fr.get_total("cost_carbon_emissions_total")[final_year])
-    cost_base = float(br.get_total("cost_carbon_emissions_total")[final_year])
-    ax2.plot([final_year, final_year], [budget_full, cum_full[final_year]],
-             color=_ETH_RED, linewidth=3, solid_capstyle="butt", zorder=5)
-    ax2.plot([final_year, final_year], [budget_base, cum_base[final_year]],
-             color=_ETH_RED, linewidth=3, solid_capstyle="butt", zorder=5)
-    # Short, numbers-only labels placed to the RIGHT of the final data point
-    # (off the plotted lines/legend entirely — a longer prose version placed
-    # near the top-left previously landed behind the legend and the lines
-    # themselves, per user feedback) — set_xlim below opens up the margin
-    # these sit in.
-    year_step = years[-1] - years[-2]
-    label_x = final_year + 0.15 * year_step
-    ax2.annotate(f"+{overshoot_full:,.0f} Mt\n{cost_full / 1e6:.1f}M EUR",
-        xy=(final_year, cum_full[final_year]), xytext=(label_x, cum_full[final_year]),
-        fontsize=8, fontweight="bold", color=_ETH_RED, ha="left", va="center",
-        arrowprops=dict(arrowstyle="->", color=_ETH_RED))
-    ax2.annotate(f"+{overshoot_base:,.0f} Mt\n{cost_base / 1e6:.1f}M EUR",
-        xy=(final_year, cum_base[final_year]), xytext=(label_x, cum_base[final_year]),
-        fontsize=8, fontweight="bold", color=base_run.color, ha="left", va="center",
-        arrowprops=dict(arrowstyle="->", color=base_run.color))
 
     ax2.set_xlabel("Year")
     ax2.set_ylabel("Cumulative carbon emissions [Mton CO$_2$eq]")
     ax2.set_title("Cumulative Emissions vs. Carbon Budget", fontsize=11, fontweight="bold")
-    ax2.set_xlim(right=final_year + 0.6 * year_step)  # headroom for the RHS labels
     ax2.set_ylim(top=max(full_vals) * 1.1)
     ax2.legend(fontsize=7.5, loc="upper left")
     ax2.grid(alpha=0.3)
@@ -2015,7 +2095,852 @@ def fig0b_emissions_source_comparison(full_run: Run, base_run: Run) -> None:
     fig.suptitle("Emission Increase Attributable to the Newly Implemented Industry Sectors",
                  fontsize=13, fontweight="bold")
     fig.tight_layout(rect=[0, 0, 1, 0.95])
-    savefig(fig, "fig0b_emissions_source_comparison")
+    savefig(fig, "fig2_emissions_source_comparison")
+
+
+# ── 8/9: Real-world industry-emissions context (input data, no model results) ──
+# Neither figure below depends on a solved ZEN-garden run: both plot exogenous,
+# real-world emissions data (JRC-IDEES-2023 / UNFCCC CRF, reached via
+# ZEN-creator's input_data) that motivate/contextualize Crystal Ball's
+# sectoral scope, per user request — generated unconditionally in main().
+
+INDUSTRY_SECTOR_EMISSIONS_JSON = FIGURES_DIR / "industry_sector_emissions_input.json"
+# Sibling-repo convention (see plot_carrier_flows.py's ZEN_CREATOR_OUTPUTS):
+# a plain CSV, so no openpyxl/env-split bridge is needed unlike fig8's JSON.
+MODEL_SCOPE_CSV = REPO_ROOT.parent / "ZEN-creator" / "input_data" / "Emissionbudget" / "sector_emissions_2022.csv"
+
+_SCOPE_COLOR = {"old": _ETH_BLUE, "new": _ETH_GREEN, None: _ETH_GREY}
+_SCOPE_LABEL = {"old": "Existing Crystal Ball sectors (Mannhardt, 2026)",
+                "new": "Industry-heat extension (this work)",
+                None: "Not modeled by Crystal Ball"}
+
+
+def fig8_industry_sector_emissions_context() -> None:
+    """European industrial CO2 emissions by subsector (JRC-IDEES-2023, EU27,
+    2022) — pure real-world input-data context, no solved model results.
+    Answers "how big are the industry sectors Crystal Ball (and its
+    industry-heat extension) model, relative to the rest of European
+    industry": each bar is colored/stacked by whether that slice is inside
+    Mannhardt's original 11-sector scope (blue), the four new industry-heat
+    sectors added here (turquoise), or not modeled at all (grey). Three
+    subsectors are split into their JRC-IDEES second-level components so this
+    line can be drawn correctly INSIDE a bar rather than per whole subsector:
+    "Non-metallic minerals" -> cement (old) + glass/ceramics (new); "Paper,
+    pulp & printing" -> paper (new) + pulp/printing (not modeled). See
+    extract_industry_sector_emissions.py for the extraction and the full
+    scope-mapping rationale.
+
+    CAVEAT: these are JRC-IDEES's energy-related (fuel combustion) emissions
+    only — the IPCC 1.A methodology JRC-IDEES itself uses — and do NOT
+    include IPCC 2.x process emissions (cement calcination, steel ore
+    reduction, glass/ceramic carbonate decomposition). Steel and non-metallic
+    minerals both have a substantial process-emissions component not counted
+    here, so their bars understate those two sectors' full footprint
+    relative to sector_emissions_2022.csv (fig9's source), which DOES fold
+    UNFCCC process-emission CRF categories in on top of combustion for the
+    specific sectors Crystal Ball models. Not comparable 1:1 with fig9's Mt
+    figures for that reason — this figure's job is relative subsector SCALE
+    across ALL of European industry, fig9's is the model's total coverage
+    SHARE of all-sector European emissions.
+    """
+    if not INDUSTRY_SECTOR_EMISSIONS_JSON.exists():
+        print(f"  skipping fig8_industry_sector_emissions_context: "
+              f"{INDUSTRY_SECTOR_EMISSIONS_JSON.relative_to(REPO_ROOT)} not found — "
+              "run scripts/extract_industry_sector_emissions.py under zen-creator-env first")
+        return
+    import json
+    data = json.loads(INDUSTRY_SECTOR_EMISSIONS_JSON.read_text())
+    sectors = data["sectors"]
+
+    # Each sector -> list of (scope, Mt) segments, ordered old/new/unmodeled
+    # for consistent bottom-to-top stacking.
+    _scope_order = {"old": 0, "new": 1, None: 2}
+    rows = []
+    for s in sectors:
+        if "subsplit" in s:
+            segs = [(sub["scope"], sub["emissions_kt_co2"] / 1000) for sub in s["subsplit"]]
+        else:
+            segs = [(s["scope"], s["emissions_kt_co2"] / 1000)]
+        segs.sort(key=lambda seg: _scope_order[seg[0]])
+        rows.append((s["label"], sum(v for _, v in segs), segs))
+    rows.sort(key=lambda r: -r[1])
+
+    fig, ax = plt.subplots(figsize=(12, 6.5))
+    x = np.arange(len(rows))
+    label_offset = 0.015 * max(r[1] for r in rows)
+    for xi, (label, total, segs) in zip(x, rows):
+        bottom = 0.0
+        for scope, val in segs:
+            ax.bar(xi, val, 0.65, bottom=bottom, color=_SCOPE_COLOR[scope],
+                   edgecolor="white", linewidth=0.5)
+            bottom += val
+        ax.text(xi, bottom + label_offset, f"{total:.0f}", ha="center", va="bottom", fontsize=8)
+
+    ax.set_xticks(x)
+    ax.set_xticklabels([r[0] for r in rows], rotation=35, ha="right", fontsize=9)
+    ax.set_ylabel("Energy-related CO$_2$ emissions [Mt CO$_2$/yr]")
+    ax.set_title(f"European Industrial CO$_2$ Emissions by Subsector (EU27, {data['year']})",
+                 fontsize=12, fontweight="bold")
+    handles = [Patch(facecolor=_SCOPE_COLOR[k], label=_SCOPE_LABEL[k]) for k in ("old", "new", None)]
+    ax.legend(handles=handles, fontsize=8.5, frameon=False, loc="upper right")
+    ax.grid(axis="y", alpha=0.3)
+    ax.set_ylim(top=ax.get_ylim()[1] * 1.08)
+    fig.text(0.01, 0.01, f"Source: {data['source']}", fontsize=7, color="grey")
+    fig.tight_layout(rect=[0, 0.03, 1, 1])
+    savefig(fig, "fig3_industry_sector_emissions_context", subdir="method")
+
+
+# Mannhardt (2026) Appendix A.2: her carbon budget is calibrated to the
+# ~90.0% share of the 28 countries' 2021 direct CO2 emissions attributable to
+# her 11 modeled sectors (see ASSUMPTIONS.md, "Carbon emissions budget") —
+# the only documented anchor for "what % of total European CO2 does Crystal
+# Ball's ORIGINAL scope cover". Not independently re-derived here (no local
+# total-emissions dataset spanning all sectors/countries at once) — treated
+# as a citation, not a computed figure, hence its own named constant here
+# rather than a CSV field.
+MANNHARDT_OLD_SECTORS_SHARE_OF_TOTAL = 0.900
+
+
+def fig9_model_scope_coverage() -> None:
+    """How much of total European (28-country: EU27+CH+NO-MT-CY) direct CO2
+    emissions Crystal Ball's modeled sectors cover, and how much of that
+    coverage the industry-heat extension (this work) adds on top of
+    Mannhardt (2026)'s original 11-sector scope.
+
+    Two numbers come from different places:
+      - Mannhardt's 11 sectors = ~90.0% of the 28-country total (her own
+        reported figure, 2021 basis, ASSUMPTIONS.md "Carbon emissions
+        budget" / dissertation Appendix A.2) — MANNHARDT_OLD_SECTORS_SHARE_
+        OF_TOTAL above.
+      - The 4 new industry-heat sectors' emissions relative to those same 11
+        sectors (E_new/E_old, 2022 UNFCCC CRF data, Variant B "naive
+        full-add" — the variant actually implemented in
+        CrystalBallIndustryEnergySystem, see ASSUMPTIONS.md) come from
+        sector_emissions_2022.csv directly.
+    The extension's ADDITIONAL percentage-point coverage is then
+    (E_new/E_old) x 90.0%, i.e. it inherits the same total-emissions
+    denominator as Mannhardt's own share rather than an independently
+    computed absolute total (no all-sector, all-28-country total is
+    available locally) — so the implied total (E_old / 0.900) and the "not
+    covered" remainder are approximate, order-of-magnitude figures, not
+    exact ones. Variant B's known caveat (it re-adds the shared cement/glass/
+    ceramic combustion bucket already counted once under "cement" — see
+    ASSUMPTIONS.md) means the extension's true additional coverage is
+    somewhat below what's shown here; shown anyway since it is the
+    documented, implemented choice (DEFAULT_VARIANT = "B").
+    """
+    df = pd.read_csv(MODEL_SCOPE_CSV)
+    e_old = df.loc[df.bucket == "old", "emissions_kt_co2_28countries"].sum()
+    new_b = df[(df.bucket == "new") & df.variant_tags.str.contains("B")]
+    e_new = (new_b["emissions_kt_co2_28countries"] + new_b["emissions_kt_co2_uk"]).sum()
+
+    share_old = MANNHARDT_OLD_SECTORS_SHARE_OF_TOTAL
+    share_new = share_old * e_new / e_old
+    share_uncovered = 1 - share_old - share_new
+    total_mt = e_old / share_old / 1000
+
+    segments = [("Existing Crystal Ball sectors\n(Mannhardt, 2026)", share_old, _ETH_BLUE, e_old / 1000),
+                ("+ Industry-heat extension\n(this work)", share_new, _ETH_GREEN, e_new / 1000),
+                ("Not covered by Crystal Ball", share_uncovered, _ETH_GREY, None)]
+
+    fig, ax = plt.subplots(figsize=(10, 3.4))
+    left = 0.0
+    outside_slot = 0  # alternates up/down for the two small segments' outside labels
+    for label, share, color, mt in segments:
+        ax.barh(0, share * 100, left=left * 100, height=0.55, color=color, edgecolor="white")
+        text = f"{share * 100:.1f}%" + (f"\n({mt:,.0f} Mt CO$_2$)" if mt is not None else "")
+        center = left * 100 + share * 50
+        if share > 0.08:
+            ax.text(center, 0, text, ha="center", va="center", fontsize=9,
+                    color=_text_color_for_bg(color), fontweight="bold")
+        else:
+            y_text = 0.62 if outside_slot == 0 else -0.62
+            va = "bottom" if outside_slot == 0 else "top"
+            ax.annotate(text, xy=(center, 0.275 if outside_slot == 0 else -0.275),
+                        xytext=(center, y_text), fontsize=8.5, ha="center", va=va,
+                        arrowprops=dict(arrowstyle="-", color=color))
+            outside_slot += 1
+        left += share
+
+    handles = [Patch(facecolor=c, label=l.replace("\n", " ")) for l, _, c, _ in segments]
+    ax.legend(handles=handles, fontsize=8, frameon=False, loc="upper center",
+              bbox_to_anchor=(0.5, -0.3), ncol=3)
+    ax.set_xlim(0, 100)
+    ax.set_ylim(-1.0, 1.0)
+    ax.set_yticks([])
+    ax.set_xlabel("Share of total European direct CO$_2$ emissions [%]  "
+                  f"(28 countries $\\approx$ {total_mt:,.0f} Mt CO$_2$/yr, approx.)")
+    ax.set_title("Crystal Ball's Coverage of Total European Direct CO$_2$ Emissions",
+                 fontsize=12, fontweight="bold")
+    for spine in ("top", "right", "left"):
+        ax.spines[spine].set_visible(False)
+    fig.text(0.01, 0.01, "Source: Mannhardt (2026) Appendix A.2 (90.0% share) + "
+              "sector_emissions_2022.csv (UNFCCC CRF, Variant B)", fontsize=7, color="grey")
+    fig.tight_layout(rect=[0, 0.08, 1, 1])
+    savefig(fig, "fig4_model_scope_coverage", subdir="method")
+
+
+# ── 10: Power-sector impact of industry-heat flexibility ───────────────────
+# No flexibility vs Crystal Ball base isolates the power-sector cost of
+# electrifying industry heat WITHOUT any flexibility (DSM/TES) to shape that
+# new load — Crystal Ball base has no industry-heat sector at all (see
+# BASE_SCENARIO's comment), so it's the "before electrification" reference.
+# Full flexibility is added as a 3rd bar throughout, to see whether
+# flexibility elsewhere in the system changes how much fleet buildout /
+# storage cycling is needed to absorb that same new load.
+#
+# Requested snapshot years were 2025/2035/2045, but the v9_0 horizon only has
+# even-numbered modeled years (2020, 2022, ..., 2048 — reference_year=2020,
+# interval_between_years=2, see get_available_years()). Each requested year
+# sits exactly between two modeled years; rounded UP to the nearest modeled
+# year (2026/2036/2046) rather than down, so the middle snapshot (2036)
+# matches the YEAR constant already used as this script's standard
+# mid-horizon snapshot elsewhere (fig0a/fig1a/fig5/etc.).
+SNAPSHOT_YEARS_POWER = [2026, 2036, 2046]
+
+
+# ── 10: Power generation capacity mix ───────────────────────────────────────
+
+POWER_GEN_TECHS = [
+    "photovoltaics", "wind_onshore", "wind_offshore",
+    "reservoir_hydro", "run-of-river_hydro",
+    "nuclear",
+    "natural_gas_turbine", "natural_gas_turbine_CCS",
+    "hard_coal_plant", "lignite_coal_plant", "oil_plant",
+    "biomass_plant", "biomass_plant_CCS",
+    "waste_plant",
+]
+
+# NOTE ON PALETTE: this figure is ETH-7-colors-only (see
+# [[feedback-si-figure-colors]]), same as every other SI figure in this
+# script, with exactly ONE true exception: photovoltaics uses a non-ETH
+# yellow, since the corporate palette has no yellow/gold at all and "solar"
+# reads as wrong in any other hue. wind_onshore/wind_offshore are "2 shades
+# of blue" per user request, but achieved by TINTING _ETH_BLUE itself (via
+# _eth_tint(), same mechanism HEAT_SUPPLY_COLOR_MAP already uses) rather than
+# a separate non-ETH blue — so wind stays on-palette. That puts 4 shades of
+# the same ETH_BLUE hue in this figure (reservoir_hydro darkest, then
+# run-of-river_hydro, wind_offshore, wind_onshore lightest) — distinguishable
+# by lightness, the same convention HEAT_SUPPLY_COLOR_MAP uses for its
+# multiple heat-pump temperature bands.
+_SOLAR_YELLOW = "#FFCA3A"
+POWER_GEN_COLOR_MAP = {
+    "photovoltaics": _SOLAR_YELLOW,
+    "wind_onshore": _eth_tint(_ETH_BLUE, 0.65),
+    "wind_offshore": _eth_tint(_ETH_BLUE, 0.45),
+    "reservoir_hydro": _ETH_BLUE,
+    "run-of-river_hydro": _eth_tint(_ETH_BLUE, 0.25),
+    "nuclear": _ETH_PURPLE,
+    "natural_gas_turbine": _ETH_TURQUOISE,
+    "natural_gas_turbine_CCS": _ETH_TURQUOISE,
+    "hard_coal_plant": _ETH_GREY,
+    "lignite_coal_plant": _eth_tint(_ETH_GREY, 0.3),
+    "oil_plant": _eth_tint(_ETH_GREY, 0.55),
+    "biomass_plant": _ETH_GREEN,
+    "biomass_plant_CCS": _ETH_GREEN,
+    "waste_plant": _ETH_RED,
+}
+POWER_GEN_HATCH_MAP = {"natural_gas_turbine_CCS": _HP_HATCH, "biomass_plant_CCS": _HP_HATCH}
+# Fossil (dirtiest first) at the bottom of the stack, then biomass/waste,
+# nuclear, hydro, VRE on top — same "cleaner = higher in the stack"
+# convention HEAT_SUPPLY_STACK_ORDER uses.
+POWER_GEN_STACK_ORDER = [
+    "hard_coal_plant", "lignite_coal_plant", "oil_plant",
+    "natural_gas_turbine", "natural_gas_turbine_CCS",
+    "waste_plant", "biomass_plant", "biomass_plant_CCS",
+    "nuclear",
+    "reservoir_hydro", "run-of-river_hydro",
+    "wind_onshore", "wind_offshore", "photovoltaics",
+]
+
+
+# BULK_STORAGE_TECHS (figures_by_run.py) is power-sector storage that exists
+# in every run, including Crystal Ball base — unlike industry TES/DSM, which
+# only exist once the industry-heat extension is loaded. ETH-7-colors-only
+# (see the palette note above POWER_GEN_COLOR_MAP), keyed to what each tech
+# stores: electricity=ETH_BLUE (battery=full strength, "hydro shade" tint for
+# pumped_hydro so the two are distinguishable within the same stack), natural
+# gas=ETH_TURQUOISE (matching natural_gas_turbine), oil=the same ETH_GREY
+# tint as oil_plant, hydrogen=ETH_PURPLE (matching nuclear; no analog in the
+# generation row, free to reuse).
+STORAGE_COLOR_MAP = {
+    "battery": _ETH_BLUE,
+    "pumped_hydro": _eth_tint(_ETH_BLUE, 0.35),
+    "natural_gas_storage": _ETH_TURQUOISE,
+    "oil_storage": _eth_tint(_ETH_GREY, 0.55),
+    "salt_cavern_storage": _ETH_PURPLE,
+}
+STORAGE_STACK_ORDER = ["battery", "pumped_hydro", "natural_gas_storage", "oil_storage", "salt_cavern_storage"]
+
+
+def fig10_power_and_storage_impact(base_run: Run, no_flex_run: Run, full_run: Run) -> None:
+    """Power-sector generation capacity (top row) and storage annual energy
+    discharged (bottom row), Crystal Ball base / No flexibility / Full
+    flexibility, at 3 snapshot years.
+
+    Isolates finding #1 (top row): adding electrified (but inflexible)
+    industry heat demand does NOT change the generation TECHNOLOGY mix —
+    every technology's SHARE of total capacity stays roughly the same across
+    scenarios — it just scales the whole fleet up (+11% total capacity at
+    2036 for No flexibility vs base, driven almost entirely by proportionally
+    more VRE: +19% PV, +12% offshore wind, +4% onshore wind, vs. essentially
+    flat dispatchable/fossil capacity). Capacity factors on the existing
+    fleet barely move either (e.g. wind onshore 0.191 vs 0.192, nuclear 0.523
+    vs 0.529 at 2036) — confirming this is a pure scale effect, not a
+    dispatch-pattern change. The mechanism: the added load is a flat,
+    non-dispatchable draw with no diurnal/seasonal shape at all (see fig7's
+    docstring for the same underlying fact about the industry-heat carriers),
+    so the optimizer meets it by building more of whatever is already
+    cheapest at the margin (predominantly VRE), not by adding new
+    technologies or new dispatchable/peaking capacity. Full flexibility is
+    included as a 3rd bar to see whether shifting the industry load itself
+    (via DSM/TES) reduces this fleet scale-up relative to No flexibility.
+
+    Isolates finding #3 (bottom row): No flexibility DISCHARGES ~16% more
+    from battery and ~16% more from salt-cavern (H2) storage than Crystal
+    Ball base at 2036 — the existing storage fleet is cycled harder to
+    buffer the added flat industry-heat electricity load. (Storage POWER
+    CAPACITY itself barely differs across scenarios — battery/pumped-hydro
+    within a few % everywhere — so that panel is omitted here; utilization
+    is where the difference actually shows up.) Full flexibility's discharge
+    sitting between No flexibility and base would mean industry-side
+    flexibility substitutes for power-sector storage cycling; sitting
+    at/above No flexibility would mean it doesn't.
+    """
+    runs = [base_run, no_flex_run, full_run]
+    gen_dfs, disch_dfs = [], []
+    for year in SNAPSHOT_YEARS_POWER:
+        gen_series = [(r.label, get_capacity(r.results, POWER_GEN_TECHS, "power")
+                       .get(year, pd.Series(dtype=float))) for r in runs]
+        gen_df = build_comparison_df(gen_series)
+        gen_df = gen_df.reindex([t for t in POWER_GEN_STACK_ORDER if t in gen_df.index]
+                                 + [t for t in gen_df.index if t not in POWER_GEN_STACK_ORDER])
+        gen_dfs.append(gen_df)
+        disch_series = [(r.label, get_storage_flows(r.results, BULK_STORAGE_TECHS, "flow_storage_discharge")
+                         .get(year, pd.Series(dtype=float))) for r in runs]
+        disch_dfs.append(build_comparison_df(disch_series).reindex(STORAGE_STACK_ORDER).fillna(0.0))
+
+    n_yr = len(SNAPSHOT_YEARS_POWER)
+    fig, axes = plt.subplots(2, n_yr, figsize=(6 * n_yr, 13), squeeze=False)
+    fig.suptitle("Power Generation & Storage Discharge — Crystal Ball Base / No Flexibility / Full Flexibility",
+                 fontsize=13, fontweight="bold")
+    with plt.rc_context({"hatch.linewidth": 0.5}):
+        for col, year in enumerate(SNAPSHOT_YEARS_POWER):
+            plot_stacked_bars(gen_dfs[col], f"Power Generation Capacity — {year}", "GW", axes[0, col],
+                              show_segment_labels=False, show_legend=(col == n_yr - 1),
+                              color_map=POWER_GEN_COLOR_MAP, hatch_map=POWER_GEN_HATCH_MAP)
+    for col, year in enumerate(SNAPSHOT_YEARS_POWER):
+        plot_stacked_bars(disch_dfs[col], f"Storage Annual Energy Discharged — {year}", "GWh", axes[1, col],
+                          show_segment_labels=True, show_legend=(col == n_yr - 1),
+                          color_map=STORAGE_COLOR_MAP, hatch_map={})
+    _apply_shared_ylim(list(axes[0, :]), gen_dfs)
+    _apply_shared_ylim(list(axes[1, :]), disch_dfs)
+    for ax in axes.flat:
+        plt.setp(ax.get_xticklabels(), rotation=20, ha="right")
+    fig.tight_layout(rect=[0, 0, 1, 0.94])
+    savefig(fig, "fig10_power_and_storage_impact")
+
+
+# ── 11: MGA method schematic (no data) ──────────────────────────────────────
+# Purely illustrative 2D geometry, hand-picked below (not derived from any
+# solved model). Left panel: a toy feasible region under a linear objective,
+# its cost-optimal vertex z*, the two parallel iso-cost lines C* and
+# (1+eps)C*, and the near-optimal "wedge" between them (the intersection of
+# the feasible region with the slack half-space) - this wedge IS the
+# near-optimal space explored on the right. Right panel: the same wedge (now
+# treated as an unknown polytope) approximated from both sides - an outer
+# approximation (AO, a bounding box, cheap to get from per-axis min/max
+# solves) and an inner approximation (IO, the convex hull of whatever
+# vertices directional solves have actually found so far, starting from just
+# z*) - refined by solving in new directions until IO closes the gap to AO.
+
+# Toy feasible region (hexagon) and its cost-optimal vertex under a linear
+# objective cost(x, y) = x + y (minimized). Chosen so z* is a genuine corner
+# solution (every other vertex has a strictly higher x+y).
+_MGA_FEASIBLE = [(1, 1), (5, 0.5), (8, 2), (7, 6), (3, 7), (0.5, 4)]
+_MGA_Z_STAR = (1.0, 1.0)  # argmin of x + y over _MGA_FEASIBLE
+_MGA_EPS = 0.4  # illustrative near-optimality slack (fraction of C*), not a real value
+
+# Where the two iso-cost lines (x+y = C*, x+y = (1+eps)*C*) cross the hexagon,
+# hand-solved from the edges adjacent to z* (line-segment intersection, see
+# module comment above): the slack line cuts the (1,1)-(5,0.5) edge at
+# (1.914, 0.886) and the (0.5,4)-(1,1) edge at (0.84, 1.96). Together with z*
+# these 3 points bound the near-optimal wedge - the same shape zoomed into on
+# the right.
+_MGA_NEAR_OPT_WEDGE = [_MGA_Z_STAR, (1.914, 0.886), (0.840, 1.960)]
+
+
+def _mga_iso_cost_line(cost: float, span: float = 1.0) -> tuple[list[float], list[float]]:
+    """Two points spanning the line x + y = cost, for plotting."""
+    return [-span, cost + span], [cost + span, -span]
+
+
+def fig11_mga_method() -> None:
+    """Conceptual, non-data schematic of Modeling to Generate Alternatives
+    (MGA): how the near-optimal space is defined (left) and how this work's
+    algorithm explores it via inner/outer polytope approximation (right).
+    See the module-level comment above this function and above
+    _MGA_FEASIBLE for the (hand-picked, unitless) geometry used.
+    """
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(13, 6))
+
+    # ── Left: feasible region, objective, slack, near-optimal space ────────
+    ax1.add_patch(Polygon(_MGA_FEASIBLE, closed=True, facecolor=eth_tint(_ETH_GREY, 0.82),
+                           edgecolor=_ETH_GREY, linewidth=1.3, zorder=1))
+    ax1.add_patch(Polygon(_MGA_NEAR_OPT_WEDGE, closed=True, facecolor=eth_tint(_ETH_BLUE, 0.35),
+                           edgecolor=_ETH_BLUE, linewidth=1.6, zorder=3))
+
+    c_star = sum(_MGA_Z_STAR)  # = 2.0
+    slack_cost = c_star * (1 + _MGA_EPS)  # = 2.8
+    iso_cost_lines = [
+        (c_star, "black", "-", "$C^*$ (optimal cost)"),
+        (slack_cost, _ETH_RED, "--", r"$(1+\varepsilon)\,C^*$ (slack bound)"),
+    ]
+    for cost, color, ls, _text in iso_cost_lines:
+        xs, ys = _mga_iso_cost_line(cost, span=1.0)
+        ax1.plot(xs, ys, color=color, linestyle=ls, linewidth=1.2, zorder=2)
+
+    # Epsilon bracket: perpendicular gap between the two iso-cost lines,
+    # anchored at a point common to both lines' "along-line" coordinate.
+    p1 = (1.5, 0.5)
+    p2 = (p1[0] + (slack_cost - c_star) / 2, p1[1] + (slack_cost - c_star) / 2)
+    ax1.annotate("", xy=p2, xytext=p1,
+                 arrowprops=dict(arrowstyle="<->", color=_ETH_RED, linewidth=1.2), zorder=4)
+    ax1.text((p1[0] + p2[0]) / 2 + 0.2, (p1[1] + p2[1]) / 2 - 0.35, r"$\varepsilon$",
+              color=_ETH_RED, fontsize=11, fontweight="bold")
+
+    # Objective direction: arrow pointing toward z*, i.e. toward decreasing cost.
+    ax1.annotate("", xy=(2.0, 2.0), xytext=(3.6, 3.6),
+                 arrowprops=dict(arrowstyle="-|>", color="black", linewidth=1.4, mutation_scale=16),
+                 zorder=4)
+    ax1.text(3.7, 3.7, "objective:\nminimize cost", fontsize=8.5, ha="left", va="bottom")
+
+    ax1.plot(*_MGA_Z_STAR, "o", color=_ETH_RED, markersize=7, zorder=5)
+    ax1.annotate("$z^*$ (cost-optimal design)", xy=_MGA_Z_STAR, xytext=(2.5, 1.85),
+                 fontsize=9, ha="left", va="center",
+                 arrowprops=dict(arrowstyle="-", color=_ETH_RED, linewidth=0.9))
+
+    line_handles = [plt.Line2D([0], [0], color=color, linestyle=ls, linewidth=1.4, label=text)
+                     for _cost, color, ls, text in iso_cost_lines]
+    z_star_handle = plt.Line2D([0], [0], marker="o", color="none", markerfacecolor=_ETH_RED,
+                                markeredgecolor=_ETH_RED, markersize=7, label="$z^*$ (cost-optimal design)")
+    ax1.legend(handles=[
+        Patch(facecolor=eth_tint(_ETH_GREY, 0.82), edgecolor=_ETH_GREY, label="feasible region"),
+        Patch(facecolor=eth_tint(_ETH_BLUE, 0.35), edgecolor=_ETH_BLUE, label="near-optimal space"),
+        *line_handles,
+        z_star_handle,
+    ], loc="upper left", fontsize=8.5, frameon=False)
+    ax1.set_xlim(-1.6, 8.8)
+    ax1.set_ylim(-1.2, 7.6)
+    ax1.set_xticks([])
+    ax1.set_yticks([])
+    ax1.set_xlabel("Variable A", fontsize=9.5)
+    ax1.set_ylabel("Variable B", fontsize=9.5)
+    ax1.set_title("Feasible Region, Objective, and Near-Optimal Space", fontsize=11, fontweight="bold")
+    ax1.text(0.5, -0.1, "A and B stand in for any two chosen decision variables.",
+             transform=ax1.transAxes, ha="center", va="top", fontsize=8.5, style="italic", color="#555555")
+    for spine in ax1.spines.values():
+        spine.set_visible(False)
+
+    # ── Right: exploring the near-optimal space via IO / AO ────────────────
+    # A 5-vertex toy polytope (not the same shape as the left wedge - this
+    # panel is a generic zoom-in, not a pixel-exact continuation) so a
+    # *partial* exploration state is meaningful: z* is always known (it's the
+    # original optimization's result), while the other 4 vertices are only
+    # revealed one at a time, each by a separate directional LP solve.
+    z_star = (0.0, 0.0)
+    v2, v3, v4, v5 = (2.6, -0.3), (3.4, 1.6), (1.8, 3.0), (-0.6, 1.8)
+    true_space = [z_star, v2, v3, v4, v5]
+    found = [z_star, v3, v4]  # 2 directional solves run so far, beyond z*
+    solved_via_direction = [v3, v4]
+    unexplored = [v2, v5]
+
+    xs, ys = zip(*true_space)
+    ao_box = Rectangle((min(xs), min(ys)), max(xs) - min(xs), max(ys) - min(ys),
+                        facecolor="none", edgecolor=_ETH_RED, linestyle="--", linewidth=1.4, zorder=2)
+    ax2.add_patch(ao_box)
+    ax2.add_patch(Polygon(true_space, closed=True, facecolor=eth_tint(_ETH_GREY, 0.88),
+                           edgecolor=_ETH_GREY, linestyle=":", linewidth=1.2, zorder=1))
+    ax2.add_patch(Polygon(found, closed=True, facecolor=eth_tint(_ETH_BLUE, 0.35),
+                           edgecolor=_ETH_BLUE, linewidth=1.8, zorder=3))
+
+    for i, v in enumerate((v3, v4), start=1):
+        ax2.annotate("", xy=v, xytext=z_star,
+                     arrowprops=dict(arrowstyle="-|>", color=_ETH_BLUE, linewidth=1.6, mutation_scale=14),
+                     zorder=4)
+        mid = ((z_star[0] + v[0]) / 2, (z_star[1] + v[1]) / 2)
+        ax2.text(mid[0] + 0.12, mid[1] + 0.12, f"solve {i}", fontsize=8, color=_ETH_BLUE)
+
+    # A candidate direction only tells the solver where to search, not where
+    # it will land - so, unlike the "solve" arrows above (which connect
+    # already-solved points), this arrow stops short of v2 rather than
+    # pointing straight at it, and is explicitly marked as an unknown outcome.
+    next_dir_end = (z_star[0] + 0.55 * (v2[0] - z_star[0]), z_star[1] + 0.55 * (v2[1] - z_star[1]))
+    ax2.annotate("", xy=next_dir_end, xytext=z_star,
+                 arrowprops=dict(arrowstyle="-|>", color=_ETH_GREY, linewidth=1.3,
+                                 linestyle=(0, (3, 2)), mutation_scale=13), zorder=4)
+    ax2.text(next_dir_end[0], next_dir_end[1] - 0.5, "next direction\nto explore",
+              fontsize=7.5, color=_ETH_GREY, ha="center", va="top")
+
+    for v in solved_via_direction:
+        ax2.plot(*v, "o", color=_ETH_BLUE, markersize=6, zorder=5)
+    for v in unexplored:
+        ax2.plot(*v, "o", markerfacecolor="white", markeredgecolor=_ETH_GREY, markersize=6, zorder=5)
+    ax2.plot(*z_star, "o", color=_ETH_RED, markersize=7, zorder=6)
+    ax2.annotate("$z^*$ (baseline: starting point for IO)", xy=z_star, xytext=(-2.1, -1.1),
+                 fontsize=8.5, ha="left", va="center",
+                 arrowprops=dict(arrowstyle="-", color=_ETH_RED, linewidth=0.9))
+
+    ax2.legend(handles=[
+        Patch(facecolor="none", edgecolor=_ETH_RED, linestyle="--", label="outer approx. (AO): bounding box from per-axis min/max solves"),
+        Patch(facecolor=eth_tint(_ETH_BLUE, 0.35), edgecolor=_ETH_BLUE, label="inner approx. (IO): convex hull of solved points"),
+        Patch(facecolor=eth_tint(_ETH_GREY, 0.88), edgecolor=_ETH_GREY, linestyle=":", label="true near-optimal space (unknown until fully explored)"),
+    ], loc="upper left", fontsize=7.8, frameon=False, bbox_to_anchor=(-0.02, 1.02))
+    ax2.set_xlim(-2.2, 4.6)
+    ax2.set_ylim(-1.6, 4.0)
+    ax2.set_xticks([])
+    ax2.set_yticks([])
+    ax2.set_title("Exploring the Space: Refining Inner (IO) / Outer (AO) Approximations",
+                  fontsize=11, fontweight="bold")
+    for spine in ax2.spines.values():
+        spine.set_visible(False)
+
+    fig.suptitle("Modeling to Generate Alternatives (MGA): Method Overview", fontsize=13.5, fontweight="bold")
+    ax2.text(0.5, -0.06,
+             "Each solid arrow = one directional LP solve (a new vertex added to IO); "
+             "iterate until IO closes the gap to AO (converged).",
+             transform=ax2.transAxes, ha="center", va="top", fontsize=8.5, style="italic", color="#555555")
+    fig.tight_layout(rect=[0, 0.04, 1, 0.93])
+    savefig(fig, "fig5_mga_method", subdir="method")
+
+
+# ── 12: LP formulation & problem size ───────────────────────────────────────
+
+def fig12_lp_formulation() -> None:
+    """General LP formulation of a cost-minimization energy transition model
+    (left, hand-typeset - not derived from a solved model) alongside this
+    work's actual "No flexibility" model's (approximate, rounded) problem
+    size (right, read directly from that run's own benchmarking.json/
+    system.json/solver.json - see the module-level comment above for why
+    these aren't hardcoded; the "16 years (2020-2050)" line is the one
+    deliberate exception, see its own inline comment). Deliberately compact:
+    one plain LP statement, one stat block, nothing else.
+    """
+    model_dir = _search_var_dict(EULER_ROOT / SCENARIOS[0][0], max_depth=3)
+    if model_dir is None:
+        print(f"  skipping fig12_lp_formulation: {SCENARIOS[0][0]!r} not found under {EULER_ROOT}")
+        return
+    bench = json.loads((model_dir / "benchmarking.json").read_text())
+    system = json.loads((model_dir / "system.json").read_text())
+    solver = json.loads((model_dir / "solver.json").read_text())
+
+    fig, ax = plt.subplots(figsize=(11.5, 3.0))
+    ax.set_xlim(0, 1)
+    ax.set_ylim(0, 1)
+    ax.axis("off")
+
+    ax.add_patch(FancyBboxPatch((0.02, 0.02), 0.45, 0.89, boxstyle="round,pad=0.012,rounding_size=0.02",
+                                 facecolor=eth_tint(_ETH_GREY, 0.93), edgecolor=_ETH_GREY, linewidth=1.1))
+    ax.add_patch(FancyBboxPatch((0.53, 0.02), 0.45, 0.89, boxstyle="round,pad=0.012,rounding_size=0.02",
+                                 facecolor=eth_tint(_ETH_BLUE, 0.90), edgecolor=_ETH_BLUE, linewidth=1.1))
+
+    # ── Left: general formulation ───────────────────────────────────────
+    # h(x)=0 / g(x)<=0 - standard equality/inequality-constraint function
+    # notation, not tied to any particular linear A x = b form. Equation and
+    # its description share one y and va="center" so a big equation and
+    # small caption line up on the same visual center instead of one
+    # baseline vs. one top-aligned.
+    lx = 0.055
+    ax.text(lx, 0.83, "General Formulation", fontsize=12.5, fontweight="bold")
+    ax.text(lx, 0.71, "energy transition model (cost minimization)", fontsize=9, style="italic", color="#444444")
+
+    ax.text(lx, 0.52, r"$\min_{x \,\geq\, 0} \; c^\top x$", fontsize=15, va="center")
+    ax.text(lx, 0.34, "s.t.", fontsize=9.5, style="italic", color="#444444", va="center")
+    ax.text(lx + 0.05, 0.26, r"$h(x) = 0$", fontsize=12.5, va="center")
+    ax.text(lx + 0.24, 0.26, "energy/mass balance", fontsize=9, va="center")
+    ax.text(lx + 0.05, 0.13, r"$g(x) \leq 0$", fontsize=12.5, va="center")
+    ax.text(lx + 0.24, 0.13, "capacity, ramping, diffusion", fontsize=9, va="center")
+
+    # ── Right: this work's actual model ─────────────────────────────────
+    rx = 0.565
+    ax.text(rx, 0.83, "ZEN-garden: \"No Flexibility\" Model", fontsize=12.5, fontweight="bold")
+    ax.text(rx, 0.71, "this work, solved model", fontsize=9, style="italic", color="#444444")
+
+    # Rounded to 1 decimal place (≈) rather than the exact benchmarking.json
+    # counts - precise to the digit isn't the point here, scale is.
+    ax.text(rx, 0.565, f"≈{bench['number_variables'] / 1e6:.1f}M variables", fontsize=13, fontweight="bold",
+            color=_ETH_BLUE, va="center")
+    ax.text(rx, 0.465, f"≈{bench['number_constraints'] / 1e6:.1f}M constraints", fontsize=13, fontweight="bold",
+            color=_ETH_BLUE, va="center")
+
+    dims_line1 = (
+        f"{len(system['set_nodes'])} nodes · {len(system['set_technologies'])} technologies · "
+        f"{len(system['set_carriers'])} carriers"
+    )
+    # Hardcoded, not derived from system.json's optimized_years=15 (2020-2048):
+    # presented as 16 years through 2050 per user instruction.
+    dims_line2 = (
+        f"16 years (2020–2050, {system['interval_between_years']}-yr steps) · "
+        f"{system['aggregated_time_steps_per_year']} h/yr (of {system['unaggregated_time_steps_per_year']})"
+    )
+    ax.text(rx, 0.30, dims_line1, fontsize=9, va="center")
+    ax.text(rx, 0.21, dims_line2, fontsize=9, va="center")
+
+    ax.text(rx, 0.09, f"Solved with {solver['name'].capitalize()} barrier solver", fontsize=9,
+            va="center", color="#444444")
+
+    fig.tight_layout(rect=[0, 0.02, 1, 0.98])
+    savefig(fig, "fig6_lp_formulation", subdir="method")
+
+
+# ── 13: MGA axis-count construction (no data) ───────────────────────────────
+# Purely illustrative, like fig11/fig12 — no solved points, hand-picked
+# numbers throughout. Each panel just COUNTS candidate axes as dimensions
+# are crossed: (1) 3 technology-group axes alone; (2) x 4 regions (the real
+# north/west/south/east geography, drawn the same way
+# plot_country_groups_map.py / fig_country_groups_map.svg in
+# data/outputs/figures/mga_investment/ does — same Natural Earth polygons,
+# same region split, same colors — rather than embedding that SVG file
+# directly, which would need a working SVG rasterizer this environment
+# doesn't have); (3) x 3 cumulative-CAPEX horizons too, all three dimensions
+# shown together on one region x group x horizon chart (this work's full
+# 3-way crossing, panel 3 has no separate map — just that one chart).
+#
+# Region/group identity is encoded consistently across all 3 panels so the
+# same visual grammar carries through: COLOR = region (_MGA_AXIS_REGION_
+# COLOR, same order as REGIONS/REGION_COLOR in mga_capex_periods_common.py),
+# PICTOGRAM = technology group (lightning bolt = power, "H2" = hydrogen,
+# "C" = carbon — the same 3 groups as config_mga_axes_capex.json's
+# technology_groups). Panel 1 has no region yet, so its 3 boxes are drawn
+# neutral-grey with just the pictogram identity panels 2-3 reuse.
+#
+# The map needs geopandas + the cached Natural Earth shapefile (data/
+# naturalearth/, already downloaded by the mga_investment scripts) — a new
+# dependency for this otherwise data-free figure, added deliberately per
+# user request for the real geography instead of an abstract icon. Falls
+# back to a simple 4-wedge compass (this figure's previous approach) if
+# geopandas/the shapefile aren't available, so fig13 still generates
+# unconditionally in main() like fig11/fig12 even without them.
+_MGA_AXIS_REGIONS = ["north", "west", "south", "east"]
+_MGA_AXIS_REGION_COLOR = dict(zip(_MGA_AXIS_REGIONS, SCENARIO_PALETTE))
+# Same node -> region split as config_mga_axes_capex_cum.json's node_capex_cumulative axes.
+_MGA_AXIS_REGION_NODES = {
+    "north": ["DK", "EE", "FI", "IE", "LT", "LV", "NO", "SE", "UK"],
+    "west": ["AT", "BE", "CH", "DE", "FR", "LU", "NL"],
+    "south": ["ES", "EL", "HR", "IT", "PT", "SI"],
+    "east": ["BG", "CZ", "HU", "PL", "RO", "SK"],
+}
+_MGA_AXIS_ISO_OVERRIDES = {"EL": "GR", "UK": "GB"}  # Natural Earth's ISO_A2_EH vs. our node codes
+_MGA_AXIS_EUROPE_EXTENT = {"lon": (-25, 45), "lat": (34, 72)}
+_MGA_AXIS_NATURALEARTH_SHP = REPO_ROOT / "data" / "naturalearth" / "ne_50m_admin_0_countries.shp"
+
+_MGA_AXIS_GROUPS = ["power", "hydrogen", "carbon"]
+_MGA_AXIS_GROUP_LABEL = {"power": "Power", "hydrogen": "H2", "carbon": "Carbon"}
+
+
+def _mga_lightning_marker() -> MplPath:
+    """Lightning-bolt Path marker for the 'power' technology group — same
+    hand-drawn-Path convention as the wind/sun/gear markers in
+    plot_mga_investment_map.py."""
+    verts = [(0.15, 1.0), (-0.55, 0.05), (-0.05, 0.05), (-0.35, -1.0),
+              (0.55, -0.05), (0.0, -0.05), (0.15, 1.0)]
+    codes = [MplPath.MOVETO] + [MplPath.LINETO] * 5 + [MplPath.CLOSEPOLY]
+    return MplPath(verts, codes)
+
+
+# marker = lightning-bolt Path for power, mathtext letter markers ("$H_2$"/
+# "$C$") for hydrogen/carbon — matplotlib renders a "$...$" string marker as
+# that mathtext's own shape, so these read as crisp letters, not custom paths.
+_MGA_AXIS_GROUP_MARKER = {"power": _mga_lightning_marker(), "hydrogen": r"$H_2$", "carbon": "$C$"}
+_MGA_AXIS_GROUP_LINESTYLE = {"power": "-", "hydrogen": "--", "carbon": ":"}
+
+
+def _mga_group_icon(ax, cx: float, cy: float, group: str, size: float, color: str) -> None:
+    ax.scatter([cx], [cy], marker=_MGA_AXIS_GROUP_MARKER[group], s=size, color=color,
+               linewidth=1.2, zorder=4, clip_on=False)
+
+
+def _mga_region_compass(ax, cx: float, cy: float, r: float) -> None:
+    """Fallback 4-wedge 'compass' standing in for the real geography, used
+    only if _mga_region_map() can't load geopandas/the shapefile."""
+    for region, (t1, t2) in zip(_MGA_AXIS_REGIONS, [(45, 135), (135, 225), (225, 315), (315, 405)]):
+        ax.add_patch(Wedge((cx, cy), r, t1, t2, facecolor=_MGA_AXIS_REGION_COLOR[region],
+                            edgecolor="white", linewidth=1.4, zorder=3))
+        mid = np.radians((t1 + t2) / 2)
+        ax.text(cx + 0.58 * r * np.cos(mid), cy + 0.58 * r * np.sin(mid), region[0].upper(),
+                 fontsize=9, ha="center", va="center", color="white", fontweight="bold", zorder=4)
+
+
+def _mga_region_map(ax, x0: float, y0: float, w: float, h: float) -> bool:
+    """Real north/west/south/east map (Natural Earth country polygons,
+    colored by region, N/W/S/E labels), inset into `ax` at axes-fraction box
+    (x0, y0, w, h) — same geography/colors as plot_country_groups_map.py.
+    Returns False (drawing nothing) if geopandas or the cached shapefile
+    aren't available, so the caller can fall back to _mga_region_compass."""
+    if not _MGA_AXIS_NATURALEARTH_SHP.exists():
+        return False
+    try:
+        import geopandas as gpd
+    except ImportError:
+        return False
+    node_to_region = {n: r for r, nodes in _MGA_AXIS_REGION_NODES.items() for n in nodes}
+    iso_to_region = {_MGA_AXIS_ISO_OVERRIDES.get(n, n): r for n, r in node_to_region.items()}
+    world = gpd.read_file(_MGA_AXIS_NATURALEARTH_SHP)[["ISO_A2_EH", "geometry"]]
+    minx, maxx = _MGA_AXIS_EUROPE_EXTENT["lon"]
+    miny, maxy = _MGA_AXIS_EUROPE_EXTENT["lat"]
+    europe = world.cx[minx:maxx, miny:maxy].copy()
+    europe["region"] = europe["ISO_A2_EH"].map(iso_to_region)
+
+    map_ax = ax.inset_axes([x0, y0, w, h])
+    europe.plot(ax=map_ax, color="#f2f2f2", edgecolor="#B0B0B0", linewidth=0.4)
+    for region, color in _MGA_AXIS_REGION_COLOR.items():
+        sub = europe[europe["region"] == region]
+        if sub.empty:
+            continue
+        sub.plot(ax=map_ax, color=color, edgecolor="white", linewidth=0.3)
+        # representative_point() (unlike centroid) is guaranteed to fall
+        # INSIDE the region's own dissolved shape — needed since a region's
+        # union of countries is often multi-part/concave (islands, fjords),
+        # where a plain centroid can land in the sea or a neighboring gap.
+        label_point = sub.geometry.union_all().representative_point()
+        map_ax.text(label_point.x, label_point.y, region[0].upper(),
+                     fontsize=8, ha="center", va="center", color="white", fontweight="bold")
+    map_ax.set_xlim(minx, maxx)
+    map_ax.set_ylim(miny, maxy)
+    map_ax.set_axis_off()
+    return True
+
+
+def _mga_axis_count(ax, x: float, y: float, text: str) -> None:
+    ax.text(x, y, text, fontsize=13.5, fontweight="bold", color=_ETH_BLUE, ha="center", va="center")
+
+
+def fig13_mga_axis_construction() -> None:
+    """Conceptual, non-data schematic of how the NUMBER of candidate MGA
+    axes grows as dimensions are crossed: 3 technology-group axes alone (1)
+    -> x 4 regions (2, the common spatial extension) -> x 3 cumulative-to-
+    year horizons too (3, this work's full 3-way crossing). See the
+    module-level comment above for the visual grammar and data sources.
+    """
+    fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(16, 6))
+    for ax in (ax1, ax2, ax3):
+        ax.set_xlim(0, 10)
+        ax.set_ylim(0, 10)
+        ax.axis("off")
+
+    # ── 1: technology-group axes ──────────────────────────────────────────
+    ax1.set_title("1. Technology (Group) Axes", fontsize=11.5, fontweight="bold")
+    for i, group in enumerate(_MGA_AXIS_GROUPS):
+        cx = 1.9 + i * 3.1
+        ax1.add_patch(FancyBboxPatch((cx - 1.25, 4.9), 2.5, 3.1, boxstyle="round,pad=0.02,rounding_size=0.1",
+                                      facecolor=eth_tint(_ETH_GREY, 0.9), edgecolor=_ETH_GREY, linewidth=1.2, zorder=2))
+        _mga_group_icon(ax1, cx, 6.9, group, 1500, "#333333")
+        ax1.text(cx, 5.4, _MGA_AXIS_GROUP_LABEL[group], fontsize=10, fontweight="bold", ha="center", va="center")
+    _mga_axis_count(ax1, 5, 2.6, "3 axes")
+    ax1.text(5, 1.55, "one axis per technology group",
+              fontsize=8.3, style="italic", color="#555555", ha="center", va="top")
+
+    # ── 2: + regional axes — crossed with 4 regions ─────────────────────
+    ax2.set_title("2. + Regional Axes", fontsize=11.5, fontweight="bold")
+    if not _mga_region_map(ax2, 0.02, 0.32, 0.42, 0.60):
+        _mga_region_compass(ax2, 2.1, 6.9, 1.9)
+    # Grid of region x group cells: each cell IS one candidate axis, colored
+    # by region with that row's group pictogram drawn directly inside it
+    # (white, for contrast) — no separate row-header icon/text and no "x"
+    # symbol, since the grid itself already reads as "regions crossed with
+    # groups" without needing either.
+    grid_x0, grid_y0, cell_w, cell_h = 5.1, 5.35, 1.1, 1.15
+    for row, group in enumerate(_MGA_AXIS_GROUPS):
+        gy = grid_y0 + (len(_MGA_AXIS_GROUPS) - 1 - row) * cell_h
+        for col, region in enumerate(_MGA_AXIS_REGIONS):
+            gx = grid_x0 + col * cell_w
+            ax2.add_patch(Rectangle((gx, gy), cell_w * 0.85, cell_h * 0.85,
+                                     facecolor=_MGA_AXIS_REGION_COLOR[region], edgecolor="white",
+                                     linewidth=0.8, zorder=3))
+            _mga_group_icon(ax2, gx + cell_w * 0.425, gy + cell_h * 0.425, group, 220, "white")
+    for col, region in enumerate(_MGA_AXIS_REGIONS):
+        ax2.text(grid_x0 + col * cell_w + cell_w * 0.425, grid_y0 - 0.25, region[0].upper(),
+                  fontsize=7.5, ha="center", va="top", fontweight="bold", color=_MGA_AXIS_REGION_COLOR[region])
+    _mga_axis_count(ax2, 5, 2.6, "4 $\\times$ 3 = 12 axes")
+    ax2.text(5, 1.55, "one axis per (region, technology group)",
+              fontsize=8.3, style="italic", color="#555555", ha="center", va="top")
+
+    # ── 3: + temporal axes (this work) — the full 3-way crossing ─────────
+    # Region x group x horizon, all on one chart (no separate map here —
+    # region identity is carried by line/marker color instead): 4 regions x
+    # 3 groups = 12 curves, each sampled (marker) at the 3 config_mga_axes_
+    # capex_cum.json until_years -> 4 x 3 x 3 = 36 points/axes total.
+    ax3.set_title("3. + Temporal Axes (this work)", fontsize=11.5, fontweight="bold")
+    cx0, cy0, cx1, cy1 = 1.3, 3.9, 9.5, 9.1
+    ax3.annotate("", xy=(cx1, cy0), xytext=(cx0, cy0),
+                 arrowprops=dict(arrowstyle="-|>", color="black", linewidth=1.1))
+    ax3.annotate("", xy=(cx0, cy1), xytext=(cx0, cy0),
+                 arrowprops=dict(arrowstyle="-|>", color="black", linewidth=1.1))
+    ax3.text((cx0 + cx1) / 2, cy0 - 0.55, "year", fontsize=7.5, color="#555555", ha="center", va="top")
+    ax3.text(cx0 - 0.45, (cy0 + cy1) / 2, "cumulative CAPEX", fontsize=7.5, color="#555555",
+              ha="center", va="center", rotation=90)
+    until_years = [2030, 2040, 2050]
+    year_x = {yr: cx0 + (yr - 2020) / 30 * (cx1 - cx0) for yr in (2020, *until_years)}
+    for yr in until_years:
+        ax3.plot([year_x[yr], year_x[yr]], [cy0, cy1 - 0.1], color="#B0B0B0", linestyle=":",
+                  linewidth=0.9, zorder=1)
+        ax3.text(year_x[yr], cy0 - 0.15, str(yr), fontsize=6.5, ha="center", va="top", color="#555555")
+
+    # Real trends, hand-picked (not solved): total 2050 cumulative investment
+    # is highest in west, similar-but-not-identical in north/south, lowest
+    # in east — so regions clearly differ by 2050 rather than converging.
+    # Within each region, power ramps up earliest (already cheap today),
+    # hydrogen mid-late, carbon (DAC/CCS) latest and slowest to scale — same
+    # story fig6_diffusion_mechanisms/fig9_heat_supply_trajectory tell for
+    # this project's actual technology diffusion.
+    region_total_2050 = {"west": 10.0, "north": 6.0, "south": 5.0, "east": 3.0}
+    group_share = {"power": 0.5, "hydrogen": 0.3, "carbon": 0.2}
+    group_growth_k = {"power": 4.0, "hydrogen": 2.2, "carbon": 1.1}
+    # Scale to the tallest SINGLE (region, group) curve (west's power share),
+    # not the tallest region TOTAL — the latter is never actually reached by
+    # any one line (each region's total is split across 3 curves), which
+    # left every curve stuck in the chart's lower half.
+    max_series_final = max(region_total_2050[r] * group_share[g]
+                            for r in _MGA_AXIS_REGIONS for g in _MGA_AXIS_GROUPS)
+    y_scale = (cy1 - cy0 - 0.3) / max_series_final
+    # Only the 4 actual points (2020 start + the 3 until_years) — ax.plot
+    # already draws straight segments between consecutive points, so NOT
+    # densely sampling t is what keeps these as literal linear segments
+    # rather than a smoothed/interpolated curve.
+    sample_years = [2020, *until_years]
+    for region in _MGA_AXIS_REGIONS:
+        for group in _MGA_AXIS_GROUPS:
+            final = region_total_2050[region] * group_share[group]
+            k = group_growth_k[group]
+            xs, ys = [], []
+            for yr in sample_years:
+                ti = (yr - 2020) / 30
+                yi = cy0 + 0.10 + final * y_scale * (1 - np.exp(-k * ti)) / (1 - np.exp(-k))
+                xs.append(year_x[yr])
+                ys.append(yi)
+            ax3.plot(xs, ys, color=_MGA_AXIS_REGION_COLOR[region], linestyle=_MGA_AXIS_GROUP_LINESTYLE[group],
+                      linewidth=1.4, alpha=0.9, zorder=2)
+            ax3.scatter(xs[1:], ys[1:], marker=_MGA_AXIS_GROUP_MARKER[group], s=75,
+                        color=_MGA_AXIS_REGION_COLOR[region], edgecolor="black", linewidth=0.4, zorder=4)
+
+    # One combined legend (region = color, group = marker/linestyle), 2
+    # columns, single opaque box — two separate legend boxes here read as
+    # cluttered; one box top-left, inside the chart, does not.
+    region_handles = [Line2D([0], [0], color=_MGA_AXIS_REGION_COLOR[r], lw=2.5, label=r.capitalize())
+                       for r in _MGA_AXIS_REGIONS]
+    group_handles = [Line2D([0], [0], color="black", lw=1.2, linestyle=_MGA_AXIS_GROUP_LINESTYLE[g],
+                             marker=_MGA_AXIS_GROUP_MARKER[g], markersize=8,
+                             label=_MGA_AXIS_GROUP_LABEL[g]) for g in _MGA_AXIS_GROUPS]
+    ax3.legend(handles=region_handles + group_handles, loc="upper left", fontsize=7, frameon=True,
+               facecolor="white", framealpha=0.92, edgecolor="none", ncol=2, columnspacing=1.2,
+               handletextpad=0.6, bbox_to_anchor=(0.01, 0.99))
+
+    _mga_axis_count(ax3, 5, 2.6, "4 $\\times$ 3 $\\times$ 3 = 36 axes")
+    ax3.text(5, 1.55, "one axis per (region, technology group, cumulative-to-year)",
+              fontsize=8.3, style="italic", color="#555555", ha="center", va="top")
+
+    fig.tight_layout(rect=[0, 0.02, 1, 0.97])
+    savefig(fig, "fig7_mga_axis_construction", subdir="method")
 
 
 # ── Main ──────────────────────────────────────────────────────────────────
@@ -2038,11 +2963,16 @@ def main() -> None:
         fig0a_cost_composition(components_with_base)
         fig0b_emissions_source_comparison(by_label(runs, "Full flexibility"), base_run)
         if any(r.label == "No flexibility" for r in runs):
-            fig5_retrofit_ccs_comparison(by_label(runs, "No flexibility"), base_run)
+            no_flex_run = by_label(runs, "No flexibility")
+            fig5_retrofit_ccs_comparison(no_flex_run, base_run)
+            if any(r.label == "Full flexibility" for r in runs):
+                fig10_power_and_storage_impact(base_run, no_flex_run, by_label(runs, "Full flexibility"))
+            else:
+                print("  skipping fig10_power_and_storage_impact: 'Full flexibility' scenario not loaded")
         else:
-            print("  skipping fig5_retrofit_ccs_comparison: 'No flexibility' scenario not loaded")
+            print("  skipping fig5/fig10: 'No flexibility' scenario not loaded")
     else:
-        print(f"  skipping fig0a/fig0b/fig5: {BASE_SCENARIO[0]} not yet under {EULER_ROOT}")
+        print(f"  skipping fig0a/fig0b/fig5/fig10: {BASE_SCENARIO[0]} not yet under {EULER_ROOT}")
     fig1a_cost_delta(metrics)
     fig1b_industry_capacity(runs)
     fig2_dsm_cycles_by_product(runs)
@@ -2057,6 +2987,11 @@ def main() -> None:
         fig7_heat_supply_trajectory(runs)
     else:
         print("  skipping fig6_diffusion_mechanisms/fig7_heat_supply_trajectory: 'No flexibility' scenario not loaded")
+    fig8_industry_sector_emissions_context()
+    fig9_model_scope_coverage()
+    fig11_mga_method()
+    fig12_lp_formulation()
+    fig13_mga_axis_construction()
     print(f"Done. Figures in {FIGURES_DIR.relative_to(REPO_ROOT)}/")
 
 

@@ -255,19 +255,14 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-# Match MT_report_HG's font -- see generate_si_figures.py for the rationale
-# (cmr10 ships inside matplotlib, no system LaTeX/font install needed).
-plt.rcParams.update({
-    "font.family": "serif",
-    "font.serif": ["cmr10"],
-    "mathtext.fontset": "cm",
-    "axes.formatter.use_mathtext": True,
-    "axes.unicode_minus": False,
-})
-
 from scipy.optimize import linprog
 
-from figure_settings import SCENARIO_PALETTE, eth_tint
+from figure_settings import SCENARIO_PALETTE, apply_font_mode, eth_tint
+
+# Match MT_report_HG's font -- see figure_settings.FONT_MODE for the
+# rationale and for the one-flag toggle that switches every figure script in
+# this repo (report/Computer Modern vs. presentation/Arial) at once.
+apply_font_mode()
 from zen_garden import Results
 from zen_garden_plugins.mga.polytope_io import Polytope, load_polytope
 from pyoNearOpt.metrics import max_separation

@@ -25,7 +25,11 @@ import geopandas as gpd
 import matplotlib.pyplot as plt
 import pandas as pd
 
-from figure_settings import SCENARIO_PALETTE
+from figure_settings import SCENARIO_PALETTE, apply_font_mode
+
+# See figure_settings.FONT_MODE for the rationale and for the one-flag
+# toggle that switches every figure script in this repo at once.
+apply_font_mode()
 
 NODES_CSV = REPO_ROOT / "data" / "Crystal_Ball" / "energy_system" / "set_nodes.csv"
 FIGURES_DIR = REPO_ROOT / "data" / "outputs" / "figures" / "mga_investment"

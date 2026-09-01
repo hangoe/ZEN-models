@@ -77,20 +77,15 @@ REPO_ROOT = Path(__file__).parent.parent
 import matplotlib.pyplot as plt
 import numpy as np
 
-# Match the rest of the MGA scripts / MT_report_HG's font -- see
-# generate_si_figures.py for the rationale.
-plt.rcParams.update({
-    "font.family": "serif",
-    "font.serif": ["cmr10"],
-    "mathtext.fontset": "cm",
-    "axes.formatter.use_mathtext": True,
-    "axes.unicode_minus": False,
-})
-
 from matplotlib.colors import TwoSlopeNorm
 from matplotlib.patches import Patch
 
-from figure_settings import SCENARIO_PALETTE, eth_tint
+from figure_settings import SCENARIO_PALETTE, apply_font_mode, eth_tint
+
+# Match the rest of the MGA scripts / MT_report_HG's font -- see
+# figure_settings.FONT_MODE for the rationale and for the one-flag toggle
+# that switches every figure script in this repo at once.
+apply_font_mode()
 from zen_garden_plugins.mga.polytope_io import load_polytope
 
 FIGURES_DIR = REPO_ROOT / "data" / "outputs" / "figures" / "mga_tests"

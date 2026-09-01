@@ -25,20 +25,23 @@ sys.path.insert(0, str(REPO_ROOT / "scripts"))
 import matplotlib.pyplot as plt
 import pandas as pd
 
-# Match the SI print figures' font (see generate_si_figures.py) for visual
-# consistency with the rest of SI_results/.
-plt.rcParams.update({
-    "font.family": "serif",
-    "font.serif": ["cmr10"],
-    "mathtext.fontset": "cm",
-    "axes.formatter.use_mathtext": True,
-    "axes.unicode_minus": False,
-})
+from figure_settings import (
+    EULER_ROOT,
+    SCENARIO_PALETTE,
+    Run,
+    apply_font_mode,
+    eth_tint,
+    get_available_years,
+    load_results,
+)
 
-from figure_settings import EULER_ROOT, SCENARIO_PALETTE, Run, eth_tint, get_available_years, load_results
+# Match the SI print figures' font (see figure_settings.FONT_MODE) for visual
+# consistency with the rest of SI_results/ — toggle FONT_MODE there to switch
+# every figure script in this repo (report/Computer Modern vs. presentation/Arial) at once.
+apply_font_mode()
 from figures_by_scenario import _annual_series, get_emissions_by_carrier
 
-FIGURES_DIR = REPO_ROOT / "data" / "outputs" / "figures" / "SI_results"
+FIGURES_DIR = REPO_ROOT / "data" / "outputs" / "figures" / "SI_results" / "archive"
 
 RUN_FOLDERS = [
     ("Crystal_Ball_ind_heat_v8_0_no_flexibility_2020_15a_2a_interval_10ts", "v8.0"),

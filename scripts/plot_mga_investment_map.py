@@ -74,15 +74,11 @@ import pandas as pd
 from matplotlib.lines import Line2D
 from matplotlib.path import Path as MplPath
 
-plt.rcParams.update({
-    "font.family": "serif",
-    "font.serif": ["cmr10"],
-    "mathtext.fontset": "cm",
-    "axes.formatter.use_mathtext": True,
-    "axes.unicode_minus": False,
-})
+from figure_settings import apply_font_mode, eth_tint
 
-from figure_settings import eth_tint
+# See figure_settings.FONT_MODE for the rationale and for the one-flag
+# toggle that switches every figure script in this repo at once.
+apply_font_mode()
 from mga_capex_periods_common import PERIODS, REGION_COLOR, REGIONS, RUN_DIR, load_batch4_data
 from plot_mga_regional_investment import REGION_NODES
 from zen_garden import Results

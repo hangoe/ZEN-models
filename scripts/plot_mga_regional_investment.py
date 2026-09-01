@@ -68,17 +68,12 @@ import numpy as np
 import pandas as pd
 from matplotlib.patches import Patch
 
-# Match the rest of the MGA scripts / MT_report_HG's font -- see
-# generate_si_figures.py for the rationale.
-plt.rcParams.update({
-    "font.family": "serif",
-    "font.serif": ["cmr10"],
-    "mathtext.fontset": "cm",
-    "axes.formatter.use_mathtext": True,
-    "axes.unicode_minus": False,
-})
+from figure_settings import apply_font_mode, eth_tint
 
-from figure_settings import eth_tint
+# Match the rest of the MGA scripts / MT_report_HG's font -- see
+# figure_settings.FONT_MODE for the rationale and for the one-flag toggle
+# that switches every figure script in this repo at once.
+apply_font_mode()
 from mga_capex_periods_common import MODEL, PERIODS, REGION_COLOR, REGIONS, RUN_DIR, savefig
 from zen_garden import Results
 

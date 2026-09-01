@@ -15,6 +15,50 @@ LOCAL_ROOT = OUTPUT_DIR / "local_outputs"
 EULER_ROOT = OUTPUT_DIR / "euler_outputs"
 HOURS_PER_YEAR = 8760
 
+# ── Font mode ────────────────────────────────────────────────────────────────
+# Every figure script in this repo (generate_si_figures.py, compare_version_v8_
+# v9.py, plot_mga_results.py, plot_mga_cum_regional_capex.py, plot_mga_regional_
+# investment.py, plot_mga_investment_map.py) used to inline its own identical
+# rcParams block for this. Centralized here so switching every script's fonts
+# at once is a ONE-LINE change: flip FONT_MODE below, nothing else. Each
+# figure's own fontsize=N calls are untouched by this toggle either way —
+# only the font FAMILY (and matching mathtext glyph set) changes.
+#   "report"       — matches MT_report_HG's LaTeX default (plain Computer
+#                     Modern, no font package loaded by 00_Preamble.sty).
+#                     cmr10 ships inside matplotlib itself (no system LaTeX/
+#                     font install needed, portable to Euler too). Its bundled
+#                     Type-1 file has no linked bold companion, so
+#                     fontweight="bold" requests silently render at regular
+#                     weight rather than a mismatched fallback font.
+#   "presentation"  — Arial, for slide decks. No exact "Arial" mathtext glyph
+#                     set ships with matplotlib, so mathtext ($...$ content —
+#                     subscripts like CO$_2$, etc.) falls back to
+#                     "dejavusans", the closest built-in sans-serif match.
+FONT_MODE = "presentation"  # "report" or "presentation"
+
+
+def apply_font_mode() -> None:
+    """Call once per script, right after `import matplotlib.pyplot as plt`
+    (before any figure is built) — see FONT_MODE's comment above for what
+    each mode does and why."""
+    if FONT_MODE == "presentation":
+        plt.rcParams.update({
+            "font.family": "sans-serif",
+            "font.sans-serif": ["Arial"],
+            "mathtext.fontset": "dejavusans",
+            "axes.formatter.use_mathtext": True,
+            "axes.unicode_minus": True,
+        })
+    else:
+        plt.rcParams.update({
+            "font.family": "serif",
+            "font.serif": ["cmr10"],
+            "mathtext.fontset": "cm",
+            "axes.formatter.use_mathtext": True,
+            "axes.unicode_minus": False,
+        })
+
+
 # ── Euler scenario metadata ────────────────────────────────────────────────────
 # 6 of the 7 case-study scenarios (MT_report_HG/Sections/03_SI.tex, Table
 # SIScenarios) are the same model version (Crystal_Ball_HG_v7_0), differing

@@ -120,8 +120,12 @@ import matplotlib.pyplot as plt
 import pandas as pd
 from matplotlib.patches import Patch
 
-from figure_settings import SCENARIO_PALETTE, eth_tint
+from figure_settings import SCENARIO_PALETTE, apply_font_mode, eth_tint
 from zen_garden import Results
+
+# See figure_settings.FONT_MODE for the rationale and for the one-flag
+# toggle that switches every figure script in this repo at once.
+apply_font_mode()
 
 # Hatch lines default to a hairline 1.0pt (matplotlib's hatch.linewidth
 # rcParam) -- far too faint to read as "dashes" at this figure's scale, so
