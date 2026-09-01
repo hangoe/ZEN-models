@@ -22,7 +22,15 @@
 #   task_id 13 = batch bbo share  batch4, capex_cum axes, tolerance_explore=0.01 (labeled _2030)
 #   task_id 14 = batch bbo share  batch6, capex_cum axes, tolerance_explore=0.01 (labeled _2030; was batch8)
 #   task_id 15 = batch bbo share  batch4, capex_cum axes, tolerance_explore=0.02
+#                (FAILED on 2026-09-01, job 12374944_15: batch_ORACLE's
+#                 add_cut() hit "Added cut but resulting outer approximation
+#                 appears infeasible" -- a numerical issue in the exploration
+#                 method itself, not a resource/config problem. Left as-is;
+#                 see task_id 17 for the retry.)
 #   task_id 16 = batch bbo share  batch6, capex_cum axes, tolerance_explore=0.02 (was batch8)
+#   task_id 17 = retry of task_id 15 (batch bbo share batch4, capex_cum axes,
+#                tolerance_explore=0.02) under a fresh task_id after the
+#                2026-09-01 failure above
 #
 # The old plain-CAPEX rows (former task_ids 0-6: sampling/bbo/batch_bbo
 # minmax over the region x tech-group capex axes) and the CAPEX_PERIODS
@@ -45,13 +53,16 @@
 # submit_euler_mga.sh`; override per range on the command line (CLI flags
 # win over #SBATCH) for the cheaper batch4 range instead of running
 # everything at the batch6 profile:
-#   sbatch --array=9,10,15                                                \
-#          --time=6-06:00:00 --cpus-per-task=40  --mem-per-cpu=4G  \
+#   sbatch --array=9,10,15,17                                             \
+#          --time=8-00:00:00 --cpus-per-task=40  --mem-per-cpu=4G  \
 #          submit_euler_mga.sh                # cum_capex batch4, minmax + share
+#                                              # (--time bumped 6-06:00:00 -> 8-00:00:00
+#                                              #  on 2026-09-01 for the task_id 17 retry;
+#                                              #  normal.120h partition allows up to 15d)
 #   sbatch --array=11,12,16                                               \
 #          --time=6-06:00:00 --cpus-per-task=40  --mem-per-cpu=4G  \
 #          submit_euler_mga.sh                # cum_capex batch6, minmax + share
-#   sbatch --array=9-16 submit_euler_mga.sh    # once you trust the walltime per range
+#   sbatch --array=9-17 submit_euler_mga.sh    # once you trust the walltime per range
 #
 # cpus-per-task=40, mem-per-cpu=4G (160G total), time=6-06:00:00 for BOTH
 # ranges -- this is the profile that actually completed task_id 9/10/11

@@ -833,7 +833,7 @@ def fig2_polytope_samples(polys: dict[str, Polytope], points: dict[str, list[tup
                     # it needs no axis-name labels of its own; those already come from (j, i)'s panel.
                     v = corr.iloc[i, j]
                     corr_im = ax.imshow([[v]], cmap="RdBu_r", vmin=-1, vmax=1, aspect="auto")
-                    ax.text(0, 0, f"{v:.2f}", ha="center", va="center", fontsize=15,
+                    ax.text(0, 0, f"{v:.2f}", ha="center", va="center", fontsize=26,
                             color="white" if abs(v) > 0.6 else "black")
                     ax.set_xticks([])
                     ax.set_yticks([])
@@ -842,7 +842,7 @@ def fig2_polytope_samples(polys: dict[str, Polytope], points: dict[str, list[tup
                     n_bins = 25 if not is_actual else max(5, min(25, len(samples_phys) // 3))
                     ax.hist(samples_phys[:, i], bins=n_bins, color="#6b1f5c", alpha=0.8)
                     ax.set_yticks([])
-                    ax.tick_params(labelsize=9)
+                    ax.tick_params(labelsize=13)
                 else:  # lower triangle: hexbin density (or, for the actual-points
                     # fallback, a plain scatter -- a hexbin of a few dozen real
                     # points is misleadingly sparse, see _hull_panel_data) + exact
@@ -877,34 +877,43 @@ def fig2_polytope_samples(polys: dict[str, Polytope], points: dict[str, list[tup
                                zorder=5, label="baseline (z*)" if not first_legend_done else None)
                     first_legend_done = True
                 if i == n_z - 1:
-                    ax.set_xlabel(f"{poly.names[j]}\n[{UNIT_LABEL.get(poly.units[j], poly.units[j] or 'n/a')}]", fontsize=11)
+                    ax.set_xlabel(f"{poly.names[j]}\n[{UNIT_LABEL.get(poly.units[j], poly.units[j] or 'n/a')}]", fontsize=17)
                 else:
                     ax.set_xticklabels([])
                 if j == 0:
-                    ax.set_ylabel(f"{poly.names[i]}\n[{UNIT_LABEL.get(poly.units[i], poly.units[i] or 'n/a')}]", fontsize=11)
+                    ax.set_ylabel(f"{poly.names[i]}\n[{UNIT_LABEL.get(poly.units[i], poly.units[i] or 'n/a')}]", fontsize=17)
                 else:
                     ax.set_yticklabels([])
-                ax.tick_params(labelsize=9)
+                ax.tick_params(labelsize=13)
         if corr_im is not None:
             # Dedicated axis in the right margin reserved above -- not
             # borrowed from the grid -- so every grid cell stays square.
-            cax = subfig.add_axes((1 - colorbar_margin_in / panel_width_in + 0.015, 0.15, 0.02, 0.55))
-            subfig.colorbar(corr_im, cax=cax, label="Pearson r")
+            # Vertically matched to the grid's own top/bottom (axes[0,0]/
+            # axes[-1,-1] corners), not a fixed guess -- otherwise it reads
+            # as "kind of low" whenever the grid's actual vertical extent
+            # (set by n_z and the xlabel/tick margins below it) doesn't
+            # match whatever fraction was hand-picked.
+            grid_top = axes[0, 0].get_position().y1
+            grid_bottom = axes[-1, -1].get_position().y0
+            cax = subfig.add_axes((1 - colorbar_margin_in / panel_width_in + 0.015, grid_bottom,
+                                    0.02, grid_top - grid_bottom))
+            cbar = subfig.colorbar(corr_im, cax=cax)
+            cbar.set_label("Pearson r", fontsize=15)
+            cbar.ax.tick_params(labelsize=12)
         if show_legend:
             handles, labels = axes[1, 0].get_legend_handles_labels()
             if handles:
                 subfig.legend(handles, labels, loc="upper center", bbox_to_anchor=(0.5, 0.945),
-                              ncol=len(handles), fontsize=10, frameon=False)
-        subtitle = (f"n={len(samples_phys)} actual points, no inner sample -- see script docstring" if is_actual
-                    else f"n={len(samples_phys)}, acceptance {rate:.1%}")
+                              ncol=len(handles), fontsize=15, frameon=False)
+        # One combined title row per panel (mode + point count folded into
+        # the same line) instead of a shared figure-level title with each
+        # panel's own stats as a separate row underneath -- that stacked
+        # layout read as a title-plus-subtitle pair; this is a single line.
+        subtitle = f"n={len(samples_phys)} actual points" if is_actual else f"n={len(samples_phys)} ({rate:.1%} accepted)"
         subfig.suptitle(
-            f"{MODE_LABEL[mode]} ({subtitle})",
-            fontsize=14, fontweight="bold", y=0.975,
+            f"MGA Near-Optimal Interior: {MODE_LABEL[mode]} ({subtitle})",
+            fontsize=20, fontweight="bold", y=0.975,
         )
-    fig.suptitle(
-        "MGA Near-Optimal Interior: Samples (lower) & Axis Correlations (upper)",
-        fontsize=17, fontweight="bold", y=0.995,
-    )
     savefig(fig, "fig2_polytope_samples")
 
 

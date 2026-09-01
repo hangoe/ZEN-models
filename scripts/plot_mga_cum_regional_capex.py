@@ -268,10 +268,65 @@ def fig_temporal_range_absolute(axis_idx, origin, phys, base) -> None:
     savefig(fig, "fig11_temporal_range_absolute")
 
 
+# ── fig12: same-region temporal growth, bars + every actual point ─────────
+# Same bars/whiskers as fig11 (baseline bar, own-axis min/max errorbar), plus
+# every OTHER actually-computed point scattered on top -- the 24 BBO
+# "iterate" solves alongside the 16 own-axis VMM extremes and the baseline
+# (41 points total, see load_batch4_data), each one a genuine ZEN-garden
+# solve that is certainly feasible and near-optimal. Deliberately NOT hit-
+# and-run samples from the outer polytope (poly.A @ x <= poly.b is only an
+# outer relaxation of the true near-optimal region -- see fig2's inner-hull
+# rejection sampling in plot_mga_results.py for why that gap matters): every
+# dot plotted here is one of this run's own solves, so it is certainly
+# inside the true near-optimal region, not just the outer approximation of it.
+def fig_temporal_range_distribution(axis_idx, origin, phys, base) -> None:
+    fig, ax = plt.subplots(figsize=(9.5, 5.5))
+    x = np.arange(len(REGIONS))
+    width = 0.34
+    rng = np.random.default_rng(0)
+
+    for i, until_year in enumerate(UNTIL_YEARS):
+        offset = (i - 0.5) * (width + 0.05)
+        cols = [axis_idx[f"{r}_{until_year}"] for r in REGIONS]
+        baseline = np.array([base[c] for c in cols]) / 1000
+        lo = np.array([phys[origin.index(f"min:{r}_{until_year}")][c]
+                       for r, c in zip(REGIONS, cols)]) / 1000
+        hi = np.array([phys[origin.index(f"max:{r}_{until_year}")][c]
+                       for r, c in zip(REGIONS, cols)]) / 1000
+        colors = [REGION_COLOR[r] if i == 0 else eth_tint(REGION_COLOR[r], 0.45) for r in REGIONS]
+
+        ax.bar(x + offset, baseline, width, color=colors, edgecolor="black", linewidth=0.6, zorder=3)
+        yerr = np.vstack([baseline - lo, hi - baseline])
+        ax.errorbar(x + offset, baseline, yerr=yerr, fmt="none", ecolor="black",
+                     capsize=4, linewidth=1.2, zorder=4)
+
+        for xi, c in zip(x + offset, cols):
+            data = phys[:, c] / 1000
+            jitter = rng.uniform(-0.5, 0.5, size=len(data)) * width * 0.6
+            ax.scatter(xi + jitter, data, s=10, color="black", alpha=0.5,
+                       linewidths=0, zorder=5)
+
+    ax.set_xticks(x)
+    ax.set_xticklabels([r.capitalize() for r in REGIONS], fontsize=11)
+    ax.set_ylabel("Cumulative regional CAPEX by that year (bn EUR)", fontsize=10)
+    ax.set_title("MGA batch4 share (v9_0): Absolute Cumulative CAPEX by Horizon Year",
+                 fontsize=11, fontweight="bold")
+    ax.legend(handles=[
+        Patch(facecolor=shade, edgecolor="black", label=f"cumulative by {until_year[-4:]}, baseline")
+        for until_year, shade in zip(UNTIL_YEARS, ("#555555", "#bbbbbb"))
+    ] + [plt.Line2D([0], [0], marker="o", color="w", markerfacecolor="black",
+                    markeredgecolor="none", alpha=0.5, markersize=6, label="computed points")],
+              fontsize=9, loc="upper left")
+    ax.grid(axis="y", alpha=0.3)
+    fig.tight_layout()
+    savefig(fig, "fig12_temporal_range_distribution")
+
+
 def main() -> None:
     poly, names, units, axis_idx, origin, phys, base = load_batch4_data()
     fig_temporal_crosseffects(names, units, axis_idx, origin, phys, base)
     fig_temporal_range_absolute(axis_idx, origin, phys, base)
+    fig_temporal_range_distribution(axis_idx, origin, phys, base)
 
 
 if __name__ == "__main__":
