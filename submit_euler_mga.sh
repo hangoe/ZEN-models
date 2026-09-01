@@ -15,8 +15,14 @@
 #                until_years=[2040, 2050]; batch_size=n_workers=4)
 #   task_id 10 = batch bbo share  batch4, capex_cum axes (same axes, "share"
 #                normalisation instead of "minmax")
-#   task_id 11 = batch bbo minmax batch8, capex_cum axes (batch_size=n_workers=8)
-#   task_id 12 = batch bbo share  batch8, capex_cum axes
+#   task_id 11 = batch bbo minmax batch6, capex_cum axes (batch_size=n_workers=6;
+#                changed from batch8 on 2026-09-01 -- its earlier CONVERGED
+#                result was under batch_size=8 and no longer matches this row)
+#   task_id 12 = batch bbo share  batch6, capex_cum axes (was batch8)
+#   task_id 13 = batch bbo share  batch4, capex_cum axes, tolerance_explore=0.01 (labeled _2030)
+#   task_id 14 = batch bbo share  batch6, capex_cum axes, tolerance_explore=0.01 (labeled _2030; was batch8)
+#   task_id 15 = batch bbo share  batch4, capex_cum axes, tolerance_explore=0.02
+#   task_id 16 = batch bbo share  batch6, capex_cum axes, tolerance_explore=0.02 (was batch8)
 #
 # The old plain-CAPEX rows (former task_ids 0-6: sampling/bbo/batch_bbo
 # minmax over the region x tech-group capex axes) and the CAPEX_PERIODS
@@ -30,29 +36,38 @@
 # (clones + installs ZEN-garden-plugins and near_optimal_tools/pyoNearOpt,
 # incl. the "bbo" extra needed by batch bbo mode).
 #
-# Resource profile per range. task_ids 9/10 (batch4) and 11/12 (batch8) size
+# Resource profile per range. task_ids 9/10 (batch4) and 11/12 (batch6) size
 # cpus-per-task as batch_size x 10, since each worker's solver requests
 # Threads=10 -- so the worker pool actually gets dedicated cores per worker
-# instead of batch_size workers dividing a flat core count. mem-per-cpu is
-# 1G (memory scales with cpus-per-task instead). --time is padded to 72h
-# flat for headroom. The #SBATCH block below is the batch8 profile (task_id
-# 11/12), i.e. the safe default for a bare `sbatch submit_euler_mga.sh`;
-# override per range on the command line (CLI flags win over #SBATCH) for
-# the cheaper batch4 range instead of running everything at the batch8
-# profile:
-#   sbatch --array=9,10                                                   \
-#          --time=72:00:00 --cpus-per-task=40  --mem-per-cpu=1G  \
+# instead of batch_size workers dividing a flat core count. --time is padded
+# to 72h flat for headroom. The #SBATCH block below is the batch6 profile
+# (task_id 11/12), i.e. the safe default for a bare `sbatch
+# submit_euler_mga.sh`; override per range on the command line (CLI flags
+# win over #SBATCH) for the cheaper batch4 range instead of running
+# everything at the batch6 profile:
+#   sbatch --array=9,10,15                                                \
+#          --time=6-06:00:00 --cpus-per-task=40  --mem-per-cpu=4G  \
 #          submit_euler_mga.sh                # cum_capex batch4, minmax + share
-#   sbatch --array=11,12                                                  \
-#          submit_euler_mga.sh                # cum_capex batch8, minmax + share (script default)
-#   sbatch --array=9-12 submit_euler_mga.sh    # once you trust the walltime per range
+#   sbatch --array=11,12,16                                               \
+#          --time=6-06:00:00 --cpus-per-task=40  --mem-per-cpu=4G  \
+#          submit_euler_mga.sh                # cum_capex batch6, minmax + share
+#   sbatch --array=9-16 submit_euler_mga.sh    # once you trust the walltime per range
+#
+# cpus-per-task=40, mem-per-cpu=4G (160G total), time=6-06:00:00 for BOTH
+# ranges -- this is the profile that actually completed task_id 9/10/11
+# (job 11966251, 2026-08-27), not the #SBATCH defaults below (those were
+# never exercised by a real run and are unverified; the 72h #SBATCH default
+# in particular is short -- task_id 9 took 2d18h and task_id 11 took 4d
+# under this profile). task_id 10/13 (share, tolerance_explore) were
+# OOM-killed at 40 cpus x 1G (40G total) on 2026-08-28 (jobs
+# 12067246_10/_13) -- 4G/cpu fixes that.
 ###############################################################################
 
 #SBATCH --job-name=zen_run_mga
-#SBATCH --time=72:00:00              # TUNABLE: batch8 profile; override per range, see above
+#SBATCH --time=72:00:00              # TUNABLE: batch6 profile; override per range, see above
 #SBATCH --ntasks=1                   # one process per array task -> keep at 1
-#SBATCH --cpus-per-task=80           # TUNABLE: batch8 profile (8 workers x 10 threads); override per range, see above
-#SBATCH --mem-per-cpu=1G              # TUNABLE: batch8 profile (~80GB total); override per range, see above
+#SBATCH --cpus-per-task=60           # TUNABLE: batch6 profile (6 workers x 10 threads); override per range, see above
+#SBATCH --mem-per-cpu=1G              # TUNABLE: batch6 profile (~60GB total); override per range, see above
 #SBATCH --output=zen_run_mga_%A_%a.out   # %A = array id, %a = task id
 #SBATCH --error=zen_run_mga_%A_%a.err
 #SBATCH --mail-type=END,FAIL         # email when a task ends/fails (ETH address)
