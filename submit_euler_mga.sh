@@ -31,6 +31,13 @@
 #   task_id 17 = retry of task_id 15 (batch bbo share batch4, capex_cum axes,
 #                tolerance_explore=0.02) under a fresh task_id after the
 #                2026-09-01 failure above
+#   task_id 18 = copy of task_id 17 (batch bbo share batch4, capex_cum axes,
+#                tolerance_explore=0.02) with aggregated_time_steps_per_year=10
+#                instead of 3 (finer time series aggregation)
+#   task_id 19 = copy of task_id 18 with interval_between_years=2 instead of 5
+#                and optimized_years=16 instead of 7 (2020 + 15*2 = 2050, same
+#                end year as task_id 17/18's 2020 + 6*5 = 2050, just evaluated
+#                every 2 years instead of every 5)
 #
 # The old plain-CAPEX rows (former task_ids 0-6: sampling/bbo/batch_bbo
 # minmax over the region x tech-group capex axes) and the CAPEX_PERIODS
@@ -63,6 +70,14 @@
 #          --time=6-06:00:00 --cpus-per-task=40  --mem-per-cpu=4G  \
 #          submit_euler_mga.sh                # cum_capex batch6, minmax + share
 #   sbatch --array=9-17 submit_euler_mga.sh    # once you trust the walltime per range
+#   sbatch --array=18,19                                                  \
+#          --time=14-00:00:00 --cpus-per-task=40  --mem-per-cpu=4G  \
+#          submit_euler_mga.sh                # cum_capex batch4, share, 10ts/year
+#                                              # (18: 7a/5a interval; 19: 16a/2a interval,
+#                                              #  both untested -- 14d padded well above
+#                                              #  17's 8d since 10ts/year and (for 19) more
+#                                              #  periods both add per-solve cost; still
+#                                              #  within normal.120h's 15d cap)
 #
 # cpus-per-task=40, mem-per-cpu=4G (160G total), time=6-06:00:00 for BOTH
 # ranges -- this is the profile that actually completed task_id 9/10/11
