@@ -254,9 +254,7 @@ def fig_temporal_range_absolute(axis_idx, origin, phys, base) -> None:
     ax.set_xticklabels([r.capitalize() for r in REGIONS], fontsize=11)
     ax.set_ylabel("Cumulative regional CAPEX by that year (bn EUR)", fontsize=10)
     ax.set_title(
-        "MGA batch4 share (v9_0): Absolute Cumulative CAPEX by Horizon -- Baseline and Achievable Range\n"
-        "(same VMM solves as fig10, in bnEUR -- how much of each region's own flexibility is already\n"
-        "locked in by 2040 vs. still added in the final decade)",
+        "Absolute Cumulative CAPEX by Horizon Year and Region",
         fontsize=11, fontweight="bold",
     )
     ax.legend(handles=[

@@ -2289,14 +2289,10 @@ def fig9_model_scope_coverage() -> None:
 # flexibility elsewhere in the system changes how much fleet buildout /
 # storage cycling is needed to absorb that same new load.
 #
-# Requested snapshot years were 2025/2035/2045, but the v9_0 horizon only has
-# even-numbered modeled years (2020, 2022, ..., 2048 — reference_year=2020,
-# interval_between_years=2, see get_available_years()). Each requested year
-# sits exactly between two modeled years; rounded UP to the nearest modeled
-# year (2026/2036/2046) rather than down, so the middle snapshot (2036)
-# matches the YEAR constant already used as this script's standard
-# mid-horizon snapshot elsewhere (fig0a/fig1a/fig5/etc.).
-SNAPSHOT_YEARS_POWER = [2026, 2036, 2046]
+# 2 snapshot years (2030/2040) so the figure is a 2x2 grid; both are directly
+# modeled years under the v9_0 horizon (2020, 2022, ..., 2048 —
+# reference_year=2020, interval_between_years=2, see get_available_years()).
+SNAPSHOT_YEARS_POWER = [2030, 2040]
 
 
 # ── 10: Power generation capacity mix ───────────────────────────────────────
@@ -2376,7 +2372,7 @@ STORAGE_STACK_ORDER = ["battery", "pumped_hydro", "natural_gas_storage", "oil_st
 def fig10_power_and_storage_impact(base_run: Run, no_flex_run: Run, full_run: Run) -> None:
     """Power-sector generation capacity (top row) and storage annual energy
     discharged (bottom row), Crystal Ball base / No flexibility / Full
-    flexibility, at 3 snapshot years.
+    flexibility, at 2 snapshot years (2030/2040).
 
     Isolates finding #1 (top row): adding electrified (but inflexible)
     industry heat demand does NOT change the generation TECHNOLOGY mix —
