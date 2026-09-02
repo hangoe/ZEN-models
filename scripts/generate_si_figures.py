@@ -34,7 +34,7 @@ SI_results/ (results, renumbered fig1-fig10):
   fig6_heat_pathway (was fig3b)        — direct vs temp-conversion heat production, 2050
   fig7_retrofit_ccs_comparison (was fig5) — CO2 captured by retrofit-CCS technology, No flexibility vs Crystal Ball base
   fig8_diffusion_mechanisms (was fig6) — ZEN-garden technology-diffusion/learning mechanisms compared
-  fig9_heat_supply_trajectory_no_flexibility (was fig7) — No flexibility heat-supply capacity, every modeled year 2020-2048
+  fig9_heat_supply_trajectory_no_flexibility (was fig7) — No flexibility heat-supply capacity, every modeled year 2020-2050
   fig10_power_and_storage_impact (unchanged) — power generation capacity (top row) & storage annual energy
                                           discharged (bottom row), Crystal Ball base / No flexibility /
                                           Full flexibility, 3 snapshot years — generation fleet SCALES UP
@@ -277,20 +277,19 @@ FIGURES_DIR = REPO_ROOT / "data" / "outputs" / "figures" / "SI_results"
 # Single-year snapshot used throughout (horizon totals used where noted).
 # As of the v8_0 re-run the horizon changed from 2025-2070/step5 to
 # 2020-2048/step2 (reference_year=2020, interval_between_years=2,
-# optimized_years=15) — 2050 is no longer a modeled year at all. 2036 is the
-# same RELATIVE position in the new horizon that 2050 was in the old one
-# (~56% of the way from first to last modeled year), chosen to preserve the
-# original intent (a snapshot with substantial capacity buildout, but not the
-# final year, which fig0a's docstring flags as prone to terminal-value/
-# budget-repayment artifacts) rather than reusing a now-nonexistent literal
-# year.
+# optimized_years=15), then as of the 2026-09 "add 2050" re-sync all runs
+# were re-solved with optimized_years=16 (2020-2050) — 2036 is left as-is
+# here (still a real modeled year, still mid-horizon, not the terminal year
+# fig0a's docstring flags as prone to terminal-value/budget-repayment
+# artifacts); it no longer needs to stand in for 2050 since 2050 is now a
+# real snapshot option (see COMPARISON_YEARS below).
 YEAR = 2036
 
-# Multi-year snapshot set shared by fig0b (panel A), fig1b, and fig4b, per
-# user request — 2030/2040 are modeled years directly; "2050" is not (the
-# horizon stops at 2048, see YEAR's comment above for the same substitution
-# rationale) so 2048 stands in for it here too.
-COMPARISON_YEARS = [2030, 2040, 2048]
+# Multi-year snapshot set shared by fig0b (panel A), fig1b, and fig4b.
+# 2030/2040/2050 are all directly modeled years under the 16a horizon
+# (2020, 2022, ..., 2050) — 2050 replaces the previous 2048 stand-in now
+# that the actual final year is modeled.
+COMPARISON_YEARS = [2030, 2040, 2050]
 
 # Thesis-consistent scenario order/labels (Table~SIScenarios), distinct from
 # the dashboard's shorter "Baseline" label for the same run. Order matches
@@ -300,12 +299,12 @@ COMPARISON_YEARS = [2030, 2040, 2048]
 # is reserved for "Crystal Ball (base)" — see the module docstring for why it
 # isn't a 7th entry here.
 SCENARIOS = [
-    ("Crystal_Ball_ind_heat_v9_0_no_flexibility_2020_15a_2a_interval_10ts", "No flexibility"),
-    ("Crystal_Ball_ind_heat_v9_0_2020_15a_2a_interval_10ts", "Full flexibility"),
-    ("Crystal_Ball_ind_heat_v9_0_DSM_pessimistic_2020_15a_2a_interval_10ts", "DSM pessimistic"),
-    ("Crystal_Ball_ind_heat_v9_0_DSM_only_2020_15a_2a_interval_10ts", "DSM only"),
-    ("Crystal_Ball_ind_heat_v9_0_TES_only_2020_15a_2a_interval_10ts", "TES only"),
-    ("Crystal_Ball_ind_heat_v9_0_single_temp_2020_15a_2a_interval_10ts", "Single temperature level"),
+    ("Crystal_Ball_ind_heat_v9_0_no_flexibility_2020_16a_2a_interval_10ts", "No flexibility"),
+    ("Crystal_Ball_ind_heat_v9_0_2020_16a_2a_interval_10ts", "Full flexibility"),
+    ("Crystal_Ball_ind_heat_v9_0_DSM_pessimistic_2020_16a_2a_interval_10ts", "DSM pessimistic"),
+    ("Crystal_Ball_ind_heat_v9_0_DSM_only_2020_16a_2a_interval_10ts", "DSM only"),
+    ("Crystal_Ball_ind_heat_v9_0_TES_only_2020_16a_2a_interval_10ts", "TES only"),
+    ("Crystal_Ball_ind_heat_v9_0_single_temp_2020_16a_2a_interval_10ts", "Single temperature level"),
 ]
 
 # fig0a/fig0b only. Uses SCENARIO_PALETTE slot 6 (grey) — see the comment there.
@@ -326,7 +325,11 @@ SCENARIOS = [
 # SCENARIOS list's (system.json's "optimized_years") if fig0a/fig0b numbers
 # ever look inconsistent with headline_metrics.csv again — this path tends to
 # drift whenever the base case gets independently re-run.
-BASE_SCENARIO = ("Crystal_Ball_2020_15a_2a_interval_10ts", "Crystal Ball (base)")
+#
+# 2026-09 "add 2050" re-sync: base case re-run with optimized_years=16
+# (2020-2050, matching the SCENARIOS list's new 16a runs) — see the
+# COMPARISON_YEARS comment above for the same re-sync.
+BASE_SCENARIO = ("Crystal_Ball_2020_16a_2a_interval_10ts", "Crystal Ball (base)")
 
 
 def load_scenarios() -> list[Run]:
@@ -634,9 +637,9 @@ def fig1b_industry_capacity(runs: list[Run]) -> None:
     changes over time are still directly comparable, just split across
     panels instead of packed into one.
 
-    CAVEAT on the "Heat Supply" row's 2048 column: capacity there is
+    CAVEAT on the "Heat Supply" row's 2050 column: capacity there is
     noticeably LOWER than at 2040 in every single scenario (e.g. "No
-    flexibility": ~94 GW at 2040 vs ~70 GW at 2048 — a ~25% drop), even
+    flexibility": ~94 GW at 2040 vs ~72 GW at 2050 — a ~24% drop), even
     though the "Production Technologies" row stays essentially FLAT across
     the whole horizon (~60 ton/h throughout, confirmed directly) — this is
     NOT a declining-demand story. Checked directly against the solved model:
@@ -644,9 +647,9 @@ def fig1b_industry_capacity(runs: list[Run]) -> None:
     electrode/coal/waste boilers all have 25-30yr lifetimes, and the model
     built most of its boiler fleet in a large initial spike (~15 GW in 2020
     + ~29 GW in 2022 alone, "No flexibility") which starts retiring right
-    around 2045-2047; replacement capacity_addition in 2044-2048 combined is
+    around 2045-2047; replacement capacity_addition in 2044-2050 combined is
     only a small fraction of what's retiring in the same window (biomass
-    boiler capacity alone falls from ~11 GW at 2040 to ~1 GW at 2048). Heat
+    boiler capacity alone falls from ~11 GW at 2040 to ~1 GW at 2050). Heat
     pumps (20yr lifetime) show no such drop. Reads as a finite-horizon/
     myopic-foresight under-investment artifact near the model's terminal
     periods — the same family of terminal-year artifact fig0a/fig0b's
@@ -688,7 +691,7 @@ def fig1b_industry_capacity(runs: list[Run]) -> None:
     for ax in axes.flat:
         plt.setp(ax.get_xticklabels(), rotation=30, ha="right")
     fig.text(0.5, 0.005,
-             "Heat-supply 2048 dip: boiler-fleet lifetime retirement (25-30yr) outpacing late-horizon "
+             "Heat-supply 2050 dip: boiler-fleet lifetime retirement (25-30yr) outpacing late-horizon "
              "replacement investment - not a demand decline (Production row is flat). See docstring.",
              ha="center", va="bottom", fontsize=8, style="italic", color="#555555")
     fig.tight_layout(rect=[0, 0.02, 1, 0.95])
@@ -700,9 +703,9 @@ def fig1b_industry_capacity(runs: list[Run]) -> None:
 def fig7_heat_supply_trajectory(runs: list[Run]) -> None:
     """Full-horizon version of fig1b's "Heat Supply" row (same techs, stack
     order, color/hatch map) for the "No flexibility" scenario only, plotting
-    every modeled year (2020-2048, 2yr steps) instead of the 3-year
+    every modeled year (2020-2050, 2yr steps) instead of the 3-year
     COMPARISON_YEARS snapshot — lets the buildout/retirement pattern fig1b's
-    docstring already flags (a ~25% capacity dip at 2048 from boiler-fleet
+    docstring already flags (a ~24% capacity dip at 2050 from boiler-fleet
     lifetime retirement outpacing late-horizon replacement) be read directly
     off the trajectory rather than inferred from 3 points.
 
@@ -1452,7 +1455,7 @@ def fig4b_industry_fuel_demand_comparison(runs: list[Run]) -> None:
     demand sectors.
 
     Cement/steel are each shown as ONE bar, at the LATEST year COMPARISON_YEARS
-    (2030/2040/2048, see that constant's own comment) has solved results for —
+    (2030/2040/2050, see that constant's own comment) has solved results for —
     not one bar per year: cement_kiln/BF_BOF/EAF/NG_DRI/H2_DRI's flows do
     change somewhat year to year, but showing all three years turned this
     into 9 densely-hatched, per-carrier-split mini-bars — user feedback: too
@@ -1902,7 +1905,7 @@ def fig0b_emissions_source_comparison(full_run: Run, base_run: Run) -> None:
     2025-2070.
 
     Panel A originally used a single year (the earliest one present in both
-    runs) — per user request it now shows COMPARISON_YEARS (2030/2040/2048)
+    runs) — per user request it now shows COMPARISON_YEARS (2030/2040/2050)
     for each run side by side instead, so the composition's evolution over
     the horizon is visible directly rather than a single cross-section. The
     original single-year rationale (kept below for context on why year
@@ -2013,7 +2016,7 @@ def fig0b_emissions_source_comparison(full_run: Run, base_run: Run) -> None:
     # Panel A: full emissions composition per run PER YEAR (carrier +
     # technology stacked together, suffix-disambiguated) so each bar's
     # height reproduces that run's true net total for that year — grouped
-    # model-major/year-minor ("base 2030/2040/2048, full 2030/2040/2048"),
+    # model-major/year-minor ("base 2030/2040/2050, full 2030/2040/2050"),
     # same convention as fig1b/fig4b.
     composition_series = []
     for run, results in [(base_run, br), (full_run, fr)]:
@@ -2290,7 +2293,7 @@ def fig9_model_scope_coverage() -> None:
 # storage cycling is needed to absorb that same new load.
 #
 # 2 snapshot years (2030/2040) so the figure is a 2x2 grid; both are directly
-# modeled years under the v9_0 horizon (2020, 2022, ..., 2048 —
+# modeled years under the v9_0 horizon (2020, 2022, ..., 2050 —
 # reference_year=2020, interval_between_years=2, see get_available_years()).
 SNAPSHOT_YEARS_POWER = [2030, 2040]
 
@@ -2618,9 +2621,8 @@ def fig12_lp_formulation() -> None:
     work's actual "No flexibility" model's (approximate, rounded) problem
     size (right, read directly from that run's own benchmarking.json/
     system.json/solver.json - see the module-level comment above for why
-    these aren't hardcoded; the "16 years (2020-2050)" line is the one
-    deliberate exception, see its own inline comment). Deliberately compact:
-    one plain LP statement, one stat block, nothing else.
+    these aren't hardcoded). Deliberately compact: one plain LP statement,
+    one stat block, nothing else.
     """
     model_dir = _search_var_dict(EULER_ROOT / SCENARIOS[0][0], max_depth=3)
     if model_dir is None:
@@ -2673,10 +2675,10 @@ def fig12_lp_formulation() -> None:
         f"{len(system['set_nodes'])} nodes · {len(system['set_technologies'])} technologies · "
         f"{len(system['set_carriers'])} carriers"
     )
-    # Hardcoded, not derived from system.json's optimized_years=15 (2020-2048):
-    # presented as 16 years through 2050 per user instruction.
+    last_year = system["reference_year"] + (system["optimized_years"] - 1) * system["interval_between_years"]
     dims_line2 = (
-        f"16 years (2020–2050, {system['interval_between_years']}-yr steps) · "
+        f"{system['optimized_years']} years ({system['reference_year']}–{last_year}, "
+        f"{system['interval_between_years']}-yr steps) · "
         f"{system['aggregated_time_steps_per_year']} h/yr (of {system['unaggregated_time_steps_per_year']})"
     )
     ax.text(rx, 0.30, dims_line1, fontsize=9, va="center")
