@@ -2443,15 +2443,19 @@ def fig10_power_and_storage_impact(base_run: Run, no_flex_run: Run, full_run: Ru
 # ── 11: MGA method schematic (no data) ──────────────────────────────────────
 # Purely illustrative 2D geometry, hand-picked below (not derived from any
 # solved model). Left panel: a toy feasible region under a linear objective,
-# its cost-optimal vertex z*, the two parallel iso-cost lines C* and
-# (1+eps)C*, and the near-optimal "wedge" between them (the intersection of
-# the feasible region with the slack half-space) - this wedge IS the
-# near-optimal space explored on the right. Right panel: the same wedge (now
-# treated as an unknown polytope) approximated from both sides - an outer
-# approximation (AO, a bounding box, cheap to get from per-axis min/max
-# solves) and an inner approximation (IO, the convex hull of whatever
-# vertices directional solves have actually found so far, starting from just
-# z*) - refined by solving in new directions until IO closes the gap to AO.
+# its cost-optimal vertex x*, and the near-optimal space X_eps = {x in X |
+# c^T x <= (1+eps)C*} - the "wedge" cut off by the slack bound. Letters and
+# minimal in-plot-label style (no legend) follow M. Steen's thesis (Steen
+# 2026, in mga_tests/Steen2026_Thesis.pdf), Section 2.1 / Figure 1 - this
+# work uses a different support-function algorithm than his ORACLE, so only
+# this near-optimal-space definition (common background, not method-specific)
+# is adopted from it. Right panel: the same wedge (now treated as an unknown
+# polytope) approximated from both sides - an outer approximation (AO, a
+# bounding box, cheap to get from per-axis min/max solves) and an inner
+# approximation (IO, the convex hull of whatever vertices directional solves
+# have actually found so far, starting from just z*) - refined by solving in
+# new directions until IO closes the gap to AO. This panel documents our own
+# algorithm, not ORACLE, so it keeps its original generic IO/AO vocabulary.
 
 # Toy feasible region (hexagon) and its cost-optimal vertex under a linear
 # objective cost(x, y) = x + y (minimized). Chosen so z* is a genuine corner
@@ -2478,66 +2482,69 @@ def fig11_mga_method() -> None:
     """Conceptual, non-data schematic of Modeling to Generate Alternatives
     (MGA): how the near-optimal space is defined (left) and how this work's
     algorithm explores it via inner/outer polytope approximation (right).
-    See the module-level comment above this function and above
-    _MGA_FEASIBLE for the (hand-picked, unitless) geometry used.
+    Left panel's letters/style follow M. Steen's thesis (Figure 1); the
+    right panel documents our own (non-ORACLE) algorithm. See the
+    module-level comment above this function and above _MGA_FEASIBLE for
+    the (hand-picked, unitless) geometry used.
     """
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(13, 6))
 
-    # ── Left: feasible region, objective, slack, near-optimal space ────────
+    # ── Left: X, x*, and the near-optimal wedge X_eps (Steen Fig. 1 style,
+    #    minimal in-plot labels, no legend) ─────────────────────────────────
     ax1.add_patch(Polygon(_MGA_FEASIBLE, closed=True, facecolor=eth_tint(_ETH_GREY, 0.82),
                            edgecolor=_ETH_GREY, linewidth=1.3, zorder=1))
-    ax1.add_patch(Polygon(_MGA_NEAR_OPT_WEDGE, closed=True, facecolor=eth_tint(_ETH_BLUE, 0.35),
-                           edgecolor=_ETH_BLUE, linewidth=1.6, zorder=3))
+    ax1.add_patch(Polygon(_MGA_NEAR_OPT_WEDGE, closed=True, facecolor=eth_tint(_ETH_RED, 0.85),
+                           edgecolor=_ETH_GREY, linewidth=1.3, zorder=3))
 
     c_star = sum(_MGA_Z_STAR)  # = 2.0
     slack_cost = c_star * (1 + _MGA_EPS)  # = 2.8
-    iso_cost_lines = [
-        (c_star, "black", "-", "$C^*$ (optimal cost)"),
-        (slack_cost, _ETH_RED, "--", r"$(1+\varepsilon)\,C^*$ (slack bound)"),
-    ]
-    for cost, color, ls, _text in iso_cost_lines:
-        xs, ys = _mga_iso_cost_line(cost, span=1.0)
-        ax1.plot(xs, ys, color=color, linestyle=ls, linewidth=1.2, zorder=2)
-
-    # Epsilon bracket: perpendicular gap between the two iso-cost lines,
-    # anchored at a point common to both lines' "along-line" coordinate.
-    p1 = (1.5, 0.5)
-    p2 = (p1[0] + (slack_cost - c_star) / 2, p1[1] + (slack_cost - c_star) / 2)
-    ax1.annotate("", xy=p2, xytext=p1,
-                 arrowprops=dict(arrowstyle="<->", color=_ETH_RED, linewidth=1.2), zorder=4)
-    ax1.text((p1[0] + p2[0]) / 2 + 0.2, (p1[1] + p2[1]) / 2 - 0.35, r"$\varepsilon$",
-              color=_ETH_RED, fontsize=11, fontweight="bold")
-
-    # Objective direction: arrow pointing toward z*, i.e. toward decreasing cost.
-    ax1.annotate("", xy=(2.0, 2.0), xytext=(3.6, 3.6),
-                 arrowprops=dict(arrowstyle="-|>", color="black", linewidth=1.4, mutation_scale=16),
-                 zorder=4)
-    ax1.text(3.7, 3.7, "objective:\nminimize cost", fontsize=8.5, ha="left", va="bottom")
+    xs, ys = _mga_iso_cost_line(slack_cost, span=0.55)
+    ax1.plot(xs, ys, color=_ETH_RED, linestyle="--", linewidth=1.3, zorder=2)
 
     ax1.plot(*_MGA_Z_STAR, "o", color=_ETH_RED, markersize=7, zorder=5)
-    ax1.annotate("$z^*$ (cost-optimal design)", xy=_MGA_Z_STAR, xytext=(2.5, 1.85),
-                 fontsize=9, ha="left", va="center",
-                 arrowprops=dict(arrowstyle="-", color=_ETH_RED, linewidth=0.9))
+    ax1.annotate("$x^*$", xy=_MGA_Z_STAR, xytext=(0.1, 1.6),
+                 fontsize=11, ha="right", va="bottom",
+                 arrowprops=dict(arrowstyle="-", color="black", linewidth=0.9), zorder=4)
 
-    line_handles = [plt.Line2D([0], [0], color=color, linestyle=ls, linewidth=1.4, label=text)
-                     for _cost, color, ls, text in iso_cost_lines]
-    z_star_handle = plt.Line2D([0], [0], marker="o", color="none", markerfacecolor=_ETH_RED,
-                                markeredgecolor=_ETH_RED, markersize=7, label="$z^*$ (cost-optimal design)")
+    ax1.text(5.4, 4.6, r"feasible space $\mathcal{X}$", fontsize=10.5, ha="center", va="center")
+
+    # Approaches the wedge's interior centroid (not a vertex) from below, so
+    # the straight leader line's cost sum x+y stays strictly below the
+    # (1+eps)C* bound throughout - it never touches the dashed line - while
+    # only briefly crossing the (unremarkable) solid hexagon edge on the way
+    # in. Also clear of x*'s leader line above it (disjoint x-ranges).
+    wedge_mid = (sum(p[0] for p in _MGA_NEAR_OPT_WEDGE) / 3, sum(p[1] for p in _MGA_NEAR_OPT_WEDGE) / 3)
+    ax1.annotate(r"near-optimal space $\mathcal{X}_\varepsilon$", xy=wedge_mid, xytext=(2.3, -0.15),
+                 fontsize=9.5, ha="left", va="bottom",
+                 arrowprops=dict(arrowstyle="-", color="black", linewidth=0.9), zorder=4)
+
+    line_anchor = ((1.914 + 0.840) / 2, (0.886 + 1.960) / 2)
+    ax1.annotate(r"$\mathbf{c}^\top\mathbf{x} = (1+\varepsilon)\,C^*$", xy=line_anchor, xytext=(2.7, 2.6),
+                 fontsize=10, ha="left", va="bottom", color=_ETH_RED,
+                 arrowprops=dict(arrowstyle="-", color=_ETH_RED, linewidth=0.9), zorder=4)
+
+    # Simple arrow axes (Steen's style) instead of boxed spines.
+    origin, x_end, y_end = (-1.5, -0.4), (8.6, -0.4), (-1.5, 7.3)
+    ax1.annotate("", xy=x_end, xytext=origin,
+                 arrowprops=dict(arrowstyle="-|>", color="black", linewidth=1.0), annotation_clip=False)
+    ax1.annotate("", xy=y_end, xytext=origin,
+                 arrowprops=dict(arrowstyle="-|>", color="black", linewidth=1.0), annotation_clip=False)
+    ax1.text(x_end[0] + 0.15, x_end[1], "$x_1$", fontsize=10.5, ha="left", va="center")
+    ax1.text(y_end[0], y_end[1] + 0.2, "$x_2$", fontsize=10.5, ha="center", va="bottom")
+
     ax1.legend(handles=[
-        Patch(facecolor=eth_tint(_ETH_GREY, 0.82), edgecolor=_ETH_GREY, label="feasible region"),
-        Patch(facecolor=eth_tint(_ETH_BLUE, 0.35), edgecolor=_ETH_BLUE, label="near-optimal space"),
-        *line_handles,
-        z_star_handle,
-    ], loc="upper left", fontsize=8.5, frameon=False)
-    ax1.set_xlim(-1.6, 8.8)
-    ax1.set_ylim(-1.2, 7.6)
+        Patch(facecolor=eth_tint(_ETH_GREY, 0.82), edgecolor=_ETH_GREY, label=r"feasible space $\mathcal{X}$"),
+        Patch(facecolor=eth_tint(_ETH_RED, 0.85), edgecolor=_ETH_GREY, label=r"near-optimal space $\mathcal{X}_\varepsilon$"),
+        plt.Line2D([0], [0], color=_ETH_RED, linestyle="--", linewidth=1.3, label=r"cost bound $\mathbf{c}^\top\mathbf{x}=(1+\varepsilon)C^*$"),
+        plt.Line2D([0], [0], marker="o", color="none", markerfacecolor=_ETH_RED, markeredgecolor=_ETH_RED,
+                   markersize=7, label="$x^*$ (cost-optimal design)"),
+    ], loc="upper left", fontsize=8, frameon=False, bbox_to_anchor=(0.08, 0.93))
+
+    ax1.set_xlim(-2.0, 8.9)
+    ax1.set_ylim(-0.9, 7.6)
     ax1.set_xticks([])
     ax1.set_yticks([])
-    ax1.set_xlabel("Variable A", fontsize=9.5)
-    ax1.set_ylabel("Variable B", fontsize=9.5)
-    ax1.set_title("Feasible Region, Objective, and Near-Optimal Space", fontsize=11, fontweight="bold")
-    ax1.text(0.5, -0.1, "A and B stand in for any two chosen decision variables.",
-             transform=ax1.transAxes, ha="center", va="top", fontsize=8.5, style="italic", color="#555555")
+    ax1.set_title("The Near-Optimal Space", fontsize=11, fontweight="bold")
     for spine in ax1.spines.values():
         spine.set_visible(False)
 
@@ -2549,7 +2556,13 @@ def fig11_mga_method() -> None:
     # revealed one at a time, each by a separate directional LP solve.
     z_star = (0.0, 0.0)
     v2, v3, v4, v5 = (2.6, -0.3), (3.4, 1.6), (1.8, 3.0), (-0.6, 1.8)
-    true_space = [z_star, v2, v3, v4, v5]
+    # Bulge vertex between v3 and v4, pushed up-right beyond the found
+    # triangle's v3-v4 edge - just enough extra room to fit a direct
+    # "near-optimal space" label inside the (still-unknown) true space,
+    # without touching v3/v4 themselves (so the found/inner-approx triangle
+    # is unaffected).
+    v_bulge = (3.6, 3.3)
+    true_space = [z_star, v2, v3, v_bulge, v4, v5]
     found = [z_star, v3, v4]  # 2 directional solves run so far, beyond z*
     solved_via_direction = [v3, v4]
     unexplored = [v2, v5]
@@ -2562,6 +2575,7 @@ def fig11_mga_method() -> None:
                            edgecolor=_ETH_GREY, linestyle=":", linewidth=1.2, zorder=1))
     ax2.add_patch(Polygon(found, closed=True, facecolor=eth_tint(_ETH_BLUE, 0.35),
                            edgecolor=_ETH_BLUE, linewidth=1.8, zorder=3))
+    ax2.text(3.05, 2.75, "near-optimal\nspace", fontsize=8, color=_ETH_GREY, ha="center", va="center", zorder=2)
 
     for i, v in enumerate((v3, v4), start=1):
         ax2.annotate("", xy=v, xytext=z_star,
@@ -2578,38 +2592,35 @@ def fig11_mga_method() -> None:
     ax2.annotate("", xy=next_dir_end, xytext=z_star,
                  arrowprops=dict(arrowstyle="-|>", color=_ETH_GREY, linewidth=1.3,
                                  linestyle=(0, (3, 2)), mutation_scale=13), zorder=4)
-    ax2.text(next_dir_end[0], next_dir_end[1] - 0.5, "next direction\nto explore",
-              fontsize=7.5, color=_ETH_GREY, ha="center", va="top")
+    # Placed just above the arrow (inside the grey true-space fill, not
+    # below it in the white margin) so it reads as labeling the arrow.
+    ax2.text(next_dir_end[0] + 0.1, next_dir_end[1] + 0.2, "next direction\nto explore",
+              fontsize=7.5, color=_ETH_GREY, ha="left", va="bottom")
 
     for v in solved_via_direction:
         ax2.plot(*v, "o", color=_ETH_BLUE, markersize=6, zorder=5)
     for v in unexplored:
         ax2.plot(*v, "o", markerfacecolor="white", markeredgecolor=_ETH_GREY, markersize=6, zorder=5)
     ax2.plot(*z_star, "o", color=_ETH_RED, markersize=7, zorder=6)
-    ax2.annotate("$z^*$ (baseline: starting point for IO)", xy=z_star, xytext=(-2.1, -1.1),
-                 fontsize=8.5, ha="left", va="center",
+    ax2.annotate("$z^*$", xy=z_star, xytext=(0.05, 0.85),
+                 fontsize=10, ha="left", va="bottom",
                  arrowprops=dict(arrowstyle="-", color=_ETH_RED, linewidth=0.9))
 
     ax2.legend(handles=[
-        Patch(facecolor="none", edgecolor=_ETH_RED, linestyle="--", label="outer approx. (AO): bounding box from per-axis min/max solves"),
-        Patch(facecolor=eth_tint(_ETH_BLUE, 0.35), edgecolor=_ETH_BLUE, label="inner approx. (IO): convex hull of solved points"),
+        Patch(facecolor="none", edgecolor=_ETH_RED, linestyle="--", label="outer approx.: bounding box from per-axis min/max solves"),
+        Patch(facecolor=eth_tint(_ETH_BLUE, 0.35), edgecolor=_ETH_BLUE, label="inner approx.: convex hull of solved points"),
         Patch(facecolor=eth_tint(_ETH_GREY, 0.88), edgecolor=_ETH_GREY, linestyle=":", label="true near-optimal space (unknown until fully explored)"),
-    ], loc="upper left", fontsize=7.8, frameon=False, bbox_to_anchor=(-0.02, 1.02))
-    ax2.set_xlim(-2.2, 4.6)
-    ax2.set_ylim(-1.6, 4.0)
+    ], loc="upper center", fontsize=7.8, frameon=False, bbox_to_anchor=(0.5, 0.92))
+    ax2.set_xlim(-1.0, 4.6)
+    ax2.set_ylim(-1.6, 5.0)
     ax2.set_xticks([])
     ax2.set_yticks([])
-    ax2.set_title("Exploring the Space: Refining Inner (IO) / Outer (AO) Approximations",
+    ax2.set_title("Exploring the Near-Optimal Space",
                   fontsize=11, fontweight="bold")
     for spine in ax2.spines.values():
         spine.set_visible(False)
 
-    fig.suptitle("Modeling to Generate Alternatives (MGA): Method Overview", fontsize=13.5, fontweight="bold")
-    ax2.text(0.5, -0.06,
-             "Each solid arrow = one directional LP solve (a new vertex added to IO); "
-             "iterate until IO closes the gap to AO (converged).",
-             transform=ax2.transAxes, ha="center", va="top", fontsize=8.5, style="italic", color="#555555")
-    fig.tight_layout(rect=[0, 0.04, 1, 0.93])
+    fig.tight_layout(rect=[0, 0.02, 1, 1])
     savefig(fig, "fig5_mga_method", subdir="method")
 
 

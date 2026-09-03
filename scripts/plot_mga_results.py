@@ -284,9 +284,11 @@ MODEL = "Crystal_Ball_ind_heat_v9_0_no_flexibility_nodiffusion"
 # (north/west/south/east) x 2 cumulative horizons (until_year in
 # [2040, 2050]) = 8 node_capex_cumulative axes, plus net_present_cost -- see
 # each run's own polytope.npz axis_meta_json for the exact node membership
-# per region (config_mga_axes_capex_cum.json). batch4_share is the
-# BATCH_MODES entry for this axis set (batch_size=4, strategy_mode="bbo" per
-# config_mga_batch_bbo.json, normalisation="share"); SUPF_MODES is empty
+# per region (config_mga_axes_capex_cum.json). batch4_tol002/batch6_tol002
+# are the BATCH_MODES entries for this axis set (batch_size=4/6,
+# strategy_mode="bbo" per config_mga_batch_bbo.json, normalisation="share",
+# tolerance_explore=0.02 -- see the tol002-switchover note below);
+# SUPF_MODES is empty
 # until a v9_0 bbo_units/sampling_units run against this axis set is
 # downloaded. Adding either later is just appending to SUPF_MODES/
 # BATCH_MODES/BATCH_RUN_SUFFIX, no other code changes needed (BASE_MODE/
@@ -296,8 +298,22 @@ ORACLE_DIR = MGA_ROOT / f"{RUN_PREFIX}_oracle"
 
 SUPF_MODES: tuple[str, ...] = ()
 
-BATCH_MODES: tuple[str, ...] = ("batch4_share",)
-BATCH_RUN_SUFFIX: dict[str, str] = {"batch4_share": "batch_bbo_share_batch4"}
+# As of 2026-09-03, RUN_PREFIX/BATCH_MODES point at the tolerance_explore=0.02
+# re-sweep of the same CAPEX-CUM/share axes (batch4_share/batch6_share above
+# were tolerance_explore=0.01) -- task_id 15/16 in parameters_mga.csv.
+# task_id 15's own job (12374944_15) FAILED on 2026-09-01 (a numerical issue
+# in batch_ORACLE's add_cut, not a resource/config problem); task_id 17 is
+# its retry under a fresh task_id, writing to the SAME output folder name
+# (batch_bbo_share_batch4_tol002) -- that retry is what's actually on disk
+# here, and it converged (223 iterations) on 2026-09-03. batch6_tol002
+# (task_id 16) was still running on Euler as of this switchover -- left in
+# BATCH_MODES so it appears automatically once its own run_dir is synced
+# down (main() skips any mode whose polytope.npz isn't present yet).
+BATCH_MODES: tuple[str, ...] = ("batch4_tol002", "batch6_tol002")
+BATCH_RUN_SUFFIX: dict[str, str] = {
+    "batch4_tol002": "batch_bbo_share_batch4_tol002",
+    "batch6_tol002": "batch_bbo_share_batch6_tol002",
+}
 # Every mode with its own polytope.npz + outer approximation -- the set
 # fig1/fig2/fig3 iterate over.
 ALL_SUPF_MODES = SUPF_MODES + BATCH_MODES
@@ -312,18 +328,21 @@ BASE_MODE.update({m: "batch" for m in BATCH_MODES})
 # Colours reused from figure_settings.SCENARIO_PALETTE (the full 7-color ETH
 # corporate swatch: blue, petrol, green, bronze, red, purple, grey), per this
 # project's convention of never inventing a separate palette for print
-# figures. _ETH_PETROL was reserved for a future CAPEX batch mode (see the
-# old constants comment, now this one) -- batch4_share gets it.
+# figures. _ETH_PETROL/_ETH_GREEN go to batch4_tol002/batch6_tol002
+# respectively (batch4_share/batch6_share used _ETH_PETROL alone before the
+# tol002 switchover, see above).
 _ETH_BLUE, _ETH_PETROL, _ETH_GREEN, _ETH_BRONZE, _ETH_RED, _ETH_PURPLE = (
     SCENARIO_PALETTE[0], SCENARIO_PALETTE[1], SCENARIO_PALETTE[2],
     SCENARIO_PALETTE[3], SCENARIO_PALETTE[4], SCENARIO_PALETTE[5],
 )
 MODE_COLOR = {
-    "batch4_share": _ETH_PETROL,
+    "batch4_tol002": _ETH_PETROL,
+    "batch6_tol002": _ETH_GREEN,
     "oracle": _ETH_BRONZE,
 }
 MODE_LABEL = {
-    "batch4_share": "Batch (bbo, batch=4, share)",
+    "batch4_tol002": "Batch (bbo, batch=4, share, tol=0.02)",
+    "batch6_tol002": "Batch (bbo, batch=6, share, tol=0.02)",
     "oracle": "Oracle",
 }
 MODES = (*ALL_SUPF_MODES, "oracle")
@@ -1627,17 +1646,13 @@ def main() -> None:
 
     fig1_pairwise_points(poly, points)
 
-    print("Sampling each mode's own inner approximation for fig2 (cf. Steen2026_Thesis "
-          "Eq. 13 for what each acceptance rate means; this runs locally -- SciPy/LP only, "
-          "no HPC resources needed)...")
+    # Rejection-sampling each mode's inner approximation for fig2 is disabled
+    # for now (2026-09-03, per user request) -- fig2 uses ONLY each mode's own
+    # actual visited points (the _hull_panel_data "actual points" fallback,
+    # normally reserved for runs with <20 accepted inner samples -- see that
+    # function's docstring) rather than a synthetic rejection-sampled cloud.
+    # samples stays empty so every mode falls through to that fallback.
     samples: dict[str, tuple[np.ndarray, float]] = {}
-    for mode in (*ALL_SUPF_MODES, "oracle"):
-        if mode not in polys:
-            continue
-        try:
-            samples[mode] = cached_rejection_sample_inner(polys[mode], mode, n_propose=30_000)
-        except Exception as exc:
-            print(f"  {mode}: rejection sampling failed ({exc!r}); skipping its fig2 panel")
 
     fig2_polytope_samples(polys, points, samples)
     fig3_query_time_comparison(points, polys)
