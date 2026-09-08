@@ -35,13 +35,21 @@ SI_results/ (results, renumbered fig1-fig10):
   fig7_retrofit_ccs_comparison (was fig5) — CO2 captured by retrofit-CCS technology, No flexibility vs Crystal Ball base
   fig8_diffusion_mechanisms (was fig6) — ZEN-garden technology-diffusion/learning mechanisms compared
   fig9_heat_supply_trajectory_no_flexibility (was fig7) — No flexibility heat-supply capacity, every modeled year 2020-2050
-  fig10_power_and_storage_impact (unchanged) — power generation capacity (top row) & storage annual energy
-                                          discharged (bottom row), Crystal Ball base / No flexibility /
-                                          Full flexibility, 3 snapshot years — generation fleet SCALES UP
-                                          with mix barely shifting; storage capacity stays near-identical
-                                          across scenarios but discharge (utilization) doesn't
+  fig9b_heat_supply_trajectory_full_flexibility — same layout as fig9, for the Full flexibility scenario
+  fig10_power_and_storage_impact — power generation capacity (top) & storage annual energy discharged
+                                          (bottom), each a single plot with Crystal Ball base / No flexibility /
+                                          Full flexibility as 3 adjacent bars per year, 3 snapshot years
+                                          (2030/2040/2050) — generation fleet SCALES UP with mix barely
+                                          shifting; storage capacity stays near-identical across scenarios
+                                          but discharge (utilization) doesn't
+  fig11_power_and_storage_impact_with_dsm — exactly fig10's template, with Full flexibility's storage bars
+                                          also stacking its DSM discharge (all 10 products; ammonia/methanol
+                                          natively GWh, the other 8 mass-carrier products converted via their
+                                          own system-wide production energy intensity that year) on top of
+                                          the same 5 power-sector storage techs — see fig11's own section
+                                          comment for the per-product methodology
 
-SI_results/method/ (no results — methodological/context only, fig1-fig7):
+SI_results/method/ (no results — methodological/context only, fig1-fig8):
   fig1_heat_demand_by_sector (was fig4a) — low-temp input heat demand by sector/band, +high-temp fuel by carrier (2023):
                                           an exogenous INPUT ASSUMPTION, not a solved-model result (see below)
   fig2_industry_fuel_demand_comparison (was fig4b) — new-sector heat/fuel demand vs. pre-existing cement/steel fuel mix
@@ -54,7 +62,9 @@ SI_results/method/ (no results — methodological/context only, fig1-fig7):
                                           direction, optimum z*, near-optimality slack ε and the
                                           resulting near-optimal space; (right) that space explored via
                                           inner (IO) / outer (AO) polytope approximations refined by
-                                          directional solves
+                                          directional solves — a mid-exploration SNAPSHOT (solve order
+                                          starts with the farthest/most-prominent corner); see fig8 for
+                                          the same toy geometry run to full completion
   fig6_lp_formulation (was fig12)       — energy system optimization as an LP: the general cost-min
                                           capacity-expansion formulation (left) next to this work's
                                           actual "No flexibility" model's size and ZEN-garden-specific
@@ -66,6 +76,16 @@ SI_results/method/ (no results — methodological/context only, fig1-fig7):
                                           (the real north/west/south/east map) = 12 axes; (3) x 3
                                           cumulative-CAPEX horizons too, all three dimensions crossed
                                           on one chart = 36 axes
+  fig8_mga_exploration_sequence (was fig14) — companion to fig5: the same toy near-optimal space,
+                                          run through ALL 5 directional solves as 5 small-multiple
+                                          panels (largest-gap direction first) instead of fig5's
+                                          mid-exploration snapshot, ending with the discovered
+                                          polytope matching the true near-optimal space exactly. Per
+                                          pyoNearOpt's actual direction selection (support-function
+                                          gap h_out(d)-h_in(d) against the CURRENT inner hull, not
+                                          against z*), each solve's arrow is anchored at whichever
+                                          already-found vertex is extremal toward the new direction -
+                                          only solve 1 starts at z* itself
 
 fig4a/fig4b (now method/fig1, method/fig2), fig8/fig9 (now method/fig3,
 method/fig4) moved into method/ because none of them plot a SOLVED MODEL
@@ -577,24 +597,29 @@ HEAT_SUPPLY_HATCH_MAP = {tech: _HP_HATCH for tech in [
     "heat_pump_industry_150_200_waste_heat", "heat_pump_industry_100_150_waste_heat", "heat_pump_industry_0_100_waste_heat",
 ]}
 HEAT_SUPPLY_HATCH_MAP["biomass_boiler_industry"] = _BIOMASS_HATCH
-# Explicit stack order (bottom → top): all boilers first (darkest→lightest
-# red family, electrode-green anchoring the bottom), then heat pumps ordered
-# low→high temperature band, water source before waste-heat source within
-# each band. Any tech not listed here (future additions) is appended at the
-# end in whatever order build_comparison_df produced, so nothing is dropped.
+# Explicit stack order (bottom → top, per user request): waste boiler at the
+# very bottom, then coal/oil/biomass/natural-gas/electrode boilers, then heat
+# pumps ordered high→low temperature band (150-200, then 100-150, then 0-100
+# at the very top), waste-heat source before water source within each band.
+# Top-to-bottom (i.e. reverse of this list, matching both the stack visually
+# and the legend, which is also drawn top-to-bottom): 0-100 (water/waste),
+# 100-150 (water/waste), 150-200 (water/waste), electrode, natural gas,
+# biomass, oil, coal, waste. Any tech not listed here (future additions) is
+# appended at the end in whatever order build_comparison_df produced, so
+# nothing is dropped.
 HEAT_SUPPLY_STACK_ORDER = [
-    "electrode_boiler_industry",
-    "natural_gas_boiler_industry",
+    "waste_boiler_industry",
     "coal_boiler_industry",
     "oil_boiler_industry",
     "biomass_boiler_industry",
-    "waste_boiler_industry",
-    "heat_pump_industry_0_100_water",
-    "heat_pump_industry_0_100_waste_heat",
-    "heat_pump_industry_100_150_water",
-    "heat_pump_industry_100_150_waste_heat",
-    "heat_pump_industry_150_200_water",
+    "natural_gas_boiler_industry",
+    "electrode_boiler_industry",
     "heat_pump_industry_150_200_waste_heat",
+    "heat_pump_industry_150_200_water",
+    "heat_pump_industry_100_150_waste_heat",
+    "heat_pump_industry_100_150_water",
+    "heat_pump_industry_0_100_waste_heat",
+    "heat_pump_industry_0_100_water",
 ]
 # Production techs: solid ETH colors only, no hatching (hatch_map={} below).
 # Reassigned off blue/petrol/bronze/purple (user request) once electricity
@@ -666,8 +691,8 @@ def fig1b_industry_capacity(runs: list[Run]) -> None:
                         .get(year, pd.Series(dtype=float))) for r in runs]
 
         heat_df = build_comparison_df(heat_series)
-        # See HEAT_SUPPLY_STACK_ORDER: all boilers drawn first -> bottom of the
-        # stack, below all heat pumps, which are then ordered low->high temperature.
+        # See HEAT_SUPPLY_STACK_ORDER: boilers drawn first -> bottom of the
+        # stack, below all heat pumps, which are then ordered high->low temperature.
         heat_df = heat_df.reindex(
             [t for t in HEAT_SUPPLY_STACK_ORDER if t in heat_df.index]
             + [t for t in heat_df.index if t not in HEAT_SUPPLY_STACK_ORDER])
@@ -811,7 +836,17 @@ def fig7_heat_supply_trajectory(runs: list[Run]) -> None:
     consequence of ZEN-garden having no early-decommissioning decision,
     combined with a technology cost-crossover partway through the
     horizon."""
-    r = by_label(runs, "No flexibility")
+    fig7_heat_supply_trajectory_for(runs, "No flexibility",
+                                     "fig9_heat_supply_trajectory_no_flexibility")
+
+
+def fig7_heat_supply_trajectory_for(runs: list[Run], label: str, fig_name: str) -> None:
+    """Generic engine behind fig7_heat_supply_trajectory (see its docstring
+    for the "No flexibility" mechanics). Parameterized over `label`/`fig_name`
+    so the same plot can be produced for other scenarios, e.g. fig9b for
+    "Full flexibility", added per user request to compare buildout/retirement
+    trajectories side by side with the no-flexibility case."""
+    r = by_label(runs, label)
     years = get_available_years(r.results)
 
     def _ordered(df: pd.DataFrame) -> pd.DataFrame:
@@ -837,19 +872,19 @@ def fig7_heat_supply_trajectory(runs: list[Run]) -> None:
 
     fig, axes = plt.subplots(3, 1, figsize=(0.8 * len(heat_df.columns) + 3, 16))
     with plt.rc_context({"hatch.linewidth": 0.5}):
-        plot_stacked_bars(output_df, "Industry heat supply (avg GW)",
-                          "avg GW delivered", axes[0], show_segment_labels=False, show_legend=True,
+        plot_stacked_bars(output_df, "Industry heat supply (GW)",
+                          "GW supplied", axes[0], show_segment_labels=False, show_legend=True,
                           color_map=HEAT_SUPPLY_COLOR_MAP, hatch_map=HEAT_SUPPLY_HATCH_MAP)
-        plot_stacked_bars(heat_df, "Industry Heat Supply Capacity (stock) - No Flexibility",
+        plot_stacked_bars(heat_df, f"Industry Heat Supply Capacity (stock) - {label}",
                           "GW", axes[1], show_segment_labels=False, show_legend=False,
                           color_map=HEAT_SUPPLY_COLOR_MAP, hatch_map=HEAT_SUPPLY_HATCH_MAP)
-        plot_stacked_bars(add_df, "Industry Heat Supply Capacity Additions (new builds/period) - No Flexibility",
+        plot_stacked_bars(add_df, f"Industry Heat Supply Capacity Additions (new builds/period) - {label}",
                           "GW added", axes[2], show_segment_labels=False, show_legend=False,
                           color_map=HEAT_SUPPLY_COLOR_MAP, hatch_map=HEAT_SUPPLY_HATCH_MAP)
     for ax in axes:
         plt.setp(ax.get_xticklabels(), rotation=0)
     fig.tight_layout()
-    savefig(fig, "fig9_heat_supply_trajectory_no_flexibility")
+    savefig(fig, fig_name)
 
 
 # ── 5: Retrofit carbon-capture tech usage, No flexibility vs. base ─────────
@@ -2277,8 +2312,8 @@ def fig9_model_scope_coverage() -> None:
                  fontsize=12, fontweight="bold")
     for spine in ("top", "right", "left"):
         ax.spines[spine].set_visible(False)
-    fig.text(0.01, 0.01, "Source: Mannhardt (2026) Appendix A.2 (90.0% share) + "
-              "sector_emissions_2022.csv (UNFCCC CRF, Variant B)", fontsize=7, color="grey")
+    fig.text(0.01, 0.01, "Source: Mannhardt (2026) Appendix A.2 + UNFCCC CRF, Variant B",
+              fontsize=7, color="grey")
     fig.tight_layout(rect=[0, 0.08, 1, 1])
     savefig(fig, "fig4_model_scope_coverage", subdir="method")
 
@@ -2292,10 +2327,12 @@ def fig9_model_scope_coverage() -> None:
 # flexibility elsewhere in the system changes how much fleet buildout /
 # storage cycling is needed to absorb that same new load.
 #
-# 2 snapshot years (2030/2040) so the figure is a 2x2 grid; both are directly
-# modeled years under the v9_0 horizon (2020, 2022, ..., 2050 —
-# reference_year=2020, interval_between_years=2, see get_available_years()).
-SNAPSHOT_YEARS_POWER = [2030, 2040]
+# 3 snapshot years, each drawn as a 3-scenario bar cluster on one shared axis
+# per row (see _plot_grouped_stacked_bars) rather than one subplot per year
+# or per scenario; all directly modeled years under the v9_0 horizon (2020,
+# 2022, ..., 2050 — reference_year=2020, interval_between_years=2, see
+# get_available_years()).
+SNAPSHOT_YEARS_POWER = [2030, 2040, 2050]
 
 
 # ── 10: Power generation capacity mix ───────────────────────────────────────
@@ -2334,7 +2371,7 @@ POWER_GEN_COLOR_MAP = {
     "natural_gas_turbine_CCS": _ETH_TURQUOISE,
     "hard_coal_plant": _ETH_GREY,
     "lignite_coal_plant": _eth_tint(_ETH_GREY, 0.3),
-    "oil_plant": _eth_tint(_ETH_GREY, 0.55),
+    "oil_plant": _ETH_BRONZE,
     "biomass_plant": _ETH_GREEN,
     "biomass_plant_CCS": _ETH_GREEN,
     "waste_plant": _ETH_RED,
@@ -2359,23 +2396,167 @@ POWER_GEN_STACK_ORDER = [
 # (see the palette note above POWER_GEN_COLOR_MAP), keyed to what each tech
 # stores: electricity=ETH_BLUE (battery=full strength, "hydro shade" tint for
 # pumped_hydro so the two are distinguishable within the same stack), natural
-# gas=ETH_TURQUOISE (matching natural_gas_turbine), oil=the same ETH_GREY
-# tint as oil_plant, hydrogen=ETH_PURPLE (matching nuclear; no analog in the
-# generation row, free to reuse).
+# gas=ETH_TURQUOISE (matching natural_gas_turbine), oil=the same ETH_BRONZE
+# as oil_plant (and oil_boiler_industry elsewhere), hydrogen=ETH_PURPLE
+# (matching nuclear; no analog in the generation row, free to reuse).
 STORAGE_COLOR_MAP = {
     "battery": _ETH_BLUE,
     "pumped_hydro": _eth_tint(_ETH_BLUE, 0.35),
     "natural_gas_storage": _ETH_TURQUOISE,
-    "oil_storage": _eth_tint(_ETH_GREY, 0.55),
+    "oil_storage": _ETH_BRONZE,
     "salt_cavern_storage": _ETH_PURPLE,
 }
 STORAGE_STACK_ORDER = ["battery", "pumped_hydro", "natural_gas_storage", "oil_storage", "salt_cavern_storage"]
 
 
+def _plot_grouped_stacked_bars(
+    dfs_by_year: dict[int, pd.DataFrame],
+    title: str,
+    unit: str,
+    ax: plt.Axes,
+    color_map: dict,
+    hatch_map: dict,
+    show_segment_labels: bool = False,
+    show_legend: bool = True,
+) -> None:
+    """Like plot_stacked_bars, but draws one cluster of adjacent bars per
+    year (dfs_by_year keys), all on a single axis, so scenarios (df columns —
+    same columns/order in every year) can be compared side by side within
+    each year AND across years in one glance. A 1-bar-width gap separates
+    each year's cluster from the next; scenario labels sit on the bar ticks,
+    year labels are annotated centered below each cluster. Unlike
+    plot_stacked_bars, color_map/hatch_map are required (every caller here
+    already passes a print-figure-specific palette)."""
+    years = sorted(dfs_by_year)
+    scenarios = dfs_by_year[years[0]].columns.tolist()
+    n_scen = len(scenarios)
+    bar_width = 0.8
+    labeled: set[str] = set()
+    positions_all: list[float] = []
+    tick_labels_all: list[str] = []
+    year_centers: list[float] = []
+
+    for yi, year in enumerate(years):
+        df = dfs_by_year[year]
+        base = yi * (n_scen + 1)
+        positions = [base + i for i in range(n_scen)]
+        positions_all.extend(positions)
+        tick_labels_all.extend(scenarios)
+        year_centers.append((positions[0] + positions[-1]) / 2)
+        positive_df = df.clip(lower=0)
+        negative_df = df.clip(upper=0)
+        for scen, pos in zip(scenarios, positions):
+            bottom_pos = 0.0
+            bottom_neg = 0.0
+            for cat_idx, category in enumerate(df.index):
+                val_pos = positive_df.loc[category, scen]
+                val_neg = negative_df.loc[category, scen]
+                color = color_map[category]
+                hatch = hatch_map.get(category, "")
+                add_label = category not in labeled
+                if val_pos > 0:
+                    ax.bar(pos, val_pos, bar_width, bottom=bottom_pos, color=color,
+                           label=category if add_label else None,
+                           edgecolor="white", linewidth=0.5, hatch=hatch)
+                    if show_segment_labels:
+                        ax.text(pos, bottom_pos + val_pos / 2, f"{val_pos:,.0f}",
+                                ha="center", va="center", fontsize=6,
+                                color=_text_color_for_bg(color))
+                    bottom_pos += val_pos
+                    labeled.add(category)
+                if val_neg < 0:
+                    ax.bar(pos, val_neg, bar_width, bottom=bottom_neg, color=color,
+                           label=category if add_label else None,
+                           edgecolor="white", linewidth=0.5, hatch=hatch if hatch else "//")
+                    if show_segment_labels:
+                        ax.text(pos, bottom_neg + val_neg / 2, f"{val_neg:,.0f}",
+                                ha="center", va="center", fontsize=6,
+                                color=_text_color_for_bg(color))
+                    bottom_neg += val_neg
+                    labeled.add(category)
+            ax.text(pos, bottom_pos, f"{positive_df[scen].sum():,.0f}",
+                    ha="center", va="bottom", fontsize=8, fontweight="bold")
+
+    ax.set_xticks(positions_all)
+    ax.set_xticklabels(tick_labels_all, fontsize=8, rotation=30, ha="right")
+    for yc, year in zip(year_centers, years):
+        ax.annotate(str(year), xy=(yc, 0), xycoords=("data", "axes fraction"),
+                    xytext=(0, -46), textcoords="offset points",
+                    ha="center", va="top", fontsize=11, fontweight="bold")
+    ax.set_ylabel(unit, fontsize=11)
+    ax.set_title(title, fontsize=12, fontweight="bold")
+    ax.axhline(0, color="black", linewidth=0.5)
+
+    if show_legend:
+        handles, labels = ax.get_legend_handles_labels()
+        if handles:
+            ax.legend(handles[::-1], labels[::-1],
+                      bbox_to_anchor=(1.02, 1), loc="upper left",
+                      fontsize=10, frameon=False)
+
+
+def _power_and_storage_dfs(
+    runs: list[Run], full_run: Run, include_dsm: bool,
+) -> tuple[dict[int, pd.DataFrame], dict[int, pd.DataFrame]]:
+    """Shared data prep for fig10/fig11: gen_by_year (generation capacity,
+    GW) and disch_by_year (storage annual discharge, GWh), each {year:
+    DataFrame(index=technology, columns=scenario label)}. include_dsm=True
+    appends a single aggregated "DSM" row (summed across all 10
+    DSM_ENERGY_STACK_ORDER techs) to disch_by_year, nonzero only in
+    full_run's column (Base/No flexibility have no industry-heat sector) —
+    via get_dsm_energy_equivalent, see that section's comment for the
+    per-product methodology behind the number being summed here."""
+    gen_by_year: dict[int, pd.DataFrame] = {}
+    disch_by_year: dict[int, pd.DataFrame] = {}
+    dsm_total_by_year = get_dsm_energy_equivalent(full_run.results, DSM_ENERGY_STACK_ORDER, SNAPSHOT_YEARS_POWER) \
+        .sum() if include_dsm else None
+    for year in SNAPSHOT_YEARS_POWER:
+        gen_series = [(r.label, get_capacity(r.results, POWER_GEN_TECHS, "power")
+                       .get(year, pd.Series(dtype=float))) for r in runs]
+        gen_df = build_comparison_df(gen_series)
+        gen_df = gen_df.reindex([t for t in POWER_GEN_STACK_ORDER if t in gen_df.index]
+                                 + [t for t in gen_df.index if t not in POWER_GEN_STACK_ORDER])
+        gen_by_year[year] = gen_df
+
+        disch_series = [(r.label, get_storage_flows(r.results, BULK_STORAGE_TECHS, "flow_storage_discharge")
+                         .get(year, pd.Series(dtype=float))) for r in runs]
+        stack_order = STORAGE_STACK_ORDER + ["DSM"] if include_dsm else STORAGE_STACK_ORDER
+        disch_df = build_comparison_df(disch_series).reindex(stack_order).fillna(0.0)
+        if include_dsm:
+            disch_df.loc["DSM", full_run.label] = dsm_total_by_year[year]
+        disch_by_year[year] = disch_df
+    return gen_by_year, disch_by_year
+
+
+def _render_power_and_storage_figure(
+    gen_by_year: dict[int, pd.DataFrame], disch_by_year: dict[int, pd.DataFrame],
+    filename: str, storage_color_map: dict, storage_hatch_map: dict,
+) -> None:
+    """Shared 2-row (generation top, storage discharge bottom) rendering for
+    fig10/fig11 — wide, ~16:9-ish (PowerPoint-slide-ish) aspect ratio. No
+    figure-level suptitle (each row's own title carries it); segment labels
+    are off on both rows (only the bar's total, matching the generation
+    row) since the storage row's segments are dense enough to overlap."""
+    fig, axes = plt.subplots(2, 1, figsize=(14, 9))
+    with plt.rc_context({"hatch.linewidth": 0.5}):
+        _plot_grouped_stacked_bars(gen_by_year, "Power Generation Capacity", "GW", axes[0],
+                                   show_segment_labels=False, show_legend=True,
+                                   color_map=POWER_GEN_COLOR_MAP, hatch_map=POWER_GEN_HATCH_MAP)
+        _plot_grouped_stacked_bars(disch_by_year, "Storage Annual Energy Discharged", "GWh", axes[1],
+                                   show_segment_labels=False, show_legend=True,
+                                   color_map=storage_color_map, hatch_map=storage_hatch_map)
+    fig.tight_layout()
+    fig.subplots_adjust(hspace=0.55)
+    savefig(fig, filename)
+
+
 def fig10_power_and_storage_impact(base_run: Run, no_flex_run: Run, full_run: Run) -> None:
-    """Power-sector generation capacity (top row) and storage annual energy
-    discharged (bottom row), Crystal Ball base / No flexibility / Full
-    flexibility, at 2 snapshot years (2030/2040).
+    """Power-sector generation capacity (top) and storage annual energy
+    discharged (bottom), Crystal Ball base / No flexibility / Full
+    flexibility shown as 3 adjacent bars per year, in a single combined
+    figure spanning 3 snapshot years (2030/2040/2050) — one plot per row,
+    not one per scenario, so all 9 (scenario x year) bars are directly
+    comparable at a glance.
 
     Isolates finding #1 (top row): adding electrified (but inflexible)
     industry heat demand does NOT change the generation TECHNOLOGY mix —
@@ -2404,40 +2585,113 @@ def fig10_power_and_storage_impact(base_run: Run, no_flex_run: Run, full_run: Ru
     is where the difference actually shows up.) Full flexibility's discharge
     sitting between No flexibility and base would mean industry-side
     flexibility substitutes for power-sector storage cycling; sitting
-    at/above No flexibility would mean it doesn't.
+    at/above No flexibility would mean it doesn't. fig11 is exactly this
+    figure with Full flexibility's DSM discharge added on top of its storage
+    bars — see fig11_power_and_storage_impact_with_dsm.
     """
     runs = [base_run, no_flex_run, full_run]
-    gen_dfs, disch_dfs = [], []
-    for year in SNAPSHOT_YEARS_POWER:
-        gen_series = [(r.label, get_capacity(r.results, POWER_GEN_TECHS, "power")
-                       .get(year, pd.Series(dtype=float))) for r in runs]
-        gen_df = build_comparison_df(gen_series)
-        gen_df = gen_df.reindex([t for t in POWER_GEN_STACK_ORDER if t in gen_df.index]
-                                 + [t for t in gen_df.index if t not in POWER_GEN_STACK_ORDER])
-        gen_dfs.append(gen_df)
-        disch_series = [(r.label, get_storage_flows(r.results, BULK_STORAGE_TECHS, "flow_storage_discharge")
-                         .get(year, pd.Series(dtype=float))) for r in runs]
-        disch_dfs.append(build_comparison_df(disch_series).reindex(STORAGE_STACK_ORDER).fillna(0.0))
+    gen_by_year, disch_by_year = _power_and_storage_dfs(runs, full_run, include_dsm=False)
+    _render_power_and_storage_figure(
+        gen_by_year, disch_by_year,
+        "fig10_power_and_storage_impact", STORAGE_COLOR_MAP, {},
+    )
 
-    n_yr = len(SNAPSHOT_YEARS_POWER)
-    fig, axes = plt.subplots(2, n_yr, figsize=(6 * n_yr, 13), squeeze=False)
-    fig.suptitle("Power Generation & Storage Discharge — Crystal Ball Base / No Flexibility / Full Flexibility",
-                 fontsize=13, fontweight="bold")
-    with plt.rc_context({"hatch.linewidth": 0.5}):
-        for col, year in enumerate(SNAPSHOT_YEARS_POWER):
-            plot_stacked_bars(gen_dfs[col], f"Power Generation Capacity — {year}", "GW", axes[0, col],
-                              show_segment_labels=False, show_legend=(col == n_yr - 1),
-                              color_map=POWER_GEN_COLOR_MAP, hatch_map=POWER_GEN_HATCH_MAP)
-    for col, year in enumerate(SNAPSHOT_YEARS_POWER):
-        plot_stacked_bars(disch_dfs[col], f"Storage Annual Energy Discharged — {year}", "GWh", axes[1, col],
-                          show_segment_labels=True, show_legend=(col == n_yr - 1),
-                          color_map=STORAGE_COLOR_MAP, hatch_map={})
-    _apply_shared_ylim(list(axes[0, :]), gen_dfs)
-    _apply_shared_ylim(list(axes[1, :]), disch_dfs)
-    for ax in axes.flat:
-        plt.setp(ax.get_xticklabels(), rotation=20, ha="right")
-    fig.tight_layout(rect=[0, 0, 1, 0.94])
-    savefig(fig, "fig10_power_and_storage_impact")
+
+# ── SI fig11: DSM discharge translated into an energy (GWh) equivalent ─────
+# ammonia_DSM/methanol_DSM already store an energy carrier (GWh) natively —
+# used as-is. The other 8 INDUSTRY_DSM_TECHS store a MASS carrier
+# (kt-of-product, see fig10's/fig2's docstrings for why they can't just be
+# summed into a GWh total): this figure instead converts each product's
+# DSM-shifted kt into an implied GWh using that PRODUCT's own system-wide
+# energy intensity in the same year — total energy input (GWh, summed across
+# every input carrier) across every technology that produces it, divided by
+# its total output (kt) that year — rather than an assumed external energy
+# density/LHV (contrast the ammonia/methanol kt-conversion reported as prose
+# earlier, which HAD to borrow a literature LHV since ammonia/methanol have
+# no kt-tracked production technology anywhere in this model). This makes
+# the intensity specific to this model's own technology mix and efficiency
+# assumptions, and lets it shift across snapshot years if that mix changes
+# (e.g. primary_steel's BF_BOF/NG_DRI/H2_DRI split).
+#
+# fig11 sums all 10 into a SINGLE "DSM" bar segment (one color, no
+# per-product breakdown) — get_dsm_energy_equivalent below still computes
+# the per-product numbers first (needed to apply each product's own
+# intensity/native-GWh treatment), _power_and_storage_dfs just sums them
+# before handing the result to the plotter.
+_PRODUCT_CARRIER_OF_DSM_TECH = {
+    "primary_steel_DSM": "primary_steel",
+    "secondary_steel_DSM": "secondary_steel",
+    "clinker_DSM": "clinker",
+    "ceramic_DSM": "ceramic",
+    "glass_DSM": "glass",
+    "food_DSM": "food",
+    "paper_DSM": "paper",
+    "olefin_DSM": "olefin",
+}
+DSM_ENERGY_STACK_ORDER = [
+    "primary_steel_DSM", "secondary_steel_DSM", "clinker_DSM", "ceramic_DSM",
+    "glass_DSM", "food_DSM", "paper_DSM", "olefin_DSM", "ammonia_DSM", "methanol_DSM",
+]
+# fig11 stacks this ON TOP OF STORAGE_COLOR_MAP's 5 techs in the same panel,
+# so pick a shade STORAGE_COLOR_MAP doesn't already use (BLUE, TURQUOISE,
+# BRONZE, PURPLE) to avoid rendering as the same color as a storage segment.
+DSM_TOTAL_COLOR = _eth_tint(_ETH_GREY, 0.55)
+
+
+def _production_energy_intensity(r, carrier: str, flow_in_all: pd.DataFrame) -> pd.Series:
+    """GWh input energy per kt output for `carrier`, by year — summed across
+    every technology that actually produces it that year (its real
+    technology mix), using each producer's TOTAL energy input (every input
+    carrier summed; already confirmed unit-homogeneous, all GWh, via
+    Results.get_unit())."""
+    prod = get_carrier_production(r, carrier)  # kt, index=technology, columns=year
+    if prod.empty:
+        return pd.Series(dtype=float)
+    output_kt = prod.sum()
+    input_gwh = pd.Series(0.0, index=output_kt.index)
+    for tech in prod.index:
+        if tech in flow_in_all.index.get_level_values("technology"):
+            input_gwh = input_gwh.add(flow_in_all.xs(tech, level="technology").sum(), fill_value=0.0)
+    return (input_gwh / output_kt).replace([np.inf, -np.inf], 0.0).fillna(0.0)
+
+
+def get_dsm_energy_equivalent(r, dsm_techs: list[str], years: list[int]) -> pd.DataFrame:
+    """DSM discharge (index=dsm_techs, columns=years) expressed in GWh — see
+    module comment above this section for the two different methods used."""
+    flow_in_all = r.get_total("flow_conversion_input")
+    intensity_cache: dict[str, pd.Series] = {}
+    rows = {}
+    for tech in dsm_techs:
+        discharge_kt_or_gwh = get_storage_flows(r, [tech], "flow_storage_discharge")
+        if tech in DSM_ENERGY_CARRIER_TECHS:
+            rows[tech] = {y: discharge_kt_or_gwh.get(y, pd.Series(dtype=float)).sum() for y in years}
+            continue
+        carrier = _PRODUCT_CARRIER_OF_DSM_TECH[tech]
+        if carrier not in intensity_cache:
+            intensity_cache[carrier] = _production_energy_intensity(r, carrier, flow_in_all)
+        intensity = intensity_cache[carrier]
+        rows[tech] = {y: discharge_kt_or_gwh.get(y, pd.Series(dtype=float)).sum() * intensity.get(y, 0.0)
+                      for y in years}
+    return pd.DataFrame(rows).T[years]
+
+
+def fig11_power_and_storage_impact_with_dsm(base_run: Run, no_flex_run: Run, full_run: Run) -> None:
+    """Exactly fig10_power_and_storage_impact's template (same 2-row layout,
+    same 3-scenario x 3-year grouped bars, same generation panel on top) —
+    the only difference is that Full flexibility's storage-discharge bars
+    here also stack a single "DSM" segment on top of the same 5
+    power-sector storage techs fig10 shows alone: all 10 DSM products
+    summed into one number via get_dsm_energy_equivalent (see that
+    section's comment for the per-product methodology behind the sum), one
+    color, no per-product breakdown. Base / No flexibility get 0 (no
+    industry-heat sector)."""
+    runs = [base_run, no_flex_run, full_run]
+    gen_by_year, disch_by_year = _power_and_storage_dfs(runs, full_run, include_dsm=True)
+    combined_color_map = {**STORAGE_COLOR_MAP, "DSM": DSM_TOTAL_COLOR}
+    _render_power_and_storage_figure(
+        gen_by_year, disch_by_year,
+        "fig11_power_and_storage_impact_with_dsm", combined_color_map, {},
+    )
 
 
 # ── 11: MGA method schematic (no data) ──────────────────────────────────────
@@ -2483,9 +2737,14 @@ def fig11_mga_method() -> None:
     (MGA): how the near-optimal space is defined (left) and how this work's
     algorithm explores it via inner/outer polytope approximation (right).
     Left panel's letters/style follow M. Steen's thesis (Figure 1); the
-    right panel documents our own (non-ORACLE) algorithm. See the
-    module-level comment above this function and above _MGA_FEASIBLE for
-    the (hand-picked, unitless) geometry used.
+    right panel documents our own (non-ORACLE) algorithm and shows a
+    mid-exploration SNAPSHOT (3 of 4 non-optimum vertices solved, 1 still
+    unexplored) - solve order starts with the farthest/most-prominent
+    corner (biggest single gain in discovered near-optimal volume), not an
+    arbitrary or nearest-first order. See fig14_mga_exploration_sequence
+    (method/fig8) for the same toy geometry run to full completion instead
+    of a snapshot, and the module-level comment above this function and
+    above _MGA_FEASIBLE for the (hand-picked, unitless) geometry used.
     """
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(13, 6))
 
@@ -2563,9 +2822,16 @@ def fig11_mga_method() -> None:
     # is unaffected).
     v_bulge = (3.6, 3.3)
     true_space = [z_star, v2, v3, v_bulge, v4, v5]
-    found = [z_star, v3, v4]  # 2 directional solves run so far, beyond z*
-    solved_via_direction = [v3, v4]
-    unexplored = [v2, v5]
+    # 3 directional solves run so far, beyond z* - crucially starting with
+    # v_bulge: the actual farthest/most-prominent corner of the true space,
+    # so it is the direction a gap-greedy algorithm would explore FIRST
+    # (biggest single gain in discovered volume), not left permanently
+    # undiscovered as in an earlier version of this figure. found's vertex
+    # order (z*, v3, v_bulge, v4) traces the true_space boundary exactly
+    # over this stretch, since all 3 solved points ARE true_space vertices.
+    found = [z_star, v3, v_bulge, v4]
+    solved_via_direction = [v_bulge, v3, v4]
+    unexplored = [v5]
 
     xs, ys = zip(*true_space)
     ao_box = Rectangle((min(xs), min(ys)), max(xs) - min(xs), max(ys) - min(ys),
@@ -2575,27 +2841,47 @@ def fig11_mga_method() -> None:
                            edgecolor=_ETH_GREY, linestyle=":", linewidth=1.2, zorder=1))
     ax2.add_patch(Polygon(found, closed=True, facecolor=eth_tint(_ETH_BLUE, 0.35),
                            edgecolor=_ETH_BLUE, linewidth=1.8, zorder=3))
-    ax2.text(3.05, 2.75, "near-optimal\nspace", fontsize=8, color=_ETH_GREY, ha="center", va="center", zorder=2)
+    ax2.text(0.35, 1.75, "near-optimal\nspace", fontsize=8, color=_ETH_GREY, ha="center", va="center", zorder=2)
 
-    for i, v in enumerate((v3, v4), start=1):
-        ax2.annotate("", xy=v, xytext=z_star,
+    # Per pyoNearOpt's actual direction-selection logic (see
+    # exploration_methods/shared_direction_oracle.py / bbo_ORACLE.py): each
+    # solve targets the direction maximising the gap between the OUTER
+    # bound and the support function of the CURRENT INNER hull - so each
+    # new solve's arrow starts at whichever already-solved vertex is
+    # extremal (in that direction) on the hull found SO FAR, not always at
+    # z*. Only solve 1 (hull = {z*} alone) is anchored at z* itself; solve 2
+    # and solve 3 both extend outward from v_bulge, since it is the current
+    # hull's extremal point in both those directions once solve 1 has run.
+    # Per-label offsets (not a uniform +0.12,+0.12 diagonal nudge) since
+    # solve 2/3 now run nearly vertical/horizontal out of v_bulge - a
+    # uniform offset would crowd their labels against the v_bulge marker
+    # and the outer bounding box.
+    _solve_segments = [
+        ((z_star, v_bulge), 1, (0.12, 0.12)),
+        ((v_bulge, v3), 2, (-0.32, -0.05)),
+        ((v_bulge, v4), 3, (-0.15, -0.35)),
+    ]
+    for (anchor, v), i, (ox, oy) in _solve_segments:
+        ax2.annotate("", xy=v, xytext=anchor,
                      arrowprops=dict(arrowstyle="-|>", color=_ETH_BLUE, linewidth=1.6, mutation_scale=14),
                      zorder=4)
-        mid = ((z_star[0] + v[0]) / 2, (z_star[1] + v[1]) / 2)
-        ax2.text(mid[0] + 0.12, mid[1] + 0.12, f"solve {i}", fontsize=8, color=_ETH_BLUE)
+        mid = ((anchor[0] + v[0]) / 2, (anchor[1] + v[1]) / 2)
+        ax2.text(mid[0] + ox, mid[1] + oy, f"solve {i}", fontsize=8, color=_ETH_BLUE)
 
     # A candidate direction only tells the solver where to search, not where
     # it will land - so, unlike the "solve" arrows above (which connect
     # already-solved points), this arrow stops short of v2 rather than
-    # pointing straight at it, and is explicitly marked as an unknown outcome.
-    next_dir_end = (z_star[0] + 0.55 * (v2[0] - z_star[0]), z_star[1] + 0.55 * (v2[1] - z_star[1]))
-    ax2.annotate("", xy=next_dir_end, xytext=z_star,
+    # pointing straight at it, and is explicitly marked as an unknown
+    # outcome. Anchored at v3 (not z*), matching the same current-hull logic:
+    # v3 is the found hull's extremal vertex toward v2.
+    next_dir_end = (v3[0] + 0.55 * (v2[0] - v3[0]), v3[1] + 0.55 * (v2[1] - v3[1]))
+    ax2.annotate("", xy=next_dir_end, xytext=v3,
                  arrowprops=dict(arrowstyle="-|>", color=_ETH_GREY, linewidth=1.3,
                                  linestyle=(0, (3, 2)), mutation_scale=13), zorder=4)
     # Placed just above the arrow (inside the grey true-space fill, not
     # below it in the white margin) so it reads as labeling the arrow.
-    ax2.text(next_dir_end[0] + 0.1, next_dir_end[1] + 0.2, "next direction\nto explore",
-              fontsize=7.5, color=_ETH_GREY, ha="left", va="bottom")
+    ax2.text(next_dir_end[0] - 0.1, next_dir_end[1] + 0.2, "next direction\nto explore",
+              fontsize=7.5, color=_ETH_GREY, ha="right", va="bottom")
 
     for v in solved_via_direction:
         ax2.plot(*v, "o", color=_ETH_BLUE, markersize=6, zorder=5)
@@ -2952,6 +3238,132 @@ def fig13_mga_axis_construction() -> None:
     savefig(fig, "fig7_mga_axis_construction", subdir="method")
 
 
+def fig14_mga_exploration_sequence() -> None:
+    """Companion to fig11 (method/fig5): the SAME toy near-optimal space
+    (see _MGA_* geometry comments above fig11), but instead of a
+    mid-exploration snapshot, shows the FULL sequence of directional solves
+    a gap-greedy IO/AO algorithm would actually run, as 5 small-multiple
+    panels (one per solve) so the growing inner hull is visible step by
+    step.
+
+    Per pyoNearOpt's actual direction-selection logic (see
+    near_optimal_tools/src/pyoNearOpt/exploration_methods/
+    shared_direction_oracle.py's ``sample_separation``/``_support_gap_from_state``,
+    and bbo_ORACLE.py's ``find_best_direction``/``gap_objective``): the next
+    direction queried is whichever maximises h_out(d) - h_in(d), the gap
+    between the OUTER approximation's support function and the support
+    function of the CURRENT INNER approximation (the convex hull of points
+    found so far) - h_in(d) is evaluated over the hull, not over z* alone.
+    So each arrow below is drawn from the point on the hull found so far
+    that is extremal in the new direction, NOT always from z* - only solve 1
+    is anchored at z* itself, since the hull is nothing but {z*} at that
+    point. Anchors below (z*, v_bulge, v_bulge, v3, v4) were found by taking
+    the dot product of each candidate hull vertex with that step's target
+    direction and keeping the largest, exactly mirroring h_in(d)'s argmax.
+    """
+    z_star = (0.0, 0.0)
+    v2, v3, v4, v5 = (2.6, -0.3), (3.4, 1.6), (1.8, 3.0), (-0.6, 1.8)
+    v_bulge = (3.6, 3.3)
+    true_space = [z_star, v2, v3, v_bulge, v4, v5]
+
+    # (anchor, target) per solve - anchor is the CURRENT hull's extremal
+    # vertex toward target, per the argmax described above; target is the
+    # true_space vertex that solve reveals.
+    steps = [
+        (z_star, v_bulge),
+        (v_bulge, v3),
+        (v_bulge, v4),
+        (v3, v2),
+        (v4, v5),
+    ]
+    # Cyclic (true_space-consistent) vertex order of the hull AFTER each
+    # solve, so Polygon always gets a non-self-intersecting vertex order -
+    # every hull here is a subset of true_space's own vertices, so it can
+    # only ever need true_space's own cyclic order, just skipping whichever
+    # vertices aren't found yet.
+    hulls_after = [
+        [z_star, v_bulge],
+        [z_star, v3, v_bulge],
+        [z_star, v3, v_bulge, v4],
+        [z_star, v2, v3, v_bulge, v4],
+        [z_star, v2, v3, v_bulge, v4, v5],
+    ]
+
+    xs, ys = zip(*true_space)
+    xlim, ylim = (min(xs) - 0.9, max(xs) + 0.9), (min(ys) - 0.8, max(ys) + 0.8)
+
+    fig, axes = plt.subplots(1, 5, figsize=(15.5, 4.7))
+    for i, (ax, (anchor, target), hull_after) in enumerate(zip(axes, steps, hulls_after), start=1):
+        hull_before = hulls_after[i - 2] if i > 1 else [z_star]
+
+        ax.add_patch(Rectangle((min(xs), min(ys)), max(xs) - min(xs), max(ys) - min(ys),
+                                facecolor="none", edgecolor=_ETH_RED, linestyle="--", linewidth=1.0, zorder=1))
+        ax.add_patch(Polygon(true_space, closed=True, facecolor="none",
+                              edgecolor=_ETH_GREY, linestyle=":", linewidth=1.0, zorder=2))
+
+        # The hull already found entering this solve - the base the new
+        # arrow extends FROM. 2 points can't fill an area (drawn as a
+        # line instead); 1 point (only z*, solve 1 only) needs nothing.
+        if len(hull_before) >= 3:
+            ax.add_patch(Polygon(hull_before, closed=True, facecolor=eth_tint(_ETH_BLUE, 0.55),
+                                  edgecolor=_ETH_BLUE, linewidth=1.4, zorder=3))
+        elif len(hull_before) == 2:
+            bx, by = zip(*hull_before)
+            ax.plot(bx, by, color=_ETH_BLUE, linewidth=2.2, zorder=3)
+
+        ax.annotate("", xy=target, xytext=anchor,
+                     arrowprops=dict(arrowstyle="-|>", color=_ETH_BLUE, linewidth=1.8, mutation_scale=15),
+                     zorder=5)
+
+        for p in hull_before:
+            if p == z_star:
+                continue
+            ax.plot(*p, "o", color=_ETH_BLUE, markersize=6, zorder=6)
+        # New vertex this solve: black-ringed so it visually pops against
+        # the already-known (plain blue) points.
+        ax.plot(*target, "o", color=_ETH_BLUE, markersize=8,
+                 markeredgecolor="black", markeredgewidth=1.1, zorder=7)
+        # Still-undiscovered true_space vertices: hollow, same convention as
+        # fig11's "unexplored" markers.
+        for p in true_space:
+            if p != z_star and p not in hull_after:
+                ax.plot(*p, "o", markerfacecolor="white", markeredgecolor=_ETH_GREY, markersize=6, zorder=6)
+        ax.plot(*z_star, "o", color=_ETH_RED, markersize=7, zorder=8)
+        if i == 1:
+            ax.annotate("$z^*$", xy=z_star, xytext=(z_star[0] + 0.1, z_star[1] - 0.55),
+                         fontsize=9, ha="left", va="top",
+                         arrowprops=dict(arrowstyle="-", color=_ETH_RED, linewidth=0.8))
+
+        ax.set_xlim(*xlim)
+        ax.set_ylim(*ylim)
+        ax.set_xticks([])
+        ax.set_yticks([])
+        ax.set_title(f"Solve {i}", fontsize=10.5, fontweight="bold")
+        ax.set_aspect("equal")
+        for spine in ax.spines.values():
+            spine.set_visible(False)
+
+    fig.subplots_adjust(left=0.02, right=0.98, top=0.80, bottom=0.32, wspace=0.15)
+    fig.suptitle("The Full MGA Exploration Sequence", fontsize=12.5, fontweight="bold", y=0.95)
+    fig.legend(handles=[
+        plt.Line2D([0], [0], marker="o", color="none", markerfacecolor=_ETH_RED, markeredgecolor=_ETH_RED,
+                   markersize=7, label="$z^*$"),
+        plt.Line2D([0], [0], marker="o", color="none", markerfacecolor=_ETH_BLUE, markeredgecolor="black",
+                   markeredgewidth=1.1, markersize=8, label="vertex found this solve"),
+        plt.Line2D([0], [0], marker="o", color="none", markerfacecolor="white", markeredgecolor=_ETH_GREY,
+                   markersize=6, label="not yet explored"),
+        Patch(facecolor=eth_tint(_ETH_BLUE, 0.55), edgecolor=_ETH_BLUE, label="inner approx. found so far"),
+        Patch(facecolor="none", edgecolor=_ETH_GREY, linestyle=":", label="true near-optimal space (unknown until fully explored)"),
+        Patch(facecolor="none", edgecolor=_ETH_RED, linestyle="--", label="outer approx. (fixed bounding box)"),
+    ], loc="upper center", ncol=2, fontsize=8.3, frameon=False, bbox_to_anchor=(0.5, 0.235),
+        columnspacing=1.4, labelspacing=0.7)
+    fig.text(0.5, 0.045, "each arrow starts at the point on the hull found so far that is extremal toward the\n"
+                          "new direction (not always z*) and ends at the new vertex it reveals",
+              fontsize=8.3, style="italic", color="#555555", ha="center", va="center")
+
+    savefig(fig, "fig8_mga_exploration_sequence", subdir="method")
+
+
 # ── Main ──────────────────────────────────────────────────────────────────
 
 def main() -> None:
@@ -2975,13 +3387,15 @@ def main() -> None:
             no_flex_run = by_label(runs, "No flexibility")
             fig5_retrofit_ccs_comparison(no_flex_run, base_run)
             if any(r.label == "Full flexibility" for r in runs):
-                fig10_power_and_storage_impact(base_run, no_flex_run, by_label(runs, "Full flexibility"))
+                full_run = by_label(runs, "Full flexibility")
+                fig10_power_and_storage_impact(base_run, no_flex_run, full_run)
+                fig11_power_and_storage_impact_with_dsm(base_run, no_flex_run, full_run)
             else:
-                print("  skipping fig10_power_and_storage_impact: 'Full flexibility' scenario not loaded")
+                print("  skipping fig10/fig11_power_and_storage_impact: 'Full flexibility' scenario not loaded")
         else:
-            print("  skipping fig5/fig10: 'No flexibility' scenario not loaded")
+            print("  skipping fig5/fig10/fig11: 'No flexibility' scenario not loaded")
     else:
-        print(f"  skipping fig0a/fig0b/fig5/fig10: {BASE_SCENARIO[0]} not yet under {EULER_ROOT}")
+        print(f"  skipping fig0a/fig0b/fig5/fig10/fig11: {BASE_SCENARIO[0]} not yet under {EULER_ROOT}")
     fig1a_cost_delta(metrics)
     fig1b_industry_capacity(runs)
     fig2_dsm_cycles_by_product(runs)
@@ -2996,11 +3410,17 @@ def main() -> None:
         fig7_heat_supply_trajectory(runs)
     else:
         print("  skipping fig6_diffusion_mechanisms/fig7_heat_supply_trajectory: 'No flexibility' scenario not loaded")
+    if any(r.label == "Full flexibility" for r in runs):
+        fig7_heat_supply_trajectory_for(runs, "Full flexibility",
+                                         "fig9b_heat_supply_trajectory_full_flexibility")
+    else:
+        print("  skipping fig9b_heat_supply_trajectory_full_flexibility: 'Full flexibility' scenario not loaded")
     fig8_industry_sector_emissions_context()
     fig9_model_scope_coverage()
     fig11_mga_method()
     fig12_lp_formulation()
     fig13_mga_axis_construction()
+    fig14_mga_exploration_sequence()
     print(f"Done. Figures in {FIGURES_DIR.relative_to(REPO_ROOT)}/")
 
 

@@ -94,6 +94,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from matplotlib.colors import TwoSlopeNorm
+from matplotlib.lines import Line2D
 from matplotlib.patches import Patch
 
 from plots.figure_settings import SCENARIO_PALETTE, apply_font_mode, eth_tint
@@ -309,29 +310,12 @@ def fig_temporal_range_absolute(axis_idx, origin, phys, base) -> None:
     savefig(fig, "fig11_temporal_range_absolute")
 
 
-# ── fig12: same-region temporal growth, bars + violin of every actual point ─
-# Same bars/whiskers as fig11 (baseline bar, own-axis min/max errorbar), plus
-# a violin (KDE) of every OTHER actually-computed point layered on top -- the
-# batch BBO "iterate" solves (892 of them as of the tol002 run, see module
-# docstring) alongside the 24 own-axis VMM extremes and the baseline, each
-# one a genuine ZEN-garden solve that is certainly feasible and near-optimal.
-# Deliberately NOT hit-and-run samples from the outer polytope (poly.A @ x <=
-# poly.b is only an outer relaxation of the true near-optimal region -- see
-# fig2's inner-hull rejection sampling in plot_mga_results.py for why that
-# gap matters): every point behind this violin is one of this run's own
-# solves, so it is certainly inside the true near-optimal region, not just
-# the outer approximation of it. A violin (matplotlib's own KDE) replaced an
-# earlier version of this figure that scattered every point directly
-# (jittered, so overlapping dots were visible individually) -- with ~900
-# points per region/horizon the scatter was mostly a solid black blob with
-# no readable internal shape; the violin's smoothed density trades exact
-# per-point visibility for a readable "where do most solves sit" shape, still
-# layered on top of the bar/whisker so the true baseline and certified VMM
-# extremes (which the violin's own empirical tails do NOT represent -- BBO's
-# explored points don't necessarily reach the true axis min/max) stay legible.
-# showextrema=False on the violin itself for exactly this reason: its default
-# min/max whiskers would be the empirical sample extremes, which read as (and
-# would be confused for) the errorbar's true VMM-certified ones.
+# ── fig12: same-region temporal growth, bars + own-axis min/max range only ──
+# Same bars/whiskers as fig11 (baseline bar, own-axis min/max errorbar) --
+# no violin/density overlay and no legend; instead the horizon year each
+# triplet of bars represents is written vertically inside north's own bar
+# (bold white text, centered), since that's the only thing the legend used
+# to convey. Region names stay as ordinary x-tick labels below the axis.
 def fig_temporal_range_distribution(axis_idx, origin, phys, base) -> None:
     fig, ax = plt.subplots(figsize=(9.5, 5.5))
     x = np.arange(len(REGIONS))
@@ -339,10 +323,6 @@ def fig_temporal_range_distribution(axis_idx, origin, phys, base) -> None:
     gap = 0.05
     width = (0.85 - (n - 1) * gap) / n
     tints = _horizon_tints(n)
-    # Violin width < bar width so the bar's own black edge stays visible on
-    # both sides of the violin body -- reads as "violin inset into its bar"
-    # rather than the violin fully occluding the bar it's layered over.
-    violin_width = width * 0.7
 
     for i, until_year in enumerate(UNTIL_YEARS):
         offset = (i - (n - 1) / 2) * (width + gap)
@@ -359,32 +339,81 @@ def fig_temporal_range_distribution(axis_idx, origin, phys, base) -> None:
         ax.errorbar(x + offset, baseline, yerr=yerr, fmt="none", ecolor="black",
                      capsize=4, linewidth=1.2, zorder=5)
 
-        for xi, c, color in zip(x + offset, cols, colors):
-            data = phys[:, c] / 1000
-            violin = ax.violinplot([data], positions=[xi], widths=violin_width,
-                                    showmeans=False, showmedians=False, showextrema=False)
-            for body in violin["bodies"]:
-                body.set_facecolor(color)
-                body.set_edgecolor("black")
-                body.set_linewidth(0.5)
-                body.set_alpha(0.6)
-                body.set_zorder(4)
+        # Year label vertically inside north's bar only -- the only place
+        # the horizon year is written now that the legend is gone.
+        ax.text(x[0] + offset, baseline[0] / 2, until_year[-4:], ha="center", va="center",
+                 rotation=90, fontsize=9, fontweight="bold", color="white", zorder=6)
 
     ax.set_xticks(x)
     ax.set_xticklabels([r.capitalize() for r in REGIONS], fontsize=11)
     ax.set_ylabel("Cumulative regional CAPEX by that year (bn EUR)", fontsize=10)
     ax.set_title("MGA batch4 share tol=0.02 (v9_0): Absolute Cumulative CAPEX by Horizon Year",
                  fontsize=11, fontweight="bold")
-    ax.legend(handles=[
-        Patch(facecolor=eth_tint("#333333", t) if t else "#333333", edgecolor="black",
-              label=f"cumulative by {until_year[-4:]}, baseline")
-        for until_year, t in zip(UNTIL_YEARS, tints)
-    ] + [Patch(facecolor="#333333", edgecolor="black", alpha=0.6,
-               label="explored points (density)")],
-              fontsize=9, loc="upper left")
     ax.grid(axis="y", alpha=0.3)
     fig.tight_layout()
     savefig(fig, "fig12_temporal_range_distribution")
+
+
+# ── fig15: same fig12 data (baseline + own-axis min/max), alternate encoding ─
+# Same region/horizon grid as fig12, but the baseline is no longer a solid
+# bar-from-zero and the range is no longer an errorbar on top of it. Instead:
+#   - the achievable range is a floating "bin" -- a bar drawn from lo to hi
+#     directly (bottom=lo, height=hi-lo), rather than from 0 to baseline with
+#     whiskers layered on;
+#   - the baseline (z*) is a horizontal tick at its own height, spanning the
+#     bar's width, capped with a star marker, rather than the bar's own
+#     height.
+# This separates "where is the reference case" (tick + star) from "how far
+# can this axis move" (the bin) as two distinct marks instead of one bar
+# doing both jobs. Year labels sit above north's bins only (same as fig12);
+# region names are ordinary x-tick labels below the axis.
+def fig_temporal_range_bins(axis_idx, origin, phys, base) -> None:
+    fig, ax = plt.subplots(figsize=(9.5, 5.5))
+    x = np.arange(len(REGIONS))
+    n = len(UNTIL_YEARS)
+    gap = 0.05
+    width = (0.85 - (n - 1) * gap) / n
+    tints = _horizon_tints(n)
+
+    for i, until_year in enumerate(UNTIL_YEARS):
+        offset = (i - (n - 1) / 2) * (width + gap)
+        cols = [axis_idx[f"{r}_{until_year}"] for r in REGIONS]
+        baseline = np.array([base[c] for c in cols]) / 1000
+        lo = np.array([phys[origin.index(f"min:{r}_{until_year}")][c]
+                       for r, c in zip(REGIONS, cols)]) / 1000
+        hi = np.array([phys[origin.index(f"max:{r}_{until_year}")][c]
+                       for r, c in zip(REGIONS, cols)]) / 1000
+        colors = [REGION_COLOR[r] if tints[i] == 0 else eth_tint(REGION_COLOR[r], tints[i]) for r in REGIONS]
+
+        # Range bin: a bar spanning [lo, hi] rather than [0, baseline].
+        ax.bar(x + offset, hi - lo, bottom=lo, width=width, color=colors,
+               edgecolor="black", linewidth=0.6, zorder=3)
+        # Baseline marker: a horizontal tick spanning the bar's own width at
+        # the baseline's height, capped with a star -- drawn on top of the bin.
+        ax.hlines(baseline, x + offset - width / 2, x + offset + width / 2,
+                   color="black", linewidth=1.2, zorder=4)
+        ax.scatter(x + offset, baseline, marker="*", s=140, color="white",
+                    edgecolor="black", linewidth=0.8, zorder=5)
+
+        # Year label on north's bin only, above its own max -- same role as
+        # fig12's year label, now that there's no legend either.
+        ax.text(x[0] + offset, hi[0], until_year[-4:], ha="center", va="bottom",
+                 fontsize=9, rotation=0)
+
+    ax.set_xticks(x)
+    ax.set_xticklabels([r.capitalize() for r in REGIONS], fontsize=11)
+    ax.set_ylim(bottom=0)
+    ax.set_ylabel("Cumulative regional CAPEX by that year (bn EUR)", fontsize=10)
+    ax.set_title("CAPEX Range by Horizon Year and Region",
+                 fontsize=11, fontweight="bold")
+    ax.legend(handles=[
+        Patch(facecolor="#333333", edgecolor="black", label="near-optimal range"),
+        Line2D([0], [0], marker="*", linestyle="None", markersize=12, markerfacecolor="white",
+               markeredgecolor="black", label="baseline (z*)"),
+    ], fontsize=9, loc="upper left")
+    ax.grid(axis="y", alpha=0.3)
+    fig.tight_layout()
+    savefig(fig, "fig15_temporal_range_bins")
 
 
 def main() -> None:
@@ -392,6 +421,7 @@ def main() -> None:
     fig_temporal_crosseffects(names, units, axis_idx, origin, phys, base)
     fig_temporal_range_absolute(axis_idx, origin, phys, base)
     fig_temporal_range_distribution(axis_idx, origin, phys, base)
+    fig_temporal_range_bins(axis_idx, origin, phys, base)
 
 
 if __name__ == "__main__":
