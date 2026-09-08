@@ -1,0 +1,37 @@
+{
+  "node_capex_cumulative_tech": {
+    "nodes": [
+      {"north": ["DK", "EE", "FI", "IE", "LT", "LV", "NO", "SE", "UK"]},
+      {"west": ["AT", "BE", "CH", "DE", "FR", "LU", "NL"]},
+      {"south": ["ES", "EL", "HR", "IT", "PT", "SI"]},
+      {"east": ["BG", "CZ", "HU", "PL", "RO", "SK"]}
+    ],
+    "technology_groups": [
+      {"power_group": [
+        "photovoltaics", "wind_onshore", "wind_offshore",
+        "run-of-river_hydro", "reservoir_hydro",
+        "natural_gas_turbine",
+        "hard_coal_plant", "lignite_coal_plant", "oil_plant",
+        "biomass_plant",
+        "waste_plant", "nuclear",
+        "battery", "pumped_hydro"
+      ]},
+      {"hydrogen_group": [
+        "electrolysis", "SMR",
+        "salt_cavern_storage",
+        "fuel_cell", "haber_bosch", "methanol_from_hydrogen",
+        "fischer_tropsch", "methanation",
+        "H2_DRI", "HDT_FCEV", "hydrogen_FC_ship", "hydrogen_to_cement_fuel"
+      ]},
+      {"carbon_group": [
+        "DAC",
+        "BF_BOF_CCS", "NG_DRI_CCS", "SMR_CCS",
+        "biomass_plant_CCS", "natural_gas_turbine_CCS",
+        "cement_post_comb", "ceramic_post_comb", "glass_post_comb",
+        "carbon_storage"
+      ]}
+    ],
+    "until_years": [2030, 2040, 2050]
+  },
+  "include_cost": true
+}

@@ -38,6 +38,15 @@
 #                and optimized_years=16 instead of 7 (2020 + 15*2 = 2050, same
 #                end year as task_id 17/18's 2020 + 6*5 = 2050, just evaluated
 #                every 2 years instead of every 5)
+#   task_id 20 = copy of task_id 17 (batch bbo share batch4, tolerance_explore=0.02,
+#                7a/5a interval, 3ts/year) using the new node_capex_cumulative_tech
+#                axes (config_mga_axes_capex_cum_tech.json: 4 regions x 3 tech
+#                groups x until_years=[2030, 2040, 2050], i.e. capex_cum and capex
+#                combined into one 3-way axis set) -- needs the not-yet-released
+#                ZEN-garden-plugins MGA changes that add this axis kind. Untested;
+#                run with --time=14-00:00:00 padded well above 17's 8d since the
+#                combined axis set is much larger (4 nodes x 3 tech groups x 3
+#                years = 36 capex axes vs. 17's 12).
 #
 # The old plain-CAPEX rows (former task_ids 0-6: sampling/bbo/batch_bbo
 # minmax over the region x tech-group capex axes) and the CAPEX_PERIODS
@@ -78,6 +87,13 @@
 #                                              #  17's 8d since 10ts/year and (for 19) more
 #                                              #  periods both add per-solve cost; still
 #                                              #  within normal.120h's 15d cap)
+#   sbatch --array=20                                                     \
+#          --time=14-00:00:00 --cpus-per-task=40  --mem-per-cpu=4G  \
+#          submit_euler_mga.sh                # capex_cum_tech (3-way node x tech
+#                                              # x until_year axes), batch4, share,
+#                                              # tolerance_explore=0.02; untested,
+#                                              # 14d padded for the much larger
+#                                              # (36-axis) polytope vs. 17's 12
 #
 # cpus-per-task=40, mem-per-cpu=4G (160G total), time=6-06:00:00 for BOTH
 # ranges -- this is the profile that actually completed task_id 9/10/11
