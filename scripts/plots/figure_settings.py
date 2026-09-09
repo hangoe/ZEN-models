@@ -715,16 +715,18 @@ def plot_stacked_bars(
     show_segment_labels: bool = False,
     color_map: dict | None = None,
     hatch_map: dict | None = None,
+    bar_width: float = 0.6,
 ) -> None:
     """color_map/hatch_map override the global COLOR_MAP/HATCH_MAP for this
     call only (e.g. a print-figure-specific palette) — omit for the default,
-    dashboard-shared look-up used everywhere else."""
+    dashboard-shared look-up used everywhere else. bar_width (default 0.6,
+    leaving a 0.4 gap between adjacent unit-spaced bars) can be widened
+    toward 1.0 to pack bars closer together when a figure has many of them."""
     if df.empty:
         ax.set_title(title, fontsize=12, fontweight="bold")
         ax.text(0.5, 0.5, "No data", ha="center", va="center", transform=ax.transAxes)
         return
 
-    bar_width = 0.6
     models = df.columns.tolist()
     positive_df = df.clip(lower=0)
     negative_df = df.clip(upper=0)

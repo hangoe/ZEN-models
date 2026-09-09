@@ -49,7 +49,7 @@ SI_results/ (results, renumbered fig1-fig10):
                                           the same 5 power-sector storage techs — see fig11's own section
                                           comment for the per-product methodology
 
-SI_results/method/ (no results — methodological/context only, fig1-fig8):
+SI_results/method/ (no results — methodological/context only, fig1-fig9):
   fig1_heat_demand_by_sector (was fig4a) — low-temp input heat demand by sector/band, +high-temp fuel by carrier (2023):
                                           an exogenous INPUT ASSUMPTION, not a solved-model result (see below)
   fig2_industry_fuel_demand_comparison (was fig4b) — new-sector heat/fuel demand vs. pre-existing cement/steel fuel mix
@@ -57,6 +57,11 @@ SI_results/method/ (no results — methodological/context only, fig1-fig8):
                                           subsector (JRC-IDEES-2023), colored by Crystal Ball scope
   fig4_model_scope_coverage (was fig9)  — Crystal Ball's (+ its industry-heat extension's) share of
                                           total European direct CO2 emissions (Mannhardt 2026 + UNFCCC CRF)
+  fig9_global_ghg_sector_breakdown (new, fig15) — global GHG emissions by sector (WRI/Climate Watch):
+                                          Energy -> Electricity & Heat / industry energy use, plus
+                                          industry's direct (non-energy) process emissions added on top,
+                                          motivating why industry needs BOTH an energy-side model
+                                          (this work's scope) and remains partly out of reach of one
   fig5_mga_method (was fig11)           — conceptual, non-data schematic of the Modeling-to-Generate-
                                           Alternatives (MGA) method: (left) feasible region, objective
                                           direction, optimum z*, near-optimality slack ε and the
@@ -1910,8 +1915,11 @@ def fig6_diffusion_mechanisms(runs: list[Run]) -> None:
 # Carriers (the larger, primary stacked segments) each get one solid base
 # hue; technologies (smaller, secondary segments) get a lighter tint of a
 # related hue via _eth_tint (defined above, fig1b's section) — the tint
-# makes "technology" read as visually distinct from "carrier" at a glance,
-# on top of the legend's " (carrier)"/" (tech)" suffix.
+# makes "technology" read as visually distinct from "carrier" at a glance.
+# The " (carrier)"/" (tech)" suffix below only disambiguates dict keys/legend
+# lookup internally — fig0b strips it from the displayed legend text (per
+# user request, it was legend clutter given the tint already carries the
+# same distinction visually).
 EMISSIONS_COLOR_MAP = {
     # Carriers (fuel combustion)
     "crude oil (carrier)": _ETH_BRONZE,
@@ -1930,7 +1938,7 @@ EMISSIONS_COLOR_MAP = {
 }
 
 
-def fig0b_emissions_source_comparison(full_run: Run, base_run: Run) -> None:
+def fig0b_emissions_source_comparison(base_run: Run, no_flex_run: Run, full_run: Run) -> None:
     """Panel A explains the emissions increase for "Full flexibility" vs
     "Crystal Ball (base)" being much larger (proportionally) than the cost
     increase (fig0a): decomposes each run's year-2025 emissions into carrier
@@ -1938,6 +1946,17 @@ def fig0b_emissions_source_comparison(full_run: Run, base_run: Run) -> None:
     Panel B then shows WHY the system can't just decarbonize its way out of
     that gap: each run's true cumulative emissions vs. its own carbon budget,
     2025-2070.
+
+    Both panels compare all 3 scenarios (base / no flexibility / full
+    flexibility, per user request) rather than just base vs. full flex.
+    Panel A's stacked-bar segments stay colored by carrier/technology
+    CATEGORY (EMISSIONS_COLOR_MAP) — that's the actual content being
+    compared — while Panel B's per-run identity (line + budget dashline)
+    uses the requested grey/dark-blue/magenta ETH triad
+    (_ETH_GREY/_ETH_BLUE/_ETH_PURPLE) instead of each run's globally
+    assigned SCENARIO_PALETTE slot, since "Full flexibility"'s global slot
+    is petrol/turquoise elsewhere (fig10/fig11 etc. never key off
+    run.color, so this local override has no cross-figure effect).
 
     Panel A originally used a single year (the earliest one present in both
     runs) — per user request it now shows COMPARISON_YEARS (2030/2040/2050)
@@ -2036,10 +2055,9 @@ def fig0b_emissions_source_comparison(full_run: Run, base_run: Run) -> None:
     any reading of this figure should treat both overshoot numbers as
     "not yet repaid by 2050", not "failed to decarbonize".
     """
-    fr, br = full_run.results, base_run.results
-    years_full = get_available_years(fr)
-    years_base = get_available_years(br)
-    years_common = sorted(set(years_full) & set(years_base))
+    fr, nfr, br = full_run.results, no_flex_run.results, base_run.results
+    years_common = sorted(set(get_available_years(fr)) & set(get_available_years(nfr))
+                           & set(get_available_years(br)))
     panel_a_years = [y for y in COMPARISON_YEARS if y in years_common]
 
     # cmr10 (this module's serif font, see the plt.rcParams block up top) has
@@ -2051,10 +2069,10 @@ def fig0b_emissions_source_comparison(full_run: Run, base_run: Run) -> None:
     # Panel A: full emissions composition per run PER YEAR (carrier +
     # technology stacked together, suffix-disambiguated) so each bar's
     # height reproduces that run's true net total for that year — grouped
-    # model-major/year-minor ("base 2030/2040/2050, full 2030/2040/2050"),
-    # same convention as fig1b/fig4b.
+    # model-major/year-minor ("base 2030/2040/2050, no-flex 2030/2040/2050,
+    # full 2030/2040/2050"), same convention as fig1b/fig4b.
     composition_series = []
-    for run, results in [(base_run, br), (full_run, fr)]:
+    for run, results in [(base_run, br), (no_flex_run, nfr), (full_run, fr)]:
         for year in panel_a_years:
             carrier = get_emissions_by_carrier(results, year)
             # H2_DRI is dropped: its emissions are ~0 in every run/year here
@@ -2066,10 +2084,20 @@ def fig0b_emissions_source_comparison(full_run: Run, base_run: Run) -> None:
     composition = build_comparison_df(composition_series)
 
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 7), gridspec_kw={"width_ratios": [1.4, 1.3]})
+    # bar_width=0.85 (vs. the shared 0.6 default) packs the now-9 bars (was
+    # 6, before the 3rd scenario was added) closer together per user request.
     plot_stacked_bars(composition, "Emissions Composition by Source",
-                      "Mton CO$_2$eq", ax1, show_segment_labels=True,
-                      color_map=EMISSIONS_COLOR_MAP)
-    _year_group_labels(ax1, 2, [base_run.label, full_run.label], panel_a_years)
+                      "Mton CO$_2$eq", ax1, show_segment_labels=False,
+                      color_map=EMISSIONS_COLOR_MAP, bar_width=0.85)
+    # Strip the " (carrier)"/" (tech)" disambiguation suffix from the legend
+    # text only — EMISSIONS_COLOR_MAP's keys (and the color/tint they drive)
+    # still need it, but the tint already distinguishes carrier vs. tech
+    # visually, so the suffix is legend clutter per user request.
+    legend = ax1.get_legend()
+    if legend is not None:
+        for text in legend.get_texts():
+            text.set_text(text.get_text().replace(" (carrier)", "").replace(" (tech)", ""))
+    _year_group_labels(ax1, 3, [base_run.label, no_flex_run.label, full_run.label], panel_a_years)
 
     # Panel B: cumulative emissions vs. each run's own carbon budget, 2025-2070.
     def _series(r, name):
@@ -2077,34 +2105,56 @@ def fig0b_emissions_source_comparison(full_run: Run, base_run: Run) -> None:
         return {int(k): float(v) for k, v in s.items()}
 
     cum_full = _series(fr, "carbon_emissions_cumulative")
+    cum_no_flex = _series(nfr, "carbon_emissions_cumulative")
     cum_base = _series(br, "carbon_emissions_cumulative")
     budget_full = float(fr.get_total("carbon_emissions_budget").iloc[0])
+    budget_no_flex = float(nfr.get_total("carbon_emissions_budget").iloc[0])
     budget_base = float(br.get_total("carbon_emissions_budget").iloc[0])
     years = sorted(cum_full)
     base_vals = [cum_base[y] for y in years]
+    no_flex_vals = [cum_no_flex[y] for y in years]
     full_vals = [cum_full[y] for y in years]
+
+    # Per-run identity color for this panel only — the requested
+    # grey/dark-blue/magenta ETH triad, NOT each run's globally assigned
+    # SCENARIO_PALETTE slot (see docstring).
+    panel_b_color = {base_run.label: _ETH_GREY, no_flex_run.label: _ETH_BLUE,
+                      full_run.label: _ETH_PURPLE}
 
     # Transient mid-horizon excess above each run's OWN budget line — real,
     # but costs nothing except at the final year (see docstring). Shown
     # muted/shared so it doesn't read as "this is the penalised amount".
-    over_base = np.array([v > budget_base for v in base_vals])
-    over_full = np.array([v > budget_full for v in full_vals])
-    ax2.fill_between(years, base_vals, budget_base, where=over_base,
-                      color=base_run.color, alpha=0.12, interpolate=True,
-                      label="excess above own budget, not yet repaid")
-    ax2.fill_between(years, full_vals, budget_full, where=over_full,
-                      color=full_run.color, alpha=0.12, interpolate=True,
-                      label="_nolegend_")
+    for label, vals, budget, legend_label in [
+        (base_run.label, base_vals, budget_base, "excess above own budget, not yet repaid"),
+        (no_flex_run.label, no_flex_vals, budget_no_flex, "_nolegend_"),
+        (full_run.label, full_vals, budget_full, "_nolegend_"),
+    ]:
+        over = np.array([v > budget for v in vals])
+        ax2.fill_between(years, vals, budget, where=over, color=panel_b_color[label],
+                          alpha=0.12, interpolate=True, label=legend_label)
 
-    ax2.plot(years, base_vals, marker="o", color=base_run.color,
-             linewidth=2, label=f"{base_run.label} - cumulative emissions")
-    ax2.axhline(budget_base, color=base_run.color, linestyle="--", linewidth=1.3,
-                label=f"{base_run.label} - carbon budget ({budget_base:,.0f} Mton)")
-
-    ax2.plot(years, full_vals, marker="o", color=full_run.color,
-             linewidth=2, label=f"{full_run.label} - cumulative emissions")
-    ax2.axhline(budget_full, color=full_run.color, linestyle="--", linewidth=1.3,
-                label=f"{full_run.label} - carbon budget ({budget_full:,.0f} Mton)")
+    # "No flexibility" and "Full flexibility" turn out to have nearly
+    # identical cumulative-emissions trajectories AND budgets (same industry
+    # sectors/demand scope, only the flexibility options differ — base gets
+    # a different budget because it lacks those sectors entirely). Solid,
+    # same-width lines would make one fully occlude the other, so each run
+    # also gets its own marker/linestyle (not just color) and "No
+    # flexibility" is drawn last/on top with a dashed line so the overlap
+    # itself stays visible instead of erasing one run.
+    line_style = {base_run.label: dict(marker="o", linestyle="-"),
+                  full_run.label: dict(marker="^", linestyle="-"),
+                  no_flex_run.label: dict(marker="s", linestyle="--", markersize=5)}
+    budget_style = {base_run.label: "--", full_run.label: "--", no_flex_run.label: ":"}
+    for label, vals, budget in [
+        (base_run.label, base_vals, budget_base),
+        (full_run.label, full_vals, budget_full),
+        (no_flex_run.label, no_flex_vals, budget_no_flex),
+    ]:
+        color = panel_b_color[label]
+        ax2.plot(years, vals, color=color, linewidth=2,
+                  label=f"{label} - cumulative emissions", **line_style[label])
+        ax2.axhline(budget, color=color, linestyle=budget_style[label], linewidth=1.5,
+                    label=f"{label} - carbon budget ({budget:,.0f} Mton)")
 
     # Budget delta: the two runs are handed DIFFERENT total carbon budgets
     # (carbon_emissions_budget) by ZEN-creator to begin with — a distinct
@@ -2126,7 +2176,7 @@ def fig0b_emissions_source_comparison(full_run: Run, base_run: Run) -> None:
     ax2.set_xlabel("Year")
     ax2.set_ylabel("Cumulative carbon emissions [Mton CO$_2$eq]")
     ax2.set_title("Cumulative Emissions vs. Carbon Budget", fontsize=11, fontweight="bold")
-    ax2.set_ylim(top=max(full_vals) * 1.1)
+    ax2.set_ylim(top=max(base_vals + no_flex_vals + full_vals) * 1.1)
     ax2.legend(fontsize=7.5, loc="upper left")
     ax2.grid(alpha=0.3)
 
@@ -2134,6 +2184,111 @@ def fig0b_emissions_source_comparison(full_run: Run, base_run: Run) -> None:
                  fontsize=13, fontweight="bold")
     fig.tight_layout(rect=[0, 0, 1, 0.95])
     savefig(fig, "fig2_emissions_source_comparison")
+
+
+def _grey_delta_bar(ax, labels: list[str], values: dict[str, float], base_label: str,
+                     delta_color: dict[str, float], value_fmt: str = "{:,.0f}",
+                     top: float | None = None) -> None:
+    """One bar per label: the shared baseline value (base_label's own total)
+    in grey, and each other bar's difference from that baseline stacked on
+    top (or hanging below, hatched, if negative) in that run's own color —
+    so only the DELTA reads as "the interesting part" and the (usually much
+    larger, near-identical-across-scenarios) baseline stays visually
+    de-emphasized. Pairs with the y-axis truncation + break marks the caller
+    adds, since the baseline otherwise dwarfs the delta (see fig0a's
+    docstring: deltas here are a few % of the baseline total)."""
+    base_val = values[base_label]
+    x = np.arange(len(labels))
+    for xi, label in zip(x, labels):
+        val = values[label]
+        delta = val - base_val
+        grey_height = min(val, base_val)
+        ax.bar(xi, grey_height, width=0.6, color=_ETH_GREY, edgecolor="white", zorder=2)
+        if delta != 0:
+            ax.bar(xi, abs(delta), width=0.6, bottom=grey_height, color=delta_color[label],
+                   edgecolor="white", zorder=2, hatch="//" if delta < 0 else None)
+        ax.text(xi, val, value_fmt.format(val), ha="center",
+                 va="bottom" if delta >= 0 else "top", fontsize=8.5, fontweight="bold")
+        if label != base_label:
+            sign = "+" if delta >= 0 else ""
+            pct = delta / base_val * 100
+            ax.text(xi, grey_height + abs(delta) / 2, f"{sign}{value_fmt.format(delta)} ({sign}{pct:.2f}%)",
+                     ha="center", va="center", fontsize=7.5, color="white", fontweight="bold")
+    ax.set_xticks(x)
+    ax.set_xticklabels(labels, fontsize=9.5)
+
+    # Truncate the y-axis just below the smallest bar value (rather than
+    # starting at 0) so the small delta isn't visually swamped by the much
+    # larger shared baseline, and mark the truncation with the standard
+    # diagonal "break" convention so it isn't mistaken for a from-zero axis.
+    bottom = min(values.values()) * 0.9
+    if top is None:
+        top = max(values.values()) * 1.12
+    ax.set_ylim(bottom, top)
+    d = 0.012
+    kwargs = dict(transform=ax.transAxes, color="black", clip_on=False, linewidth=1)
+    for xoff in (0, 1):
+        ax.plot((xoff - d, xoff + d), (-d, +d), **kwargs)
+    ax.spines["bottom"].set_visible(False)
+    ax.tick_params(axis="x", length=0)
+
+
+def fig1b_cost_and_emissions_totals(base_run: Run, no_flex_run: Run, full_run: Run) -> None:
+    """Companion to fig0a/fig0b, requested as a single at-a-glance pair: for
+    all 3 scenarios (base / no flexibility / full flexibility), show the
+    TOTAL (not just the delta) discounted system cost (left) and TOTAL true
+    cumulative emissions (right) — but with "Crystal Ball (base)"'s own
+    value rendered as the shared grey base of every bar, and only each other
+    scenario's difference from that base value drawn in color, so the
+    figure reads as fig0a/fig0b's deltas without hiding how small they are
+    relative to the totals they sit on top of.
+
+    Cost uses the same horizon-total discounted `get_annual_total_cost` as
+    compute_headline_metrics's npc_total_meur. Emissions deliberately do
+    NOT use compute_headline_metrics's emissions_total_mton — that's a naive
+    per-year sum which badly understates true cumulative emissions (see
+    fig0b's docstring) — instead using the same
+    `carbon_emissions_cumulative` value (at the final modeled year) that
+    fig0b's Panel B plots, for consistency with that figure's numbers.
+    """
+    runs = [base_run, no_flex_run, full_run]
+    base_label = base_run.label
+
+    # bn EUR (billion EUR) rather than MEUR per user request — MEUR values
+    # here run ~2.3e7 (i.e. ~23 trillion EUR); dividing by 1000 gives a
+    # legible ~23,000 bn EUR without scientific-notation axis ticks.
+    cost = {}
+    for r in runs:
+        years = get_available_years(r.results)
+        cost[r.label] = float(get_annual_total_cost(r.results, years, discount=True).sum()) / 1000
+
+    def _series(r, name):
+        s = r.get_total(name)
+        return {int(k): float(v) for k, v in s.items()}
+
+    emissions = {}
+    for r in runs:
+        cum = _series(r.results, "carbon_emissions_cumulative")
+        emissions[r.label] = cum[max(cum)]
+
+    delta_color = {base_label: _ETH_GREY, no_flex_run.label: _ETH_BLUE, full_run.label: _ETH_PURPLE}
+    labels = [r.label for r in runs]
+
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(11, 4.6))
+    # Capped at 26,000 (vs. the auto ~1.12x headroom, which reached ~27,000)
+    # per user request — still enough headroom above the ~24,400 max bar for
+    # its value label.
+    _grey_delta_bar(ax1, labels, cost, base_label, delta_color, value_fmt="{:,.0f}", top=26000)
+    ax1.set_ylabel("Discounted total system cost [bn EUR]")
+    ax1.set_title("Total System Cost", fontsize=12, fontweight="bold")
+
+    # Same 26,000 cap, same reasoning (auto headroom reached ~27,500 here).
+    _grey_delta_bar(ax2, labels, emissions, base_label, delta_color, value_fmt="{:,.0f}", top=26000)
+    ax2.set_ylabel("Cumulative carbon emissions [Mton CO$_2$eq]")
+    ax2.set_title("Total Cumulative Emissions", fontsize=12, fontweight="bold")
+
+    fig.tight_layout()
+    savefig(fig, "fig1b_cost_emissions_totals")
 
 
 # ── 8/9: Real-world industry-emissions context (input data, no model results) ──
@@ -2316,6 +2471,155 @@ def fig9_model_scope_coverage() -> None:
               fontsize=7, color="grey")
     fig.tight_layout(rect=[0, 0.08, 1, 1])
     savefig(fig, "fig4_model_scope_coverage", subdir="method")
+
+
+# Global GHG sector breakdown (WRI, "World Greenhouse Gas Emissions in 2023
+# (Sector | End Use | Gas)", Climate Watch data via IEA 2025 — the Sankey at
+# https://www.wri.org/data/world-greenhouse-gas-emissions-2023, the one
+# actually giving the numbers below; the companion article
+# https://www.wri.org/insights/4-charts-explain-greenhouse-gas-emissions-countries-and-sectors
+# only has the 5 top-level shares). TWO independent partitions of the same
+# 76.7% Energy total are read off that Sankey's first two columns:
+#  - Source sector (left column): Electricity & Heat 33.6%, Buildings 6.3%,
+#    Other Fuel Combustion 1.2%, Manufacturing & Construction 12.2%,
+#    Transportation 14.3%, International Bunker 2.4%, Fugitive Emissions
+#    6.8% — mutually exclusive, sums to 76.8% (~76.7%, rounding).
+#  - End use (middle column): who the energy was ultimately for — Iron &
+#    steel 5.8%, Chemical & petrochemical 6.5%, Non-metallic minerals
+#    (cement/glass/ceramics) 2.9%, Food & tobacco 1.3%, Non-ferrous metals
+#    1.8%, Machinery 1.6%, Other Industry 4.4%, Residential/Commercial
+#    Buildings, Road/Air/Ship, Unallocated, Vented/Flared — also mutually
+#    exclusive, sums to the same 76.7%. Every industrial end use draws from
+#    BOTH source sectors above (Manufacturing & Construction's own on-site
+#    fuel combustion AND its share of grid electricity/heat) — the Sankey
+#    doesn't publish that per-industry electricity-vs-fuel split, so it
+#    can't be read exactly off the source-sector column alone.
+#
+# Per user instruction: this is NOT filtered down to Crystal Ball's own
+# modeled sectors (sector_emissions_2022.csv's list) — it's every end-use
+# category the WRI Sankey itself labels as industry: Iron & steel, Chemical
+# & petrochemical, Non-ferrous metals, Non-metallic minerals (cement/glass/
+# ceramics), Machinery, Food & tobacco, and "Other Industry" (WRI's own
+# catch-all for the remaining industrial subsectors it doesn't break out
+# individually — textiles & leather, mining & quarrying, construction,
+# wood products, etc.). Together these sum to 24.3%, ALL of Manufacturing &
+# Construction's/Electricity & Heat's industrial end uses, not a Crystal-
+# Ball-scope subset. That whole 24.3% end-use total is shown carved out of
+# Electricity & Heat's 33.6% alone (not split proportionally across both
+# source sectors, since the Sankey doesn't publish that per-industry
+# electricity-vs-fuel split) — a known simplification, not a claim that
+# zero of it comes from Manufacturing & Construction's direct fuel
+# combustion.
+_GHG_TOTAL_GT = 50.8  # GtCO2e, 2023 (Sankey title)
+_GHG_ENERGY_TOTAL_SHARE = 0.767
+_GHG_ELECTRICITY_HEAT_SHARE = 0.336
+_GHG_MANUFACTURING_CONSTRUCTION_SHARE = 0.122  # WRI's own category — NOT "industry" (see docstring), shown as "Others"
+_GHG_TRANSPORT_SHARE = 0.143
+_GHG_BUILDINGS_SHARE = 0.063
+_GHG_INDUSTRIAL_PROCESS_SHARE = 0.062
+_GHG_AGRICULTURE_SHARE = 0.123
+_GHG_WASTE_SHARE = 0.038
+_GHG_LULUCF_SHARE = 0.009
+# Every industrial end-use category in the WRI Sankey (see comment above) —
+# not filtered to Crystal Ball's own modeled sector list.
+_GHG_INDUSTRY_ENDUSE = {
+    "Iron & steel": 0.058,
+    "Chemical & petrochemical": 0.065,
+    "Non-metallic minerals\n(cement, glass, ceramics)": 0.029,
+    "Non-ferrous metals": 0.018,
+    "Machinery": 0.016,
+    "Food & tobacco": 0.013,
+    "Other industry\n(textiles, mining, etc.)": 0.044,
+}
+_GHG_INDUSTRY_ENDUSE_SHARE = sum(_GHG_INDUSTRY_ENDUSE.values())  # 24.3%
+
+
+def fig15_global_ghg_sector_breakdown() -> None:
+    """Two stacked horizontal bars, top-down drill-in: (1) all global GHG
+    emissions (100%) split into Energy (76.7%, blue), Industrial processes
+    (6.2%, green — cement calcination/steel ore reduction/chemical
+    reactions, non-combustion) and everything else (~17.1%, grey:
+    agriculture, waste, land use); (2) directly below, Energy's own 76.7%
+    split by SOURCE SECTOR (Electricity & Heat, Manufacturing &
+    Construction relabeled "Others", Transportation, Buildings, other) —
+    with a green wedge carved out of Electricity & Heat sized to EVERY
+    industrial end-use category in the WRI Sankey (24.3% — iron & steel,
+    chemicals, non-ferrous metals, non-metallic minerals, machinery, food &
+    tobacco, other industry; NOT filtered to Crystal Ball's own modeled
+    sectors — see the module comment above for exactly which categories and
+    why). Dashed guide lines tie bar 2's span to bar 1's Energy segment so
+    the drill-down relationship reads immediately.
+
+    The two green wedges are industry's two-part global footprint: process
+    emissions (top bar, 6.2%, uncapturable by any energy-system model) and
+    industry's energy-side footprint (bottom bar, 24.3%, most — not all —
+    of which is Crystal Ball's industry-heat extension's actual target,
+    since it also models cement/glass/ceramics as heat-supply sectors)
+    together approach a QUARTER of all global GHG emissions.
+
+    A pure global-reference-data figure like fig3/fig4 above (no solved
+    model results, no local dataset) — generated unconditionally in main().
+    """
+    elec_heat_other = _GHG_ELECTRICITY_HEAT_SHARE - _GHG_INDUSTRY_ENDUSE_SHARE
+    other_energy = (_GHG_ENERGY_TOTAL_SHARE - _GHG_ELECTRICITY_HEAT_SHARE
+                     - _GHG_MANUFACTURING_CONSTRUCTION_SHARE - _GHG_TRANSPORT_SHARE - _GHG_BUILDINGS_SHARE)
+    other_sectors = 1.0 - _GHG_ENERGY_TOTAL_SHARE - _GHG_INDUSTRIAL_PROCESS_SHARE
+
+    top_segments = [
+        ("Energy", _GHG_ENERGY_TOTAL_SHARE, _ETH_BLUE),
+        ("Industrial\nprocesses", _GHG_INDUSTRIAL_PROCESS_SHARE, _ETH_GREEN),
+        ("Agriculture, waste\n& land use", other_sectors, _eth_tint(_ETH_GREY, 0.5)),
+    ]
+    bottom_segments = [
+        ("Industry\n(electricity & heat)", _GHG_INDUSTRY_ENDUSE_SHARE, _ETH_GREEN),
+        ("Non-Industry\n(electricity & heat)", elec_heat_other, _ETH_BLUE),
+        ("Manufacturing &\nConstruction", _GHG_MANUFACTURING_CONSTRUCTION_SHARE, _ETH_GREY),
+        ("Transportation", _GHG_TRANSPORT_SHARE, _eth_tint(_ETH_GREY, 0.25)),
+        ("Buildings", _GHG_BUILDINGS_SHARE, _eth_tint(_ETH_GREY, 0.45)),
+        ("Other energy", other_energy, _eth_tint(_ETH_GREY, 0.65)),
+    ]
+
+    fig, ax = plt.subplots(figsize=(11.5, 5.0))
+    y_top, y_bot, bar_h = 1.0, 0.0, 0.55
+
+    def _draw_bar(y: float, segments: list) -> dict:
+        left, bounds = 0.0, {}
+        for label, share, color in segments:
+            ax.barh(y, share * 100, left=left * 100, height=bar_h, color=color,
+                     edgecolor="white", linewidth=0.7)
+            center = left * 100 + share * 50
+            text = f"{label}\n{share * 100:.1f}%"
+            if share >= 0.06:
+                ax.text(center, y, text, ha="center", va="center", fontsize=8,
+                        color=_text_color_for_bg(color), fontweight="bold", linespacing=1.2)
+            else:
+                ax.annotate(text, xy=(center, y - bar_h / 2), xytext=(center, y - 1.05), fontsize=7.3,
+                            ha="center", va="top", arrowprops=dict(arrowstyle="-", color=color),
+                            linespacing=1.15)
+            bounds[label] = (left * 100, (left + share) * 100)
+            left += share
+        return bounds
+
+    top_bounds = _draw_bar(y_top, top_segments)
+    _draw_bar(y_bot, bottom_segments)
+
+    # Dashed guides from Energy's edges (top bar) down to the full span of
+    # the source-sector breakdown (bottom bar) — makes the "this second bar
+    # IS what's inside Energy" relationship explicit rather than implied.
+    x0, x1 = top_bounds["Energy"]
+    for x in (x0, x1):
+        ax.plot([x, x], [y_top - bar_h / 2, y_bot + bar_h / 2], color=_ETH_GREY,
+                 linestyle="--", linewidth=0.9, zorder=0)
+
+    ax.set_xlim(0, 100)
+    ax.set_ylim(-0.65, 1.55)
+    ax.set_yticks([])
+    ax.set_xlabel("Share of total global GHG emissions [%]")
+    ax.set_title("Total Global GHG Emissions", fontsize=12, fontweight="bold")
+    for spine in ("top", "right", "left"):
+        ax.spines[spine].set_visible(False)
+    fig.tight_layout(rect=[0, 0.05, 1, 1])
+    savefig(fig, "fig9_global_ghg_sector_breakdown", subdir="method")
 
 
 # ── 10: Power-sector impact of industry-heat flexibility ───────────────────
@@ -3382,18 +3686,20 @@ def main() -> None:
     if base_run is not None:
         components_with_base = compute_cost_components([base_run] + runs)
         fig0a_cost_composition(components_with_base)
-        fig0b_emissions_source_comparison(by_label(runs, "Full flexibility"), base_run)
         if any(r.label == "No flexibility" for r in runs):
             no_flex_run = by_label(runs, "No flexibility")
             fig5_retrofit_ccs_comparison(no_flex_run, base_run)
             if any(r.label == "Full flexibility" for r in runs):
                 full_run = by_label(runs, "Full flexibility")
+                fig0b_emissions_source_comparison(base_run, no_flex_run, full_run)
+                fig1b_cost_and_emissions_totals(base_run, no_flex_run, full_run)
                 fig10_power_and_storage_impact(base_run, no_flex_run, full_run)
                 fig11_power_and_storage_impact_with_dsm(base_run, no_flex_run, full_run)
             else:
-                print("  skipping fig10/fig11_power_and_storage_impact: 'Full flexibility' scenario not loaded")
+                print("  skipping fig0b_emissions_source_comparison/fig1b_cost_and_emissions_totals/"
+                      "fig10/fig11_power_and_storage_impact: 'Full flexibility' scenario not loaded")
         else:
-            print("  skipping fig5/fig10/fig11: 'No flexibility' scenario not loaded")
+            print("  skipping fig0b/fig5/fig10/fig11: 'No flexibility' scenario not loaded")
     else:
         print(f"  skipping fig0a/fig0b/fig5/fig10/fig11: {BASE_SCENARIO[0]} not yet under {EULER_ROOT}")
     fig1a_cost_delta(metrics)
@@ -3417,6 +3723,7 @@ def main() -> None:
         print("  skipping fig9b_heat_supply_trajectory_full_flexibility: 'Full flexibility' scenario not loaded")
     fig8_industry_sector_emissions_context()
     fig9_model_scope_coverage()
+    fig15_global_ghg_sector_breakdown()
     fig11_mga_method()
     fig12_lp_formulation()
     fig13_mga_axis_construction()
