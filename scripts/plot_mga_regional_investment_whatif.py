@@ -190,6 +190,39 @@ _FACTOR_STYLE = {3: 0.30, 2.5: 0.85}
 CAPEX_CUM_CONFIG = json.loads((REPO_ROOT / "data" / "config_mga_axes_capex_cum.json").read_text())
 REGION_NODES = {next(iter(d)): next(iter(d.values())) for d in CAPEX_CUM_CONFIG["node_capex_cumulative"]["nodes"]}
 
+# fig18/19: caps expressed as a share of the region's own GDP instead of a
+# multiple of its 2020 investment (fig16/17) -- see fig_whatif_gdp's
+# docstring. GDP_MUSD_2024 is nominal GDP (IMF estimates, "List of European
+# countries by GDP (nominal)", Wikipedia), millions USD, converted to EUR at
+# USD_TO_EUR_2024 (approx. 2024 average rate) -- summed over the same
+# REGION_NODES country groups already used for the EUR/inhabitant analysis.
+# Unlike region_2020 (read from the model's own Results), region GDP is
+# external data with no dependence on this run's solution.
+GDP_MUSD_2024 = {
+    "DK": 429458, "EE": 42752, "FI": 298833, "IE": 577216, "LT": 84847,
+    "LV": 43508, "NO": 483727, "SE": 610118, "UK": 3644636,
+    "AT": 521269, "BE": 664965, "CH": 936738, "DE": 4684182, "FR": 3160902,
+    "LU": 93169, "NL": 1227174,
+    "ES": 1722227, "EL": 257067, "HR": 92506, "IT": 2372059, "PT": 308590, "SI": 72463,
+    "BG": 112232, "CZ": 344931, "HU": 223060, "PL": 908583, "RO": 384148, "SK": 140636,
+}
+USD_TO_EUR_2024 = 1 / 1.08
+# fig18/19: three nested caps, each a share of regional GDP/year, mirroring
+# FACTORS_2020's loosest-first/tightest-last convention. 2.5% (the direct
+# analogue of FACTORS_2020's 2.5x) is certified INFEASIBLE in every region
+# (checked directly: e.g. north's cap = 3*0.025*5755 = 431.6 bn EUR, already
+# below its own 2030 near-optimal minimum of 441.8 bn EUR; same for
+# west/south/east), so the band set is 5%/4%/3% instead. All three are a mix
+# of outcomes, checked directly against each region's own 2030 near-optimal
+# range: 5% is non-binding for north (863.3 vs max 694.6) and west (1567.8
+# vs max 1186.1) but binding for south (670.2) and east (293.6); 4% is
+# binding for north (690.6), south (536.2) and east (234.8) but still
+# non-binding for west (1254.2 vs max 1186.1); 3% is binding for north
+# (517.9) and west (940.7) but INFEASIBLE for south (402.1 vs min 470.1) and
+# east (176.1 vs min 222.2).
+GDP_FRACTIONS = [0.05, 0.04, 0.03]
+_GDP_FRACTION_STYLE = {0.05: 0.22, 0.04: 0.55, 0.03: 0.85}
+
 
 def savefig(fig: plt.Figure, name: str) -> None:
     FIGURES_DIR.mkdir(parents=True, exist_ok=True)
@@ -270,6 +303,17 @@ def compute_region_2020(base_r: Results) -> dict:
         sub = capex[capex.index.get_level_values("location").isin(nodes)]
         out[region] = sub[[c for c in sub.columns if c == 2020]].sum().sum() / 1000
     return out
+
+
+def compute_region_gdp() -> dict:
+    """{region: nominal GDP in bn EUR, 2024} summed over REGION_NODES'
+    countries from GDP_MUSD_2024 (IMF nominal estimates), USD->EUR at
+    USD_TO_EUR_2024 -- used only to build fig18/19's %GDP-normalised cap.
+    External data, unlike compute_region_2020's model Results read."""
+    return {
+        region: sum(GDP_MUSD_2024[c] for c in countries) / 1000 * USD_TO_EUR_2024
+        for region, countries in REGION_NODES.items()
+    }
 
 
 def threshold_factor_norm(poly, axis_idx, region_2020: dict, region: str, factor: float) -> tuple[str, float, float]:
@@ -402,6 +446,53 @@ def cell_range_factor(poly, axis_idx, ranges, region_2020: dict, constrained_reg
     return lo_out, hi_out, method
 
 
+def threshold_gdp_norm(poly, axis_idx, region_gdp: dict, region: str, fraction: float) -> tuple[str, float, float]:
+    """(axis_name, normalised upper bound, threshold in bn EUR) for region's
+    CONSTRAINED_YEAR axis capped so that its AVERAGE ANNUAL investment over
+    2020-2030 equals `fraction` of region's own GDP. The until_2030 axis is
+    the raw SUM of the model's three yearly snapshots (2020+2025+2030 --
+    verified directly against this run: e.g. north's baseline 538.6 =
+    177.5+173.6+187.5), not an integral over 11 calendar years, so "average
+    annual rate = X" translates to "cumulative axis value = 3*X", the same
+    convention used to convert this run's own annual investment ranges."""
+    annual_target_bn = fraction * region_gdp[region]
+    thresh_bn = 3 * annual_target_bn
+    ax = f"{region}_until_{CONSTRAINED_YEAR}"
+    k = axis_idx[ax]
+    return ax, ((thresh_bn * 1000) - poly.offset[k]) / poly.scale[k], thresh_bn
+
+
+def cell_range_gdp(poly, axis_idx, ranges, region_gdp: dict, constrained_region: str, affected_region: str, fraction: float):
+    """Like cell_range_factor, but the constrained axis is capped via
+    threshold_gdp_norm (a share of constrained_region's own GDP) instead of
+    a multiple of its 2020 investment. Returns (lo, hi, method, thresh_bn,
+    binding) -- thresh_bn is the imposed cap in bn EUR and binding is False
+    if thresh_bn sits AT OR ABOVE constrained_region's own certified
+    achievable MAXIMUM (ranges' hi), i.e. the GDP-based cap is looser than
+    every near-optimal design already is and does not constrain anything
+    -- or None if the cap is certified INFEASIBLE (below the achievable
+    MINIMUM, ranges' lo)."""
+    _, lo_c, hi_c = ranges[(constrained_region, CONSTRAINED_YEAR)]
+    axis_name, bound, thresh_bn = threshold_gdp_norm(poly, axis_idx, region_gdp, constrained_region, fraction)
+    if thresh_bn < lo_c:
+        return None
+    thresholds_norm = {axis_name: bound}
+    lo_out, hi_out, method = [], [], "inner"
+    for y in YEARS:
+        if affected_region == constrained_region and y == CONSTRAINED_YEAR:
+            lo_out.append(lo_c)
+            hi_out.append(min(thresh_bn, hi_c))
+            continue
+        target_axis = f"{affected_region}_until_{y}"
+        lo_v, m_lo = solve_bound_with_fallback(poly, axis_idx, thresholds_norm, target_axis, "min")
+        hi_v, m_hi = solve_bound_with_fallback(poly, axis_idx, thresholds_norm, target_axis, "max")
+        lo_out.append(lo_v / 1000)
+        hi_out.append(hi_v / 1000)
+        if m_lo == "outer" or m_hi == "outer":
+            method = "outer"
+    return lo_out, hi_out, method, thresh_bn, thresh_bn < hi_c
+
+
 def _draw_ribbon(ax, x, lo, hi, color, *, alpha=0.35, hatch=None, zorder=2, linestyle="-"):
     ax.fill_between(x, lo, hi, color=color, alpha=alpha, hatch=hatch,
                      edgecolor=color, linewidth=1.0, linestyle=linestyle, zorder=zorder)
@@ -529,6 +620,66 @@ def draw_cell_factor(ax, poly, axis_idx, ranges, region_2020: dict, constrained_
         labels = ", ".join(f"{f}x" for f in infeasible_factors)
         ax.text(0.5, 0.94, f"{labels}: infeasible\n(below achievable min)", transform=ax.transAxes,
                 ha="center", va="top", fontsize=6.5, style="italic", color="#b33333")
+
+    ax.set_xticks(x)
+    ax.set_xlim(x[0] - 2, x[-1] + 2)
+    ax.grid(axis="y", alpha=0.3)
+    return min(lo_base), max(hi_base)
+
+
+def draw_cell_gdp(ax, poly, axis_idx, ranges, region_gdp: dict, constrained_region: str, affected_region: str) -> tuple[float, float]:
+    """fig18/19's per-cell drawer -- structurally draw_cell_factor again,
+    with the same nested-bands convention generalised to THREE bands
+    (GDP_FRACTIONS, loosest 5% first/most translucent, tightest 3%
+    last/most opaque -- see
+    GDP_FRACTIONS' module-level comment for why 2.5% was dropped). Per
+    fraction, three outcomes, all labelled rather than silently drawn as an
+    ordinary ribbon: infeasible (cell_range_gdp returns None, red italic
+    annotation, no ribbon), non-binding (the cap sits at or above
+    constrained_region's own achievable maximum -- i.e. even the loosest
+    near-optimal design for that region already costs less than that share
+    of its GDP -- drawn as the ordinary unconstrained ribbon plus a green
+    italic note), and binding (drawn as a shaded ribbon, downward triangle
+    marking the imposed cap on the diagonal, same convention as
+    draw_cell_factor)."""
+    x = [int(y) for y in YEARS]
+    base_y, lo_base, hi_base = zip(*[ranges[(affected_region, y)] for y in YEARS])
+    _draw_ribbon(ax, x, lo_base, hi_base, REGION_COLOR[affected_region], alpha=0.15, zorder=1)
+    ax.plot(x, base_y, color="black", marker="*", markersize=8, linewidth=1.0,
+            linestyle="--", alpha=0.8, zorder=15)
+
+    is_diagonal = affected_region == constrained_region
+    cy_idx = YEARS.index(CONSTRAINED_YEAR)
+    color = REGION_COLOR[affected_region]
+    infeasible_fractions, non_binding_fractions = [], []
+    for zi, fraction in enumerate(GDP_FRACTIONS):
+        alpha = _GDP_FRACTION_STYLE[fraction]
+        result = cell_range_gdp(poly, axis_idx, ranges, region_gdp, constrained_region, affected_region, fraction)
+        zorder = 2 + zi
+        if result is None:
+            infeasible_fractions.append(fraction)
+            continue
+        lo_scn, hi_scn, method, thresh_bn, binding = result
+        if not binding:
+            non_binding_fractions.append(fraction)
+        if method == "inner":
+            _draw_ribbon(ax, x, lo_scn, hi_scn, color, alpha=alpha, zorder=zorder)
+            if is_diagonal:
+                _draw_fixed_star(ax, x[cy_idx], hi_scn[cy_idx], color,
+                                 alpha=min(alpha + 0.15, 1.0), size=10, zorder=zorder + 10, marker="v")
+        else:
+            _draw_ribbon(ax, x, lo_scn, hi_scn, color, alpha=alpha * 0.7, zorder=zorder, linestyle="--")
+            ax.text(0.5, 0.06, f"{fraction:.0%} GDP: outer bound only", transform=ax.transAxes, ha="center",
+                    va="bottom", fontsize=6, style="italic", color="#555555")
+
+    if infeasible_fractions:
+        labels = ", ".join(f"{f:.0%}" for f in infeasible_fractions)
+        ax.text(0.5, 0.94, f"{labels}: infeasible\n(below achievable min)", transform=ax.transAxes,
+                ha="center", va="top", fontsize=6.5, style="italic", color="#b33333")
+    elif non_binding_fractions:
+        labels = ", ".join(f"{f:.0%}" for f in non_binding_fractions)
+        ax.text(0.5, 0.94, f"{labels}: not binding\n(above achievable range)", transform=ax.transAxes,
+                ha="center", va="top", fontsize=6, style="italic", color="#2a6f2a")
 
     ax.set_xticks(x)
     ax.set_xlim(x[0] - 2, x[-1] + 2)
@@ -686,6 +837,373 @@ def fig_whatif_2020factor(poly, axis_idx, ranges, region_2020: dict, constrained
     savefig(fig, fig_name)
 
 
+def fig_whatif_gdp(poly, axis_idx, ranges, region_gdp: dict, constrained_regions: list, fig_name: str) -> None:
+    """fig18/19: fig_whatif_2020factor's grid again (same row/column layout,
+    same south+west / north+east split, same nested-bands convention,
+    generalised to three bands here instead of two),
+    but the cap is normalised by GDP instead of by 2020 investment -- GDP
+    varies far more across regions than 2020 investment does (west's GDP is
+    ~5x east's), so a 2020-investment multiple compares regions against
+    their OWN past spending, while a %GDP cap compares them against a
+    common, physically meaningful yardstick (investment as a share of
+    economic output, the standard way transition-cost studies report
+    figures) that is directly comparable across regions of very different
+    economic size. GDP_FRACTIONS (5%, 4%, 3%) replaces FACTORS_2020 (3x, 2.5x)
+    -- see GDP_FRACTIONS' module-level comment for why 2.5% was dropped."""
+    fig = plt.figure(figsize=(3.6 * len(REGIONS), 3.4 * len(constrained_regions)))
+    grid = fig.add_gridspec(len(constrained_regions), len(REGIONS), hspace=0.55, wspace=0.3)
+    print(f"  solving GDP-normalised what-if LPs ({'/'.join(constrained_regions)} constrained, region capped by "
+          f"{CONSTRAINED_YEAR} at {', '.join(f'{f:.0%}' for f in GDP_FRACTIONS)} of its own GDP/yr, inner-hull certified)...")
+    for i, cr in enumerate(constrained_regions):
+        for j, ar in enumerate(REGIONS):
+            ax = fig.add_subplot(grid[i, j])
+            draw_cell_gdp(ax, poly, axis_idx, ranges, region_gdp, cr, ar)
+            if i == 0:
+                ax.set_title(ar.capitalize(), fontsize=11, fontweight="bold")
+            if j == 0:
+                ax.set_ylabel(f"{cr.capitalize()}\nconstrained\n(bn EUR)", fontsize=8.5)
+            if i == len(constrained_regions) - 1:
+                ax.set_xticklabels(YEARS, fontsize=8.5)
+            else:
+                ax.set_xticklabels([])
+            ax.tick_params(labelsize=8)
+        caps = ", ".join(f"{f:.0%}={3*f*region_gdp[cr]:.1f}" for f in GDP_FRACTIONS)
+        print(f"    {cr}: done (GDP={region_gdp[cr]:.0f} bn EUR, caps [bn EUR cumulative-until-2030]: {caps})")
+
+    lo = min(a.get_ylim()[0] for a in fig.axes)
+    hi = max(a.get_ylim()[1] for a in fig.axes)
+    for a in fig.axes:
+        a.set_ylim(lo, hi)
+
+    # fig.legend with ncol=2 fills COLUMN-major (top-to-bottom down column 1,
+    # then column 2), so the LHS/RHS split the user wants (baseline
+    # range/z*/own cap on the left, the GDP-fraction caps on the right) is
+    # just the two groups concatenated, not interleaved.
+    left_col = [
+        Patch(facecolor="#999999", alpha=0.15, label="baseline range"),
+        Line2D([0], [0], color="black", marker="*", markersize=9, linewidth=1.0, linestyle="--",
+               label="baseline (z*)"),
+        Line2D([0], [0], marker="v", color="none", markerfacecolor="#999999", markeredgecolor="#999999",
+               markersize=10, label="region's own cap"),
+    ]
+    right_col = [
+        Patch(facecolor="#999999", alpha=_GDP_FRACTION_STYLE[f], label=f"capped at {f:.0%} of GDP/yr")
+        for f in GDP_FRACTIONS
+    ]
+    handles = left_col + right_col
+    fig.legend(handles=handles, loc="lower center", ncol=2, fontsize=9, frameon=False,
+               bbox_to_anchor=(0.5, -0.07))
+
+    fig.suptitle(
+        f"Regional Investment Ranges Capped at a Share of GDP per Year\n"
+        f"(rows: region capped at {' / '.join(f'{f:.0%}' for f in GDP_FRACTIONS)} of its own GDP by {CONSTRAINED_YEAR}  |  "
+        f"{' & '.join(r.capitalize() for r in constrained_regions)} constrained, effect on all 4 regions)",
+        fontsize=12.5, fontweight="bold", y=0.995,
+    )
+    savefig(fig, fig_name)
+
+
+# fig20/21: ONE region only constrained at a time (a single row, not the
+# 2-region grids above), cap expressed as an ABSOLUTE bn-EUR ceiling on that
+# region's cumulative-until-CAP_YEAR investment -- no factor, no GDP
+# derivation, just the numbers the user asked for directly -- at
+# CAP_YEAR=2050 for both, unlike every other what-if figure in this script,
+# which constrains CONSTRAINED_YEAR=2030.
+#
+# fig20 (east): east's own 2050 near-optimal range is [540.1, 1884.9] bn EUR
+# (baseline z*=727.5). 500 was certified INFEASIBLE (below the achievable
+# minimum) and is dropped per user request; 600 and 700 are both
+# feasible/binding, and 700 in particular sits BELOW east's own cost-optimal
+# trajectory value at 2050 -- so even the baseline path would have to
+# change, not just the near-optimal ceiling.
+CAP_YEAR_EAST = "2050"
+CAPS_EAST_ABS = [700, 600]  # loosest first/most translucent, tightest last/most opaque
+_CAP_EAST_STYLE = {700: 0.30, 600: 0.85}
+
+# fig21 (west): west's own 2050 near-optimal range is [2079.2, 3649.8] bn
+# EUR (baseline z*=2452.5). Both 2200 and 2100 are feasible/binding, and
+# both -- like east's 700 above -- sit BELOW west's own cost-optimal
+# trajectory value at 2050.
+CAP_YEAR_WEST = "2050"
+CAPS_WEST_ABS = [2200, 2100]
+_CAP_WEST_STYLE = {2200: 0.30, 2100: 0.85}
+
+
+def threshold_abs_norm(poly, axis_idx, region: str, year: str, thresh_bn: float) -> tuple[str, float]:
+    """(axis_name, normalised upper bound) for region's `year` axis capped
+    directly at `thresh_bn` (bn EUR) -- an absolute value with no per-region
+    derivation, unlike threshold_factor_norm/threshold_gdp_norm."""
+    ax = f"{region}_until_{year}"
+    k = axis_idx[ax]
+    return ax, ((thresh_bn * 1000) - poly.offset[k]) / poly.scale[k]
+
+
+def cell_range_abs(poly, axis_idx, ranges, constrained_region: str, cap_year: str, affected_region: str, thresh_bn: float):
+    """Like cell_range_gdp, but the cap is an absolute bn-EUR value on
+    constrained_region's `cap_year` axis (fig20 constrains 2050, not this
+    script's usual CONSTRAINED_YEAR=2030). Returns (lo, hi, method, binding)
+    across YEARS for affected_region, or None if thresh_bn is certified
+    INFEASIBLE (below constrained_region's own achievable minimum at
+    cap_year)."""
+    _, lo_c, hi_c = ranges[(constrained_region, cap_year)]
+    if thresh_bn < lo_c:
+        return None
+    axis_name, bound = threshold_abs_norm(poly, axis_idx, constrained_region, cap_year, thresh_bn)
+    thresholds_norm = {axis_name: bound}
+    lo_out, hi_out, method = [], [], "inner"
+    for y in YEARS:
+        if affected_region == constrained_region and y == cap_year:
+            lo_out.append(lo_c)
+            hi_out.append(min(thresh_bn, hi_c))
+            continue
+        target_axis = f"{affected_region}_until_{y}"
+        lo_v, m_lo = solve_bound_with_fallback(poly, axis_idx, thresholds_norm, target_axis, "min")
+        hi_v, m_hi = solve_bound_with_fallback(poly, axis_idx, thresholds_norm, target_axis, "max")
+        lo_out.append(lo_v / 1000)
+        hi_out.append(hi_v / 1000)
+        if m_lo == "outer" or m_hi == "outer":
+            method = "outer"
+    return lo_out, hi_out, method, thresh_bn < hi_c
+
+
+def draw_cell_abs(ax, poly, axis_idx, ranges, constrained_region: str, cap_year: str, affected_region: str,
+                   caps: list, style: dict) -> tuple[float, float]:
+    """fig20's per-cell drawer -- structurally draw_cell_gdp again (same
+    nested-bands convention, same infeasible/not-binding/binding labelling),
+    but caps are absolute bn-EUR values at `cap_year` (not CONSTRAINED_YEAR)
+    rather than a GDP share."""
+    x = [int(y) for y in YEARS]
+    base_y, lo_base, hi_base = zip(*[ranges[(affected_region, y)] for y in YEARS])
+    _draw_ribbon(ax, x, lo_base, hi_base, REGION_COLOR[affected_region], alpha=0.15, zorder=1)
+    ax.plot(x, base_y, color="black", marker="*", markersize=8, linewidth=1.0,
+            linestyle="--", alpha=0.8, zorder=15)
+
+    is_diagonal = affected_region == constrained_region
+    cy_idx = YEARS.index(cap_year)
+    color = REGION_COLOR[affected_region]
+    infeasible_caps, non_binding_caps = [], []
+    for zi, cap in enumerate(caps):
+        alpha = style[cap]
+        result = cell_range_abs(poly, axis_idx, ranges, constrained_region, cap_year, affected_region, cap)
+        zorder = 2 + zi
+        if result is None:
+            infeasible_caps.append(cap)
+            continue
+        lo_scn, hi_scn, method, binding = result
+        if not binding:
+            non_binding_caps.append(cap)
+        if method == "inner":
+            _draw_ribbon(ax, x, lo_scn, hi_scn, color, alpha=alpha, zorder=zorder)
+            if is_diagonal:
+                _draw_fixed_star(ax, x[cy_idx], hi_scn[cy_idx], color,
+                                 alpha=min(alpha + 0.15, 1.0), size=10, zorder=zorder + 10, marker="v")
+        else:
+            _draw_ribbon(ax, x, lo_scn, hi_scn, color, alpha=alpha * 0.7, zorder=zorder, linestyle="--")
+            ax.text(0.5, 0.06, f"{cap:.0f} bn EUR: outer bound only", transform=ax.transAxes, ha="center",
+                    va="bottom", fontsize=6, style="italic", color="#555555")
+
+    if infeasible_caps:
+        labels = ", ".join(f"{c:.0f}" for c in infeasible_caps)
+        ax.text(0.5, 0.94, f"{labels} bn EUR: infeasible\n(below achievable min)", transform=ax.transAxes,
+                ha="center", va="top", fontsize=6.5, style="italic", color="#b33333")
+    elif non_binding_caps:
+        labels = ", ".join(f"{c:.0f}" for c in non_binding_caps)
+        ax.text(0.5, 0.94, f"{labels} bn EUR: not binding\n(above achievable range)", transform=ax.transAxes,
+                ha="center", va="top", fontsize=6, style="italic", color="#2a6f2a")
+
+    ax.set_xticks(x)
+    ax.set_xlim(x[0] - 2, x[-1] + 2)
+    ax.grid(axis="y", alpha=0.3)
+    return min(lo_base), max(hi_base)
+
+
+def fig_region_abs_cap(poly, axis_idx, ranges, region: str, cap_year: str, caps: list, style: dict, fig_name: str) -> None:
+    """fig20 (region="east")/fig21 (region="west"): single row (`region`
+    constrained only) x 4 columns (effect on every region), cap expressed as
+    an absolute bn-EUR ceiling on `region`'s cumulative-until-`cap_year`
+    investment -- see CAPS_EAST_ABS/CAPS_WEST_ABS's module-level comments
+    for each region's feasibility check."""
+    fig = plt.figure(figsize=(3.6 * len(REGIONS), 3.6))
+    grid = fig.add_gridspec(1, len(REGIONS), wspace=0.3)
+    print(f"  solving absolute-cap what-if LPs ({region} constrained at {cap_year} to "
+          f"{', '.join(f'{c:.0f}' for c in caps)} bn EUR, inner-hull certified)...")
+    for j, ar in enumerate(REGIONS):
+        ax = fig.add_subplot(grid[0, j])
+        draw_cell_abs(ax, poly, axis_idx, ranges, region, cap_year, ar, caps, style)
+        ax.set_title(ar.capitalize(), fontsize=11, fontweight="bold")
+        if j == 0:
+            ax.set_ylabel(f"{region.capitalize()} constrained\n(bn EUR)", fontsize=8.5)
+        ax.set_xticklabels(YEARS, fontsize=8.5)
+        ax.tick_params(labelsize=8)
+    print(f"    {region}: done")
+
+    lo = min(a.get_ylim()[0] for a in fig.axes)
+    hi = max(a.get_ylim()[1] for a in fig.axes)
+    for a in fig.axes:
+        a.set_ylim(lo, hi)
+
+    left_col = [
+        Patch(facecolor="#999999", alpha=0.15, label="baseline range"),
+        Line2D([0], [0], color="black", marker="*", markersize=9, linewidth=1.0, linestyle="--",
+               label="baseline (z*)"),
+        Line2D([0], [0], marker="v", color="none", markerfacecolor="#999999", markeredgecolor="#999999",
+               markersize=10, label="region's own cap"),
+    ]
+    right_col = [Patch(facecolor="#999999", alpha=style[c], label=f"capped at {c:.0f} bn EUR") for c in caps]
+    fig.legend(handles=left_col + right_col, loc="lower center", ncol=2, fontsize=9, frameon=False,
+               bbox_to_anchor=(0.5, -0.13))
+
+    fig.suptitle(
+        f"{region.capitalize()} Constrained: Absolute Investment Cap at {cap_year}\n"
+        f"({region.capitalize()}'s cumulative-until-{cap_year} investment capped at "
+        f"{', '.join(f'{c:.0f}' for c in caps)} bn EUR; effect on all 4 regions)",
+        fontsize=12.5, fontweight="bold", y=1.08,
+    )
+    savefig(fig, fig_name)
+
+
+def cell_range_joint(poly, axis_idx, constraints: dict, affected_region: str):
+    """(lo, hi, method) across YEARS for affected_region under EVERY cap in
+    `constraints` ({region: (year, thresh_bn)}) applied SIMULTANEOUSLY, or
+    None if the joint constraint set is INFEASIBLE even in the OUTER
+    (cutting-plane) approximation -- the strongest infeasibility this
+    script can certify (see solve_outer_bound's module-role: a valid but
+    not necessarily tight superset of the true near-optimal region). Unlike
+    fig20/21's single-region caps, joint feasibility of two caps at once
+    cannot be read off each region's own marginal [lo, hi] -- two
+    individually-feasible caps can still conflict purely from cross-region
+    correlation (fig14's pairwise-dependency figure), so this only ever
+    determines feasibility by actually attempting the LP, via the same
+    solve_bound_with_fallback (inner-hull first, outer as fallback) every
+    other cell-range function here already uses. A method="outer" result
+    means the JOINT set is not yet CERTIFIED achievable from this run's own
+    solved points (no VMM extreme or iterate happens to satisfy both caps
+    at once) but is not ruled out by the cutting-plane relaxation either --
+    "not yet certified", not "impossible"."""
+    thresholds_norm = {}
+    for region, (year, thresh_bn) in constraints.items():
+        ax = f"{region}_until_{year}"
+        k = axis_idx[ax]
+        thresholds_norm[ax] = ((thresh_bn * 1000) - poly.offset[k]) / poly.scale[k]
+    lo_out, hi_out, method = [], [], "inner"
+    try:
+        for y in YEARS:
+            target_axis = f"{affected_region}_until_{y}"
+            lo_v, m_lo = solve_bound_with_fallback(poly, axis_idx, thresholds_norm, target_axis, "min")
+            hi_v, m_hi = solve_bound_with_fallback(poly, axis_idx, thresholds_norm, target_axis, "max")
+            lo_out.append(lo_v / 1000)
+            hi_out.append(hi_v / 1000)
+            if m_lo == "outer" or m_hi == "outer":
+                method = "outer"
+    except RuntimeError:
+        return None
+    return lo_out, hi_out, method
+
+
+def draw_cell_joint(ax, poly, axis_idx, ranges, constraints: dict, affected_region: str) -> bool:
+    """fig22's per-cell drawer for ONE specific joint constraint combination
+    -- baseline ribbon + z* line as usual, plus a single induced ribbon (or
+    a red "JOINTLY INFEASIBLE" annotation, or a dashed/lower-alpha "not yet
+    certified" ribbon if only the outer approximation succeeds -- see
+    cell_range_joint's docstring). Returns whether the combination was
+    feasible at all (inner OR outer), which is the same for every
+    affected_region under one constraint set, so the caller only needs to
+    check it once per row rather than solving it again separately."""
+    x = [int(y) for y in YEARS]
+    base_y, lo_base, hi_base = zip(*[ranges[(affected_region, y)] for y in YEARS])
+    color = REGION_COLOR[affected_region]
+    _draw_ribbon(ax, x, lo_base, hi_base, color, alpha=0.15, zorder=1)
+    ax.plot(x, base_y, color="black", marker="*", markersize=8, linewidth=1.0,
+            linestyle="--", alpha=0.8, zorder=15)
+
+    result = cell_range_joint(poly, axis_idx, constraints, affected_region)
+    if result is None:
+        ax.text(0.5, 0.5, "JOINTLY\nINFEASIBLE", transform=ax.transAxes, ha="center", va="center",
+                fontsize=11, fontweight="bold", style="italic", color="#b33333")
+        feasible = False
+    else:
+        lo_scn, hi_scn, method = result
+        if method == "inner":
+            _draw_ribbon(ax, x, lo_scn, hi_scn, color, alpha=0.6, zorder=2)
+        else:
+            _draw_ribbon(ax, x, lo_scn, hi_scn, color, alpha=0.4, zorder=2, linestyle="--")
+            ax.text(0.5, 0.06, "not yet certified\n(outer bound only)", transform=ax.transAxes, ha="center",
+                    va="bottom", fontsize=6, style="italic", color="#555555")
+        if affected_region in constraints:
+            year, thresh_bn = constraints[affected_region]
+            cy_idx = YEARS.index(year)
+            _draw_fixed_star(ax, x[cy_idx], hi_scn[cy_idx], color, alpha=0.9, size=10, zorder=12, marker="v")
+        feasible = True
+
+    ax.set_xticks(x)
+    ax.set_xlim(x[0] - 2, x[-1] + 2)
+    ax.grid(axis="y", alpha=0.3)
+    return feasible
+
+
+def fig_joint_east_west(poly, axis_idx, ranges) -> None:
+    """fig22: does east's and west's absolute 2050 cap (fig20/21) hold up
+    when imposed at the SAME TIME? All 4 combinations of CAPS_EAST_ABS x
+    CAPS_WEST_ABS, one row per combination, same 4 columns (effect on every
+    region) as fig20/21. Checked directly against this run: only the
+    loosest combination (east<=700 & west<=2200) is CERTIFIED feasible from
+    an actual solved point in this run's polytope; the other three
+    (700&2100, 600&2200, 600&2100) fail in the inner hull -- no VMM extreme
+    or iterate this run actually solved happens to satisfy both caps
+    simultaneously -- but all three remain feasible in the outer
+    cutting-plane approximation, so they are "not yet certified", not
+    proven impossible (see cell_range_joint's docstring for why fig20/21's
+    marginal feasibility checks don't carry over to the joint case)."""
+    combos = [(e, w) for e in CAPS_EAST_ABS for w in CAPS_WEST_ABS]
+    fig = plt.figure(figsize=(3.6 * len(REGIONS), 3.4 * len(combos)))
+    grid = fig.add_gridspec(len(combos), len(REGIONS), hspace=0.55, wspace=0.3)
+    print(f"  solving JOINT what-if LPs (east+west constrained simultaneously at {CAP_YEAR_EAST}, "
+          f"{len(combos)} combinations, inner-hull certified, outer fallback)...")
+    for i, (e_cap, w_cap) in enumerate(combos):
+        constraints = {"east": (CAP_YEAR_EAST, e_cap), "west": (CAP_YEAR_WEST, w_cap)}
+        row_feasible = None
+        for j, ar in enumerate(REGIONS):
+            ax = fig.add_subplot(grid[i, j])
+            feasible = draw_cell_joint(ax, poly, axis_idx, ranges, constraints, ar)
+            if row_feasible is None:
+                row_feasible = feasible
+            if i == 0:
+                ax.set_title(ar.capitalize(), fontsize=11, fontweight="bold")
+            if j == 0:
+                ax.set_ylabel(f"East<={e_cap:.0f}\nWest<={w_cap:.0f}\n(bn EUR)", fontsize=8.5)
+            if i == len(combos) - 1:
+                ax.set_xticklabels(YEARS, fontsize=8.5)
+            else:
+                ax.set_xticklabels([])
+            ax.tick_params(labelsize=8)
+        status = "feasible" if row_feasible else "INFEASIBLE (even in outer approximation)"
+        print(f"    east<={e_cap:.0f} & west<={w_cap:.0f}: {status}")
+
+    lo = min(a.get_ylim()[0] for a in fig.axes)
+    hi = max(a.get_ylim()[1] for a in fig.axes)
+    for a in fig.axes:
+        a.set_ylim(lo, hi)
+
+    handles = [
+        Patch(facecolor="#999999", alpha=0.15, label="baseline range"),
+        Patch(facecolor="#999999", alpha=0.6, label="induced range (certified)"),
+        Line2D([0], [0], color="black", marker="*", markersize=9, linewidth=1.0, linestyle="--",
+               label="baseline (z*)"),
+        Line2D([0], [0], marker="v", color="none", markerfacecolor="#999999", markeredgecolor="#999999",
+               markersize=10, label="region's own cap"),
+    ]
+    fig.legend(handles=handles, loc="lower center", ncol=2, fontsize=9, frameon=False,
+               bbox_to_anchor=(0.5, -0.03))
+
+    fig.suptitle(
+        f"Joint Feasibility: East & West Both Capped at {CAP_YEAR_EAST} Simultaneously\n"
+        f"(rows: east/west cap combinations from {CAPS_EAST_ABS} x {CAPS_WEST_ABS} bn EUR  |  "
+        "columns: effect on all 4 regions)",
+        fontsize=12.5, fontweight="bold", y=0.995,
+    )
+    savefig(fig, "fig22_east_west_joint_feasibility")
+
+
 def main() -> None:
     poly, axis_idx, origin, phys, base = load_data()
     ranges = compute_ranges(axis_idx, origin, phys, base)
@@ -752,6 +1270,23 @@ def main() -> None:
                            constrained_regions=["south", "west"], fig_name="fig16_regional_investment_2020factor")
     fig_whatif_2020factor(poly, axis_idx, ranges, region_2020,
                            constrained_regions=["north", "east"], fig_name="fig17_regional_investment_2020factor_north_east")
+
+    region_gdp = compute_region_gdp()
+    print("  region GDP (bn EUR, IMF nominal 2024): "
+          + ", ".join(f"{r}={v:.0f}" for r, v in region_gdp.items()))
+    # Same south+west / north+east row split as fig16/17, GDP-normalised cap
+    # instead of a 2020-investment multiple. See fig_whatif_gdp's docstring.
+    fig_whatif_gdp(poly, axis_idx, ranges, region_gdp,
+                   constrained_regions=["south", "west"], fig_name="fig18_regional_investment_gdp5pct")
+    fig_whatif_gdp(poly, axis_idx, ranges, region_gdp,
+                   constrained_regions=["north", "east"], fig_name="fig19_regional_investment_gdp5pct_north_east")
+
+    fig_region_abs_cap(poly, axis_idx, ranges, "east", CAP_YEAR_EAST, CAPS_EAST_ABS, _CAP_EAST_STYLE,
+                       fig_name="fig20_east_investment_abs2050")
+    fig_region_abs_cap(poly, axis_idx, ranges, "west", CAP_YEAR_WEST, CAPS_WEST_ABS, _CAP_WEST_STYLE,
+                       fig_name="fig21_west_investment_abs2050")
+
+    fig_joint_east_west(poly, axis_idx, ranges)
 
 
 if __name__ == "__main__":
