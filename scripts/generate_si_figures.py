@@ -52,16 +52,19 @@ SI_results/ (results, renumbered fig1-fig10):
                                           (absolute stack) + a floating Δ No flexibility bar per year
   fig13_regional_capacity_delta_map      — that same Δ No flexibility, per node, as area-scaled pie
                                           glyphs on a map of the modeled European regions
-  fig14a_heat_supply_output_full_vs_single_temp — fig9's top ("Industry heat supply" operated-output)
-                                          panel, side by side for Full flexibility vs. Single
-                                          temperature level at 2020/2030/2040/2050, with each bar's
-                                          heat-pump share of total output called out — total output is
-                                          near-identical between the two, but Full flexibility's HP
-                                          share climbs to 82% by 2050 vs. Single temperature level's 54%
-  fig14b_cost_emissions_totals_full_vs_single_temp — fig1b's (fig1b_cost_emissions_totals) template
-                                          applied to Full flexibility vs. Single temperature level:
-                                          Full flexibility's cost/emissions totals in grey, Single
-                                          temperature level's difference on top
+  fig14a_heat_supply_electrification_singletemp_vs_full — "electrified" industry heat share (heat
+                                          pump + electrode boiler, stacked) at 2030/2040/2050, as 2
+                                          grouped-bar panels — one per model option (No flexibility /
+                                          Full flexibility) — each contrasting that option's normal run
+                                          (solid) against its single-temp-band counterpart (hatched); the
+                                          combined total barely moves, but the HP/electrode-boiler split
+                                          within it shifts sharply; only singletemp-vs-not is ever
+                                          compared, never the 2 model options against each other
+  fig14b_cost_emissions_totals_singletemp_vs_full — fig1b's (fig1b_cost_emissions_totals) template
+                                          applied to 2 independent baselines side by side: No
+                                          flexibility's own totals in grey vs. its single-temp
+                                          counterpart's difference, and (separately) Full flexibility's
+                                          own totals in grey vs. its single-temp counterpart's difference
 
 SI_results/method/ (no results — methodological/context only, fig1-fig9):
   fig1_heat_demand_by_sector (was fig4a) — low-temp input heat demand by sector/band, +high-temp fuel by carrier (2023):
@@ -372,6 +375,15 @@ SCENARIOS = [
 # COMPARISON_YEARS comment above for the same re-sync.
 BASE_SCENARIO = ("Crystal_Ball_2020_16a_2a_interval_10ts", "Crystal Ball (base)")
 
+# Single-temperature-band counterpart of "No flexibility", loaded separately
+# from SCENARIOS (like BASE_SCENARIO) since it isn't one of the 6 case-study
+# scenarios in Table~SIScenarios — it exists purely so fig14a/fig14b can
+# compare singletemp vs. not for BOTH model options (No flexibility and
+# Full flexibility), not just Full flexibility as before, per user request.
+NO_FLEX_SINGLE_TEMP_SCENARIO = (
+    "Crystal_Ball_ind_heat_v9_0_no_flex_single_temp_2020_16a_2a_interval_10ts",
+    "No flexibility (single temp)")
+
 
 def load_scenarios() -> list[Run]:
     """Skips (rather than raising on) any scenario whose euler run hasn't
@@ -400,6 +412,20 @@ def load_base_scenario() -> Run | None:
         return None
     return Run(name=folder, label=label, mode="euler", results=results,
                color=SCENARIO_PALETTE[6])
+
+
+def load_no_flex_single_temp_scenario() -> Run | None:
+    """Returns None (rather than raising) if the run hasn't landed yet. Not
+    in SCENARIOS/load_scenarios() — see NO_FLEX_SINGLE_TEMP_SCENARIO."""
+    folder, label = NO_FLEX_SINGLE_TEMP_SCENARIO
+    try:
+        results = load_results(EULER_ROOT, folder)
+    except FileNotFoundError:
+        return None
+    # Color unused: fig14a/fig14b pick their own colors by hand (HP/e-boiler
+    # share vs. singletemp-or-not), never r.color.
+    return Run(name=folder, label=label, mode="euler", results=results,
+               color=SCENARIO_PALETTE[0])
 
 
 def by_label(runs: list[Run], label: str) -> Run:
@@ -914,87 +940,200 @@ def fig7_heat_supply_trajectory_for(runs: list[Run], label: str, fig_name: str) 
     savefig(fig, fig_name)
 
 
-# fig14a snapshot years: 2020 (pre-buildout) + fig9's COMPARISON_YEARS-style
-# trio (2030/2040/2050) rather than fig9's own full 2yr-step horizon — per
-# user request, a 4-point before/during/after comparison of the same
-# quantity fig9's TOP panel plots (actual operated output, not nameplate
-# capacity — the panel that shows what's actually delivering heat, since
-# fig7's own docstring already establishes nameplate capacity as a
-# retirement-lag artifact that doesn't track real utilization).
-FIG14A_YEARS = [2020, 2030, 2040, 2050]
+def _heat_supply_shares(r: Run) -> pd.DataFrame:
+    """Heat-pump share and electrode-boiler share of total industry heat
+    output (both as % of INDUSTRY_HEAT_TECHS_BOILERS_HP's total, the same
+    quantity fig9's top panel and the old fig14a's "HP: XX%" annotation
+    used), one row each, indexed by year over `r`'s full modeled horizon."""
+    df = _output_avg_gw(r, INDUSTRY_HEAT_TECHS_BOILERS_HP)
+    total = df.sum(axis=0)
+    hp_total = df.loc[[t for t in df.index if t.startswith("heat_pump")]].sum(axis=0)
+    eboiler = df.loc["electrode_boiler_industry"] if "electrode_boiler_industry" in df.index \
+        else pd.Series(0.0, index=total.index)
+    return pd.DataFrame({"Heat pump share": 100 * hp_total / total,
+                          "Electrode boiler share": 100 * eboiler / total})
 
 
-def fig14a_heat_supply_output_full_vs_single(runs: list[Run]) -> None:
-    """Companion to fig14b: fig9's top ("Industry heat supply", i.e. actual
-    operated output not nameplate capacity — see fig7_heat_supply_trajectory's
-    docstring for why output rather than capacity is the meaningful
-    quantity here) panel, side by side for "Full flexibility" and "Single
-    temperature level" at 2020/2030/2040/2050, with each bar's heat-pump
-    share of total output called out above it — per user request, to make
-    the difference in heat-pump UTILIZATION between the two scenarios
-    directly readable rather than requiring the reader to sum stack
-    segments themselves.
+# fig14a-specific: one color per TEMPERATURE BAND, not per source — unlike
+# HEAT_SUPPLY_COLOR_MAP (fig9/fig1b), which hues by source (water=blue vs.
+# waste heat=turquoise) and tints by band, fig14a merges water and waste-heat
+# into a single heat-pump color per band per user request, so the two
+# same-temp segments read as one solid block instead of two shades. Bands
+# get only a very slight tint step apart (user: "only very slightly") since
+# the point is one shared color family, not a highlighted gradient.
+_FIG14A_HP_COLOR_MAP = {
+    "heat_pump_industry_150_200_water": _ETH_BLUE,
+    "heat_pump_industry_150_200_waste_heat": _ETH_BLUE,
+    "heat_pump_industry_100_150_water": _eth_tint(_ETH_BLUE, 0.15),
+    "heat_pump_industry_100_150_waste_heat": _eth_tint(_ETH_BLUE, 0.15),
+    "heat_pump_industry_0_100_water": _eth_tint(_ETH_BLUE, 0.30),
+    "heat_pump_industry_0_100_waste_heat": _eth_tint(_ETH_BLUE, 0.30),
+    "electrode_boiler_industry": _ETH_GREEN,
+}
+# Per-tech labels for the legend below — only the "electrified" subset
+# (electrode boiler + all 6 heat-pump variants) appears here since those are
+# the only techs fig14a stacks. Water/waste-heat variants of the same band
+# share one label (they now also share a color, see _FIG14A_HP_COLOR_MAP),
+# deduplicated when the legend is built.
+_ELECTRIFIED_TECH_LABELS = {
+    "electrode_boiler_industry": "Electrode boiler",
+    "heat_pump_industry_150_200_water": r"HP 150-200$^\circ$C",
+    "heat_pump_industry_150_200_waste_heat": r"HP 150-200$^\circ$C",
+    "heat_pump_industry_100_150_water": r"HP 100-150$^\circ$C",
+    "heat_pump_industry_100_150_waste_heat": r"HP 100-150$^\circ$C",
+    "heat_pump_industry_0_100_water": r"HP 0-100$^\circ$C",
+    "heat_pump_industry_0_100_waste_heat": r"HP 0-100$^\circ$C",
+}
 
-    Both scenarios deliver essentially the SAME total output at every year
-    (~46 GW average throughout, confirmed directly — matches fig7's own
-    flat-industrial-demand finding) — collapsing the 3 industry-heat
-    temperature bands into one doesn't change how much heat is delivered,
-    only how it's delivered. What differs sharply is the heat-pump SHARE of
-    that output: Full flexibility's HP share climbs 2020's ~3% -> 53%
-    (2030) -> 75% (2040) -> 82% (2050), while Single temperature level's
-    plateaus far lower: ~3% -> 30% -> 55% -> 54% (actually DROPS slightly
-    2040->2050). The mechanism is visible directly in which HP techs each
-    scenario even has available: Full flexibility can dispatch all 6
-    temperature/source-split heat-pump variants (0-100/100-150/150-200,
-    water/waste-heat each), so cheap LOW-temperature heat pumps cover the
-    low-temperature share of demand directly. Single temperature level
-    collapses everything into ONE heat-supply pathway, so only the
-    150-200 water/waste-heat HP variants exist at all in that scenario's
-    technology set (confirmed directly: no 0-100 or 100-150 heat-pump techs
-    have ANY nonzero output in this run, any year) — every unit of demand
-    that in Full flexibility would have been served by a cheaper low-temp
-    heat pump instead has to be served by boilers (electrode/gas) or the
-    one remaining high-temp heat pump running at a less favorable COP, so
-    the optimizer leans more heavily on boilers to fill the gap instead of
-    building out heat-pump capacity as aggressively.
-    -> SI_results/fig14a_heat_supply_output_full_vs_single_temp.svg
+
+def _electrification_stack(r: Run) -> pd.DataFrame:
+    """Per-TECH share of total industry heat output for the "electrified"
+    subset (electrode boiler + every heat-pump temperature/source variant —
+    the same techs, colors and stack order fig9's top panel uses via
+    HEAT_SUPPLY_COLOR_MAP/HEAT_SUPPLY_STACK_ORDER), rather than
+    _heat_supply_shares' 2 pre-aggregated categories — per user request, so
+    fig14a's heat-pump segment shows each variant's own correct color
+    instead of one flat blue. Indexed by year, columns in stack order
+    (bottom to top)."""
+    df = _output_avg_gw(r, INDUSTRY_HEAT_TECHS_BOILERS_HP)
+    total = df.sum(axis=0)
+    electrified = [t for t in df.index if t == "electrode_boiler_industry" or t.startswith("heat_pump")]
+    shares = 100 * df.loc[electrified].div(total, axis=1)
+    ordered = [t for t in HEAT_SUPPLY_STACK_ORDER if t in shares.index]
+    return shares.loc[ordered].T
+
+
+def fig14a_heat_supply_electrification_singletemp_vs_full(no_flex_run: Run, no_flex_single_run: Run,
+                                                           full_run: Run, single_run: Run) -> None:
+    """Companion to fig14b. Plots the "electrified" share of total industry
+    heat output — electrode boiler + every heat-pump variant, the
+    technologies that draw on electricity rather than a fossil/biomass fuel
+    — as a stacked bar, broken down by INDIVIDUAL tech (see
+    _electrification_stack) but colored via _FIG14A_HP_COLOR_MAP: one color
+    per heat-pump TEMPERATURE BAND (not per source), with water and
+    waste-heat variants of the same band sharing that color so they read as
+    one solid block, and only a very slight tint step between bands (per
+    user request — this replaced an earlier version with 6 distinct
+    per-source-and-band colors), at COMPARISON_YEARS' 3 snapshot years
+    (2030/2040/2050) instead of the full 2020-2050 horizon, PLUS the
+    non-electrified remainder (coal/oil/biomass/natural-gas/waste boilers,
+    not broken out individually) stacked on top in grey ("Other heat
+    carriers") so every bar reaches a full 100% rather than stopping at the
+    electrified share with implicit blank space above — the boundary with
+    that grey segment itself reads as the electrified total, without a
+    numeric "XX%" label there, and no per-segment value labels either (both
+    removed per user request). Instead, each bar gets its TOTAL heat-pump
+    share (sum of the 3 temperature-band segments, excluding the electrode
+    boiler and the grey remainder) labeled above it — per user request,
+    replacing the old per-segment labels with the one number that actually
+    matters for the comparison (an earlier version also showed the
+    full-resolution-minus-single-temp delta above each year's pair; removed
+    per user request to keep just the per-bar totals). Two
+    panels, one per model option (No flexibility / Full flexibility); within each,
+    every year has 2 adjacent bars — solid for that option's normal
+    (multi-temp-band) run, thinly hatched ("/", hatch.linewidth 0.5 —
+    lighter than fig3b_heat_pathway's own "//" so the texture cue doesn't
+    compete visually with the tech-color fills; kept separate from
+    HEAT_SUPPLY_HATCH_MAP's own per-tech hatch, which would otherwise
+    collide with it) for its single-temp counterpart — so, per user
+    instruction, the only comparison drawn is singletemp vs. not, never "No
+    flexibility" against "Full flexibility" directly.
+
+    The electrified total (readable as where the grey "Others" segment
+    begins) is the headline finding: it is only mildly depressed by
+    collapsing to a single temperature band
+    (e.g. Full flexibility 2050: 99.3% -> 97.9%, barely 1.4pp) — total
+    electrification of industry heat supply happens almost regardless of
+    temperature-band resolution. What resolution actually controls is the
+    MIX within that total: singletemp runs only ever have the 150-200 water/
+    waste-heat variants (confirmed directly — see _electrification_stack's
+    docstring), so their heat-pump color band collapses to 2 dark segments
+    instead of 6 tinted ones, and electrode boiler (green) grows to fill the
+    gap — see the previous line-chart version's docstring (git history) for
+    the full 2020/2030/2040/2050 trajectory and mechanism.
+    -> SI_results/fig14a_heat_supply_electrification_singletemp_vs_full.svg
     """
-    full_run = by_label(runs, "Full flexibility")
-    single_run = by_label(runs, "Single temperature level")
+    groups = [("No flexibility", no_flex_run, no_flex_single_run),
+              ("Full flexibility", full_run, single_run)]
+    # Thin ("/" not "//", hatch.linewidth 0.5 not matplotlib's default 1.0)
+    # per user request — the singletemp/full-res distinction should read as
+    # a light texture cue, not compete visually with the tech-color fills.
+    variants = [("Full resolution", -0.19, ""), ("Single temp", 0.19, "/")]
+    OTHERS_LABEL = "Other heat carriers (fossil/biomass boilers)"
 
-    def _snapshot_output(r: Run) -> pd.DataFrame:
-        df = _output_avg_gw(r, INDUSTRY_HEAT_TECHS_BOILERS_HP)
-        df = df.reindex(
-            [t for t in HEAT_SUPPLY_STACK_ORDER if t in df.index]
-            + [t for t in df.index if t not in HEAT_SUPPLY_STACK_ORDER])
-        return df[[y for y in FIG14A_YEARS if y in df.columns]]
+    # Sized to leave headroom above the 0-100% bars for the per-bar HP-total
+    # label added below; y-ticks pinned to 0-100 (see ax.set_yticks below) so
+    # that headroom carries no gridlines of its own and reads as label space.
+    HP_LABEL_Y, YLIM_TOP = 103, 114
+    LABEL_FONTSIZE = 11  # large enough per user request (was 6.5 for the old inline segment labels)
 
-    dfs = {full_run.label: _snapshot_output(full_run), single_run.label: _snapshot_output(single_run)}
-
-    fig, axes = plt.subplots(1, 2, figsize=(2.0 * len(FIG14A_YEARS) + 2, 6.5))
+    fig, axes = plt.subplots(1, 2, figsize=(11, 6), sharey=True)
+    x = np.arange(len(COMPARISON_YEARS))
+    techs_present: list[str] = []
     with plt.rc_context({"hatch.linewidth": 0.5}):
-        for ax, (label, df) in zip(axes, dfs.items()):
-            plot_stacked_bars(df, label, "GW supplied", ax, show_segment_labels=False,
-                              show_legend=(label == single_run.label),
-                              color_map=HEAT_SUPPLY_COLOR_MAP, hatch_map=HEAT_SUPPLY_HATCH_MAP)
-    # Extra headroom (vs. _apply_shared_ylim's usual 0.08 default) so the
-    # "HP: XX%" annotation, itself placed above plot_stacked_bars' own bar-
-    # total label, has room without the two overlapping.
-    _apply_shared_ylim(list(axes), list(dfs.values()), headroom=0.22)
-    for ax, df in zip(axes, dfs.values()):
-        hp_total = df.loc[[t for t in df.index if t.startswith("heat_pump")]].sum()
-        total = df.sum()
-        for xi, year in enumerate(df.columns):
-            pct = 100 * hp_total[year] / total[year] if total[year] else 0.0
-            ax.annotate(f"HP: {pct:.0f}%", xy=(xi, total[year]), xytext=(0, 15),
-                        textcoords="offset points", ha="center", va="bottom",
-                        fontsize=8.5, fontweight="bold", color=_ETH_BLUE)
-        plt.setp(ax.get_xticklabels(), rotation=0)
-    fig.suptitle("Industry Heat Supply Output and Heat-Pump Utilization: "
-                 "Full Flexibility vs. Single Temperature Level",
-                 fontsize=13, fontweight="bold")
-    fig.tight_layout(rect=[0, 0, 1, 0.93])
-    savefig(fig, "fig14a_heat_supply_output_full_vs_single_temp")
+        for ax, (title, base, single) in zip(axes, groups):
+            dfs = {"Full resolution": _electrification_stack(base).loc[COMPARISON_YEARS],
+                   "Single temp": _electrification_stack(single).loc[COMPARISON_YEARS]}
+            for variant, dx, hatch in variants:
+                df = dfs[variant].copy()
+                techs_present += [t for t in df.columns if t not in techs_present]
+                hp_cols = [c for c in df.columns if c.startswith("heat_pump")]
+                hp_total = df[hp_cols].sum(axis=1).to_numpy()
+                # Remainder (coal/oil/biomass/natural-gas/waste boilers, not
+                # individually broken out) stacked on top in grey, so every
+                # bar reaches a full 100% — per user request — rather than
+                # stopping at the electrified share with implicit blank space.
+                df[OTHERS_LABEL] = (100 - df.sum(axis=1)).clip(lower=0)
+                bottom = np.zeros(len(COMPARISON_YEARS))
+                for tech in df.columns:
+                    vals = df[tech].to_numpy()
+                    color = _ETH_GREY if tech == OTHERS_LABEL else _FIG14A_HP_COLOR_MAP[tech]
+                    ax.bar(x + dx, vals, width=0.36, bottom=bottom, color=color,
+                           hatch=hatch, edgecolor="white", zorder=2)
+                    bottom += vals
+                # Total heat-pump share (all 3 bands combined) above each bar
+                # — the number that actually matters, replacing the old
+                # per-segment inline labels.
+                for xi, hp_val in zip(x, hp_total):
+                    ax.text(xi + dx, HP_LABEL_Y, f"{hp_val:.0f}%", ha="center", va="bottom",
+                            fontsize=LABEL_FONTSIZE, fontweight="bold")
+            ax.set_title(title, fontsize=12, fontweight="bold")
+            ax.set_xticks(x)
+            ax.set_xticklabels(COMPARISON_YEARS)
+            ax.set_xlabel("Year")
+            ax.set_ylim(0, YLIM_TOP)
+            ax.set_yticks(range(0, 101, 20))
+            ax.grid(axis="y", alpha=0.3)
+    axes[0].set_ylabel("Share of total industry heat output [%]")
+
+    # Color legend follows HEAT_SUPPLY_STACK_ORDER (top-to-bottom, matching
+    # the visual stack) over whichever techs actually appear in any of the 4
+    # runs, with the grey "Others" remainder listed first (it sits above
+    # everything else in the stack); hatch legend is separate, 2 entries,
+    # since it encodes singletemp-or-not rather than technology. Water/
+    # waste-heat variants of the same band share a label+color (see
+    # _FIG14A_HP_COLOR_MAP), so dedupe by label to avoid two identical
+    # legend entries per band.
+    tech_order = [t for t in reversed(HEAT_SUPPLY_STACK_ORDER) if t in techs_present]
+    legend_handles = [Patch(facecolor=_ETH_GREY, label=OTHERS_LABEL)]
+    seen_labels: set[str] = set()
+    for t in tech_order:
+        label = _ELECTRIFIED_TECH_LABELS[t]
+        if label in seen_labels:
+            continue
+        seen_labels.add(label)
+        legend_handles.append(Patch(facecolor=_FIG14A_HP_COLOR_MAP[t], label=label))
+    legend_handles += [
+        Patch(facecolor="white", edgecolor="black", label="Full resolution"),
+        Patch(facecolor="white", edgecolor="black", hatch="/", label="Single temp"),
+    ]
+    # Legend pulled closer to the plots (smaller reserved rect + bbox_to_anchor
+    # nudged up from the figure's bottom edge) per user request — the previous
+    # 0.18 reservation left more empty vertical space above the legend than
+    # the legend itself needed.
+    fig.legend(handles=legend_handles, loc="lower center", ncol=3, fontsize=8, bbox_to_anchor=(0.5, 0.02))
+    fig.tight_layout(rect=[0, 0.12, 1, 1])
+    savefig(fig, "fig14a_heat_supply_electrification_singletemp_vs_full")
 
 
 # ── 5: Retrofit carbon-capture tech usage, No flexibility vs. base ─────────
@@ -2294,16 +2433,22 @@ def fig0b_emissions_source_comparison(base_run: Run, no_flex_run: Run, full_run:
     savefig(fig, "fig2_emissions_source_comparison")
 
 
-def _grey_delta_bar(ax, labels: list[str], values: dict[str, float], base_label: str,
+def _grey_delta_bar(ax, labels: list[str], values: dict[str, float], base_for: dict[str, str],
                      delta_color: dict[str, float], value_fmt: str = "{:,.0f}",
                      top: float | None = None, bottom: float | None = None,
-                     delta_fmt: str | None = None) -> None:
-    """One bar per label: the shared baseline value (base_label's own total)
-    in grey, and each other bar's difference from that baseline stacked on
-    top (or hanging below, hatched, if negative) in that run's own color —
-    so only the DELTA reads as "the interesting part" and the (usually much
-    larger, near-identical-across-scenarios) baseline stays visually
-    de-emphasized. Pairs with the y-axis truncation + break marks the caller
+                     delta_fmt: str | None = None, x: np.ndarray | None = None) -> None:
+    """One bar per label: a baseline value in grey, and each bar's
+    difference from ITS OWN baseline (`base_for[label]`, another label whose
+    value supplies the grey height — itself for a baseline bar, so its own
+    delta is 0) stacked on top (or hanging below, hatched, if negative) in
+    that run's own color — so only the DELTA reads as "the interesting
+    part" and the (usually much larger, near-identical-across-scenarios)
+    baseline stays visually de-emphasized. `base_for` mapping more than one
+    label to itself supports multiple independent baselines in one chart
+    (fig14b's 2 model-option groups, each compared only against its own
+    single-temp counterpart, never against the other group) — pass `x` with
+    gaps between such groups so they don't read as one continuous
+    comparison. Pairs with the y-axis truncation + break marks the caller
     adds, since the baseline otherwise dwarfs the delta (see fig0a's
     docstring: deltas here are a few % of the baseline total).
 
@@ -2326,9 +2471,9 @@ def _grey_delta_bar(ax, labels: list[str], values: dict[str, float], base_label:
     span = top - bottom
     delta_fmt = delta_fmt or value_fmt
 
-    base_val = values[base_label]
-    x = np.arange(len(labels))
+    x = np.arange(len(labels)) if x is None else x
     for xi, label in zip(x, labels):
+        base_val = values[base_for[label]]
         val = values[label]
         delta = val - base_val
         grey_height = min(val, base_val)
@@ -2338,7 +2483,7 @@ def _grey_delta_bar(ax, labels: list[str], values: dict[str, float], base_label:
                    edgecolor="white", zorder=2, hatch="//" if delta < 0 else None)
         ax.text(xi, val, value_fmt.format(val), ha="center",
                  va="bottom" if delta >= 0 else "top", fontsize=8.5, fontweight="bold")
-        if label != base_label:
+        if label != base_for[label]:
             sign = "+" if delta >= 0 else ""
             pct = delta / base_val * 100
             text = f"{sign}{delta_fmt.format(delta)} ({sign}{pct:.2f}%)"
@@ -2384,47 +2529,70 @@ def fig1b_cost_and_emissions_totals(base_run: Run, no_flex_run: Run, full_run: R
     `carbon_emissions_cumulative` value (at the final modeled year) that
     fig0b's Panel B plots, for consistency with that figure's numbers.
     """
+    base_for = {r.label: base_run.label for r in [base_run, no_flex_run, full_run]}
     delta_color = {base_run.label: _ETH_GREY, no_flex_run.label: _ETH_BLUE,
                    full_run.label: _ETH_PURPLE}
     # Capped at 26,000 on both panels (vs. the auto ~1.12x headroom, which
     # reached ~27,000 / ~27,500) per user request — still enough headroom
     # above the ~24,400 max bar for its value label.
-    _cost_and_emissions_totals([base_run, no_flex_run, full_run], base_run, delta_color,
+    _cost_and_emissions_totals([base_run, no_flex_run, full_run], base_for, delta_color,
                                "fig1b_cost_emissions_totals", top=26000)
 
 
-def fig14b_cost_and_emissions_totals_full_vs_single(full_run: Run, single_temp_run: Run) -> None:
-    """Exactly fig1b's template with the scenario PAIR swapped, per user
-    request: Full flexibility's own totals as the shared grey base of both
-    bars, Single temperature level drawn as its difference from them. Only
-    2 bars per panel instead of fig1b's 3.
+def fig14b_cost_and_emissions_totals_singletemp_vs_full(no_flex_run: Run, no_flex_single_run: Run,
+                                                         full_run: Run, single_temp_run: Run) -> None:
+    """Fig1b's template applied to 2 INDEPENDENT baselines side by side, per
+    user request to bring fig14a and fig14b in line with each other: "No
+    flexibility"'s own totals as the grey base of its own pair (vs. "No
+    flexibility (single temp)"), and separately "Full flexibility"'s own
+    totals as the grey base of ITS pair (vs. "Single temperature level") —
+    a visible gap between the two pairs (via `x`) keeps them from reading as
+    one continuous 4-bar comparison, since (per user instruction) the figure
+    should only ever compare singletemp vs. not within a model option, never
+    "No flexibility" against "Full flexibility" directly (fig1a/fig1b already
+    cover that comparison).
 
-    These two runs differ far less than fig1b's do (+83 bn EUR = +0.34% on
-    cost; emissions IDENTICAL to the last digit, both runs spending exactly
-    the same binding cumulative carbon budget — the temperature-band
-    resolution changes HOW the budget is met, not how much of it is used),
-    so the y-limits are pinned tight around the bars (24,300-24,650)
-    instead of fig1b's automatic 0.9x truncation, which at this delta size
-    would leave the cost delta a 1-pixel sliver. `delta_fmt` keeps 1 decimal
-    on the delta labels for the same reason.
-    -> SI_results/fig14b_cost_emissions_totals_full_vs_single_temp.svg
+    All 4 runs share the exact same binding carbon budget (cumulative
+    emissions identical to the last digit across all 4 — confirmed
+    directly), so the temperature-band resolution changes HOW the budget is
+    met, not how much of it is used, in BOTH model options. Cost deltas are
+    similarly small in both pairs (No flexibility: +90.6 bn EUR = +0.37%;
+    Full flexibility: +82.9 bn EUR = +0.34%), so the y-limits are pinned
+    tight around all 4 bars (24,300-24,650) instead of the automatic 0.9x
+    truncation, which at this delta size would leave the cost deltas a
+    1-pixel sliver. `delta_fmt` keeps 1 decimal on the delta labels for the
+    same reason. Emissions panel dropped per user request — all 4 runs share
+    the identical binding carbon budget noted above, so that panel showed 4
+    visually-identical bars with no information; only Total System Cost is
+    plotted now, single-panel.
+    -> SI_results/fig14b_cost_emissions_totals_singletemp_vs_full.svg
     """
-    delta_color = {full_run.label: _ETH_GREY, single_temp_run.label: _ETH_PURPLE}
-    _cost_and_emissions_totals([full_run, single_temp_run], full_run, delta_color,
-                               "fig14b_cost_emissions_totals_full_vs_single_temp",
-                               bottom=24300, top=24650, delta_fmt="{:,.1f}")
+    base_for = {no_flex_run.label: no_flex_run.label, no_flex_single_run.label: no_flex_run.label,
+                full_run.label: full_run.label, single_temp_run.label: full_run.label}
+    delta_color = {no_flex_run.label: _ETH_GREY, no_flex_single_run.label: _ETH_BLUE,
+                   full_run.label: _ETH_GREY, single_temp_run.label: _ETH_PURPLE}
+    # Extra gap (0.6 instead of the usual 1.0 spacing) between the 2 pairs so
+    # they read as visually distinct groups, not one continuous 4-bar comparison.
+    x = np.array([0, 1, 2.6, 3.6])
+    _cost_and_emissions_totals([no_flex_run, no_flex_single_run, full_run, single_temp_run], base_for,
+                               delta_color, "fig14b_cost_emissions_totals_singletemp_vs_full",
+                               bottom=24300, top=24650, delta_fmt="{:,.1f}", x=x, figsize=(7.5, 4.6),
+                               cost_only=True)
 
 
-def _cost_and_emissions_totals(runs: list[Run], base_run: Run, delta_color: dict[str, str],
+def _cost_and_emissions_totals(runs: list[Run], base_for: dict[str, str], delta_color: dict[str, str],
                                 fig_name: str, top: float | None = None,
                                 bottom: float | None = None,
-                                delta_fmt: str | None = None) -> None:
-    """Shared body of fig1b/fig14b — `base_run` supplies the grey shared
-    baseline every bar is drawn on top of, `runs` (which must include it)
-    the bars themselves, in order. `top`/`bottom`/`delta_fmt` pass straight
-    through to _grey_delta_bar (same limits on both panels)."""
-    base_label = base_run.label
-
+                                delta_fmt: str | None = None, x: np.ndarray | None = None,
+                                figsize: tuple[float, float] = (11, 4.6),
+                                cost_only: bool = False) -> None:
+    """Shared body of fig1b/fig14b — `base_for` maps each run's label to the
+    label supplying ITS grey baseline (see _grey_delta_bar), `runs` the bars
+    themselves, in order. `top`/`bottom`/`delta_fmt`/`x` pass straight
+    through to _grey_delta_bar (same limits/positions on both panels).
+    `cost_only=True` (fig14b, per user request) drops the emissions panel
+    entirely and renders a single-axes figure instead of the 2-panel
+    cost+emissions layout fig1b still uses."""
     # bn EUR (billion EUR) rather than MEUR per user request — MEUR values
     # here run ~2.3e7 (i.e. ~23 trillion EUR); dividing by 1000 gives a
     # legible ~23,000 bn EUR without scientific-notation axis ticks.
@@ -2433,27 +2601,31 @@ def _cost_and_emissions_totals(runs: list[Run], base_run: Run, delta_color: dict
         years = get_available_years(r.results)
         cost[r.label] = float(get_annual_total_cost(r.results, years, discount=True).sum()) / 1000
 
-    def _series(r, name):
-        s = r.get_total(name)
-        return {int(k): float(v) for k, v in s.items()}
-
-    emissions = {}
-    for r in runs:
-        cum = _series(r.results, "carbon_emissions_cumulative")
-        emissions[r.label] = cum[max(cum)]
-
     labels = [r.label for r in runs]
 
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(11, 4.6))
-    _grey_delta_bar(ax1, labels, cost, base_label, delta_color, value_fmt="{:,.0f}",
-                    top=top, bottom=bottom, delta_fmt=delta_fmt)
+    if cost_only:
+        fig, ax1 = plt.subplots(1, 1, figsize=figsize)
+    else:
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=figsize)
+    _grey_delta_bar(ax1, labels, cost, base_for, delta_color, value_fmt="{:,.0f}",
+                    top=top, bottom=bottom, delta_fmt=delta_fmt, x=x)
     ax1.set_ylabel("Discounted total system cost [bn EUR]")
     ax1.set_title("Total System Cost", fontsize=12, fontweight="bold")
 
-    _grey_delta_bar(ax2, labels, emissions, base_label, delta_color, value_fmt="{:,.0f}",
-                    top=top, bottom=bottom, delta_fmt=delta_fmt)
-    ax2.set_ylabel("Cumulative carbon emissions [Mton CO$_2$eq]")
-    ax2.set_title("Total Cumulative Emissions", fontsize=12, fontweight="bold")
+    if not cost_only:
+        def _series(r, name):
+            s = r.get_total(name)
+            return {int(k): float(v) for k, v in s.items()}
+
+        emissions = {}
+        for r in runs:
+            cum = _series(r.results, "carbon_emissions_cumulative")
+            emissions[r.label] = cum[max(cum)]
+
+        _grey_delta_bar(ax2, labels, emissions, base_for, delta_color, value_fmt="{:,.0f}",
+                        top=top, bottom=bottom, delta_fmt=delta_fmt, x=x)
+        ax2.set_ylabel("Cumulative carbon emissions [Mton CO$_2$eq]")
+        ax2.set_title("Total Cumulative Emissions", fontsize=12, fontweight="bold")
 
     fig.tight_layout()
     savefig(fig, fig_name)
@@ -4374,6 +4546,9 @@ def main() -> None:
     print(f"Loading base scenario ({BASE_SCENARIO[1]})...")
     base_run = load_base_scenario()
 
+    print(f"Loading {NO_FLEX_SINGLE_TEMP_SCENARIO[1]!r} scenario...")
+    no_flex_single_run = load_no_flex_single_temp_scenario()
+
     print("Generating figures...")
     if base_run is not None:
         components_with_base = compute_cost_components([base_run] + runs)
@@ -4404,15 +4579,21 @@ def main() -> None:
     fig2_dsm_cycles_by_product(runs)
     if any(r.label == "Single temperature level" for r in runs):
         fig3b_heat_pathway(runs)
-        # fig14a/fig14b: Full flexibility vs. Single temperature level — no
-        # base run needed (both are v9_0 runs).
-        if any(r.label == "Full flexibility" for r in runs):
+        # fig14a/fig14b: No flexibility vs. its single-temp counterpart AND
+        # Full flexibility vs. its single-temp counterpart — no base run
+        # needed (all 4 are v9_0 runs).
+        if (no_flex_single_run is not None and any(r.label == "No flexibility" for r in runs)
+                and any(r.label == "Full flexibility" for r in runs)):
+            no_flex_run = by_label(runs, "No flexibility")
             full_flex_run = by_label(runs, "Full flexibility")
             single_temp_run = by_label(runs, "Single temperature level")
-            fig14a_heat_supply_output_full_vs_single(runs)
-            fig14b_cost_and_emissions_totals_full_vs_single(full_flex_run, single_temp_run)
+            fig14a_heat_supply_electrification_singletemp_vs_full(no_flex_run, no_flex_single_run,
+                                                                   full_flex_run, single_temp_run)
+            fig14b_cost_and_emissions_totals_singletemp_vs_full(no_flex_run, no_flex_single_run,
+                                                                full_flex_run, single_temp_run)
         else:
-            print("  skipping fig14a/fig14b: 'Full flexibility' scenario not loaded")
+            print(f"  skipping fig14a/fig14b: requires 'No flexibility', 'Full flexibility', and "
+                  f"{NO_FLEX_SINGLE_TEMP_SCENARIO[1]!r} all loaded")
     else:
         print("  skipping fig3b_heat_pathway/fig14a/fig14b: "
               "'Single temperature level' scenario not loaded")
