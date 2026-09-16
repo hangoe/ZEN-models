@@ -36,6 +36,12 @@ SI_results/ (results, renumbered fig1-fig10):
   fig8_diffusion_mechanisms (was fig6) — ZEN-garden technology-diffusion/learning mechanisms compared
   fig9_heat_supply_trajectory_no_flexibility (was fig7) — No flexibility heat-supply capacity, every modeled year 2020-2050
   fig9b_heat_supply_trajectory_full_flexibility — same layout as fig9, for the Full flexibility scenario
+  fig15a_heat_supply_output_no_flexibility_twh (new, fig9c) — standalone copy of fig9's top
+                                          ("Industry heat supply") panel only, in TWh instead of GW —
+                                          per user request, for use on its own without the capacity-
+                                          stock/additions panels below it
+  fig15b_heat_supply_output_full_flexibility_twh (new, fig9c) — same as fig15a, for the Full
+                                          flexibility scenario (was the sole fig15 before fig15a was added)
   fig10_power_and_storage_impact — power generation capacity (top) & storage annual energy discharged
                                           (bottom), each a single plot with Crystal Ball base / No flexibility /
                                           Full flexibility as 3 adjacent bars per year, 3 snapshot years
@@ -936,6 +942,42 @@ def fig7_heat_supply_trajectory_for(runs: list[Run], label: str, fig_name: str) 
                           color_map=HEAT_SUPPLY_COLOR_MAP, hatch_map=HEAT_SUPPLY_HATCH_MAP)
     for ax in axes:
         plt.setp(ax.get_xticklabels(), rotation=0)
+    fig.tight_layout()
+    savefig(fig, fig_name)
+
+
+def _output_annual_twh(r: Run, techs: list[str]) -> pd.DataFrame:
+    """Same quantity as _output_avg_gw (actual OPERATED output), expressed as
+    total annual energy in TWh (avg GW * HOURS_PER_YEAR / 1000) instead of an
+    averaged-power rate — used by fig9c's standalone panel, per user request
+    to move fig9b's top panel from GW to the more intuitive annual-energy
+    TWh unit."""
+    return _output_avg_gw(r, techs) * HOURS_PER_YEAR / 1000
+
+
+def fig9c_heat_supply_output_twh_for(runs: list[Run], label: str, fig_name: str) -> None:
+    """Standalone version of fig9/fig9b's top ("Industry heat supply") panel
+    only — per user request, extracted out of the 3-panel fig9/fig9b figure
+    (which also has capacity-stock and capacity-addition panels below it)
+    into its own single-panel figure, with the unit changed from average GW
+    to annual TWh (see _output_annual_twh). Parameterized over `label`/
+    `fig_name` (fig9_heat_supply_trajectory_for's pattern) so the same panel
+    can be produced for both "No flexibility" (fig15a) and "Full
+    flexibility" (fig15b)."""
+    r = by_label(runs, label)
+    years = get_available_years(r.results)
+    output_df = _output_annual_twh(r, INDUSTRY_HEAT_TECHS_BOILERS_HP)
+    output_df = output_df.reindex(
+        [t for t in HEAT_SUPPLY_STACK_ORDER if t in output_df.index]
+        + [t for t in output_df.index if t not in HEAT_SUPPLY_STACK_ORDER])
+    output_df = output_df[[y for y in years if y in output_df.columns]]
+
+    fig, ax = plt.subplots(1, 1, figsize=(0.8 * len(output_df.columns) + 3, 6))
+    with plt.rc_context({"hatch.linewidth": 0.5}):
+        plot_stacked_bars(output_df, f"Industry heat supply (TWh) - {label}",
+                          "TWh supplied", ax, show_segment_labels=False, show_legend=True,
+                          color_map=HEAT_SUPPLY_COLOR_MAP, hatch_map=HEAT_SUPPLY_HATCH_MAP)
+    plt.setp(ax.get_xticklabels(), rotation=0)
     fig.tight_layout()
     savefig(fig, fig_name)
 
@@ -4602,13 +4644,19 @@ def main() -> None:
     if any(r.label == "No flexibility" for r in runs):
         fig6_diffusion_mechanisms(runs)
         fig7_heat_supply_trajectory(runs)
+        fig9c_heat_supply_output_twh_for(runs, "No flexibility",
+                                          "fig15a_heat_supply_output_no_flexibility_twh")
     else:
-        print("  skipping fig6_diffusion_mechanisms/fig7_heat_supply_trajectory: 'No flexibility' scenario not loaded")
+        print("  skipping fig6_diffusion_mechanisms/fig7_heat_supply_trajectory/fig15a_heat_supply_output_no_flexibility_twh: "
+              "'No flexibility' scenario not loaded")
     if any(r.label == "Full flexibility" for r in runs):
         fig7_heat_supply_trajectory_for(runs, "Full flexibility",
                                          "fig9b_heat_supply_trajectory_full_flexibility")
+        fig9c_heat_supply_output_twh_for(runs, "Full flexibility",
+                                          "fig15b_heat_supply_output_full_flexibility_twh")
     else:
-        print("  skipping fig9b_heat_supply_trajectory_full_flexibility: 'Full flexibility' scenario not loaded")
+        print("  skipping fig9b_heat_supply_trajectory_full_flexibility/fig15b_heat_supply_output_full_flexibility_twh: "
+              "'Full flexibility' scenario not loaded")
     fig8_industry_sector_emissions_context()
     fig9_model_scope_coverage()
     fig15_global_ghg_sector_breakdown()
