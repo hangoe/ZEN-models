@@ -8,3 +8,7 @@ task_id,my_dataset,my_comment,conduct_time_series_aggregation,aggregated_time_st
 6,Crystal_Ball_ind_heat_v9_0_nodiffusion,2020_16a_2a_interval_10ts,True,10,2020,16,2,False
 7,Crystal_Ball,2020_16a_2a_interval_10ts,True,10,2020,16,2,False
 8,Crystal_Ball_ind_heat_v9_0_no_flex_single_temp,2020_16a_2a_interval_10ts,True,10,2020,16,2,False
+10,Crystal_Ball_ind_heat_v9_0_no_flexibility_nodiffusion,2020_16a_2a_interval_1ts,True,1,2020,16,2,False
+11,Crystal_Ball_ind_heat_v9_0_no_flexibility_nodiffusion,2020_16a_2a_interval_3ts,True,3,2020,16,2,False
+12,Crystal_Ball_ind_heat_v9_0_no_flexibility_nodiffusion,2020_16a_2a_interval_10ts,True,10,2020,16,2,False
+13,Crystal_Ball_ind_heat_v9_0_no_flexibility_nodiffusion,2020_16a_2a_interval_20ts,True,20,2020,16,2,False

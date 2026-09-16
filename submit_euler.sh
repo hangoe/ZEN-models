@@ -9,6 +9,7 @@
 #   sbatch --array=0        submit_euler.sh     # calibrate: run ONE row first
 #   sbatch --array=1-7      submit_euler.sh     # then the rest
 #   sbatch --array=0-7      submit_euler.sh     # or all rows at once
+#   sbatch --array=10-13    submit_euler.sh     # no_flexibility_nodiffusion ts sweep (1/3/10/20 ts)
 #
 # The --array range must match the task_id values in parameters.csv.
 ###############################################################################
