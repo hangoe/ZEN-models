@@ -37,7 +37,8 @@
         "max_function_evaluations": 2000,
         "n_restarts": 1,
         "batch_size": 4,
-        "n_workers": 4
+        "n_workers": 4,
+        "track_implied_threshold": true
       }
     }
   }

@@ -32,7 +32,8 @@
         "n_samples": 2000,
         "alpha": 0.05,
         "method": "jeffreys",
-        "use_bounding_box": false
+        "use_bounding_box": false,
+        "track_implied_threshold": true
       }
     }
   }

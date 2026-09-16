@@ -35,7 +35,8 @@
         "use_bounding_box": false,
         "strategy_mode": "sampling",
         "batch_size": 4,
-        "n_workers": 4
+        "n_workers": 4,
+        "track_implied_threshold": true
       }
     }
   }
