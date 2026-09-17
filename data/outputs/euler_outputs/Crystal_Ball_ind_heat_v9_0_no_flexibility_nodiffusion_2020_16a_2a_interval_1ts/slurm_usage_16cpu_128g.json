@@ -3,6 +3,8 @@
   "task_id": 10,
   "elapsed": "00:02:40",
   "elapsed_seconds": 160,
+  "total_cpu": "00:03:05",
+  "total_cpu_seconds": 185,
   "max_rss_kb": 8541872,
   "alloc_cpus": 16,
   "req_mem": "128G",

@@ -33,11 +33,27 @@
 # "relative"/"units" normalisation and batch sampling (strategy_mode=
 # "sampling") aren't swept here either -- add a row for any of those too.
 #
+# 3 more rows added 2026-09-17, all config-identical to task_id 0
+# (1ts/7a/5a) except as noted -- fig3a/3b comparison runs, see
+# scripts/plot_mga_ts_resolution.py's TS_RUNS/TS_COLOR:
+#   task_id 4 = seed_rng=42 (task_id 0 itself has no seed_rng set --
+#               batch_oracle's BBO restarts/direction fallbacks then seed
+#               nondeterministically from OS entropy, see run_model.py's
+#               module docstring -- so this is a same-config, explicit-seed
+#               run to compare against task_id 0's unpinned draw, not a
+#               "different seed from task_id 0's seed" since task_id 0
+#               never had one). Same batch4/40cpu/4G profile as task_id 0.
+#   task_id 5 = batch_size=n_workers=16 (vs. 4), solver_threads=2 (vs. the
+#               config's default 10) -- needs its own #SBATCH profile, see
+#               below.
+#   task_id 6 = batch_size=n_workers=32, solver_threads=2 -- same reasoning
+#               as task_id 5, needs its own #SBATCH profile too.
+#
 # Requires the MGA install step in setup_euler_env.sh to have been run once
 # (clones + installs ZEN-garden-plugins and near_optimal_tools/pyoNearOpt,
 # incl. the "bbo" extra needed by batch bbo mode).
 #
-# Resource profile. All 4 rows use batch_size=n_workers=4, so cpus-per-task
+# Resource profile. task_id 0-4 use batch_size=n_workers=4, so cpus-per-task
 # is sized as 4 workers x 10 threads/worker = 40, since each worker's solver
 # requests Threads=10 -- the worker pool needs dedicated cores per worker
 # instead of dividing a flat core count. mem-per-cpu=4G (160G total): task_id
@@ -48,10 +64,23 @@
 # at this cpu/mem profile (job 12374944 retry); 14d is the standard padding
 # used for every row since, so this is the #SBATCH default below -- no need
 # to pass --time/--cpus-per-task/--mem-per-cpu on the command line, just:
-#   sbatch --array=0-3 submit_euler_mga.sh    # all 4 rows, batch4/share/tol002
-# Override on the command line (CLI flags win over #SBATCH) only if a
-# specific row needs something other than the 14d/40cpu/4G standard --
-# normal.120h partition allows up to 15d if more padding is ever needed.
+#   sbatch --array=0-4 submit_euler_mga.sh    # task_id 0-4, batch4/share/tol002
+#
+# task_id 5/6 use a bigger batch_size (16/32) than the config's default
+# Threads=10 was tuned for; rather than scale cpus-per-task to
+# batch_size x 10 (160/320 cores -- likely bigger than a single Euler node,
+# and the exact profile that thread-thrashed/OOM'd the retired batch8/batch16
+# rows once flat BLAS/numexpr thread pools oversubscribed it, see this
+# script's OPENBLAS_NUM_THREADS etc. exports below), each row's own
+# solver_threads column pins Gurobi's per-worker Threads down to 2, so
+# cpus-per-task only needs batch_size x 2 cores -- pass that as an explicit
+# CLI override (CLI flags win over the #SBATCH defaults above), since these
+# 2 rows don't fit the 40cpu/4G standard profile:
+#   sbatch --array=5 --cpus-per-task=32 --mem-per-cpu=6G submit_euler_mga.sh   # task_id 5: batch16, 32cpu/192GB
+#   sbatch --array=6 --cpus-per-task=64 --mem-per-cpu=6G submit_euler_mga.sh   # task_id 6: batch32, 64cpu/384GB
+# Neither has a prior completed run at this profile (unlike the 14d/40cpu/4G
+# standard, backed by job 12374944_17's own 8d completion) -- watch their
+# first attempts and adjust --time/--mem-per-cpu if they OOM or run long.
 ###############################################################################
 
 #SBATCH --job-name=zen_run_mga

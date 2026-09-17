@@ -20,12 +20,26 @@ CHANGES:
     copy of the chosen config -- the shared data/*.json config is never
     touched, so one config_mga_bbo.json / config_mga_sampling.json covers
     all normalisation modes instead of needing a config file per mode.
-  * Rows may also set `batch_size` / `n_workers` / `tolerance_explore`
-    columns that overwrite the matching keys under plugins.mga.batch (batch
-    mode only) in the same private staged copy, the same way `normalisation`
-    does -- e.g. a row using normalisation="share" can set its own
-    tolerance_explore without changing the shared config file's value for
-    the other (minmax) rows that also point at it.
+  * Rows may also set `batch_size` / `n_workers` / `tolerance_explore` /
+    `seed_rng` columns that overwrite the matching keys under
+    plugins.mga.batch (batch mode only) in the same private staged copy, the
+    same way `normalisation` does -- e.g. a row using normalisation="share"
+    can set its own tolerance_explore without changing the shared config
+    file's value for the other (minmax) rows that also point at it.
+    `seed_rng` pins pyoNearOpt's batch_oracle RNG (BBO restarts + direction
+    fallbacks); left unset, batch_oracle seeds nondeterministically from OS
+    entropy (see shared_direction_oracle._get_rng), so two rows with
+    otherwise-identical config still explore different directions and are
+    NOT reproducible against each other unless both set seed_rng explicitly.
+  * Rows may also set a `solver_threads` column that overwrites
+    solver.solver_options.Threads in the same private staged copy. Batch
+    mode forks batch_size worker processes that each run their own Gurobi
+    solve concurrently, so cpus-per-task (see submit_euler_mga.sh) needs to
+    be sized as batch_size x Threads-per-worker -- a row using a larger
+    batch_size than the shared config's default Threads was tuned for
+    should set solver_threads to whatever per-worker core count its own
+    #SBATCH profile actually allocates, or Gurobi will oversubscribe the
+    node (see submit_euler_mga.sh's batch8/batch16 postmortem).
   * The `axes` block for every MGA mode except `weights` is no longer
     duplicated per config file -- it's merged in from data/config_mga_axes_capex.json
     (the default) into the private staged copy, so all five
@@ -70,7 +84,8 @@ DATASET_SEARCH_DIRS = [
 # Everything else in a row is applied as a system_overrides key.
 META_COLUMNS = {
     "my_dataset", "my_comment", "config", "normalisation", "batch_size",
-    "n_workers", "axes_config", "tolerance_explore",
+    "n_workers", "axes_config", "tolerance_explore", "seed_rng",
+    "solver_threads",
 }
 
 # Fallback system.json overrides, used for any of these keys a CSV row
@@ -136,23 +151,27 @@ def apply_normalisation_override(config_json: dict, config_name: str, normalisat
     mga_cfg["normalisation"] = normalisation
 
 
-def apply_batch_overrides(config_json: dict, config_name: str, batch_size, n_workers, tolerance_explore) -> None:
-    """Overwrite plugins.mga.batch.{batch_size,n_workers,tolerance_explore} in-place with the CSV row's values.
+def apply_batch_overrides(config_json: dict, config_name: str, batch_size, n_workers, tolerance_explore, seed_rng) -> None:
+    """Overwrite plugins.mga.batch.{batch_size,n_workers,tolerance_explore,seed_rng} in-place with the CSV row's values.
 
     Same private-staged-copy pattern as apply_normalisation_override(): lets
     one config_mga_batch_*.json be swept over different batch_size/n_workers/
-    tolerance_explore values from parameters.csv without touching the shared
-    data/*.json file. tolerance_explore is normalisation-dependent (see the
-    MGA plugin's docs): under "share" it trades off how much exploration
-    effort larger vs. smaller axes/regions get, so a row may need its own
-    value distinct from other rows sharing the same config file.
+    tolerance_explore/seed_rng values from parameters.csv without touching
+    the shared data/*.json file. tolerance_explore is normalisation-dependent
+    (see the MGA plugin's docs): under "share" it trades off how much
+    exploration effort larger vs. smaller axes/regions get, so a row may
+    need its own value distinct from other rows sharing the same config
+    file. seed_rng left unset keeps batch_oracle's default nondeterministic
+    seeding (see module docstring) -- set it to pin a row to a specific,
+    reproducible draw, e.g. for an explicit random-seed comparison against
+    an unpinned row using the same config otherwise.
     """
-    if batch_size is None and n_workers is None and tolerance_explore is None:
+    if batch_size is None and n_workers is None and tolerance_explore is None and seed_rng is None:
         return
     batch_cfg = config_json.get("plugins", {}).get("mga", {}).get("batch")
     if batch_cfg is None:
         raise SystemExit(
-            f"[run_model] row sets batch_size/n_workers/tolerance_explore but "
+            f"[run_model] row sets batch_size/n_workers/tolerance_explore/seed_rng but "
             f"{config_name} has no plugins.mga.batch block to apply them to."
         )
     if batch_size is not None:
@@ -161,6 +180,27 @@ def apply_batch_overrides(config_json: dict, config_name: str, batch_size, n_wor
         batch_cfg["n_workers"] = n_workers
     if tolerance_explore is not None:
         batch_cfg["tolerance_explore"] = tolerance_explore
+    if seed_rng is not None:
+        batch_cfg["seed_rng"] = seed_rng
+
+
+def apply_solver_threads_override(config_json: dict, config_name: str, solver_threads) -> None:
+    """Overwrite solver.solver_options.Threads in-place with the CSV row's value.
+
+    Same private-staged-copy pattern as the other overrides. Batch mode's
+    per-worker Gurobi solves each request this many threads, so
+    submit_euler_mga.sh's cpus-per-task needs batch_size x solver_threads
+    cores to avoid oversubscribing the node (see module docstring).
+    """
+    if solver_threads is None:
+        return
+    solver_options = config_json.get("solver", {}).get("solver_options")
+    if solver_options is None:
+        raise SystemExit(
+            f"[run_model] row sets solver_threads but {config_name} has no "
+            f"solver.solver_options block to apply it to."
+        )
+    solver_options["Threads"] = solver_threads
 
 
 def validate_plugin_config(config_json: dict, config_name: str) -> None:
@@ -260,6 +300,12 @@ def main() -> None:
     tolerance_explore = None
     if "tolerance_explore" in table.columns and pd.notna(row["tolerance_explore"]) and str(row["tolerance_explore"]).strip():
         tolerance_explore = to_native(row["tolerance_explore"])
+    seed_rng = None
+    if "seed_rng" in table.columns and pd.notna(row["seed_rng"]) and str(row["seed_rng"]).strip():
+        seed_rng = to_native(row["seed_rng"])
+    solver_threads = None
+    if "solver_threads" in table.columns and pd.notna(row["solver_threads"]) and str(row["solver_threads"]).strip():
+        solver_threads = to_native(row["solver_threads"])
     system_overrides = {
         **DEFAULT_SYSTEM_OVERRIDES,
         **{col: to_native(row[col]) for col in table.columns if col not in META_COLUMNS},
@@ -267,7 +313,8 @@ def main() -> None:
 
     print(f"[run_model] task_id={args.task_id}  dataset={my_dataset}  comment={my_comment}")
     print(f"[run_model] config={config_name}  axes_config={axes_config_path.name}  normalisation={normalisation}")
-    print(f"[run_model] batch_size={batch_size}  n_workers={n_workers}  tolerance_explore={tolerance_explore}")
+    print(f"[run_model] batch_size={batch_size}  n_workers={n_workers}  tolerance_explore={tolerance_explore}  "
+          f"seed_rng={seed_rng}  solver_threads={solver_threads}")
     print(f"[run_model] system_overrides={system_overrides}")
 
     with open(DATA_DIR_CONFIG / config_name) as f:
@@ -275,7 +322,8 @@ def main() -> None:
     apply_axes_override(config_json, config_name, axes_config_path)
     if normalisation is not None:
         apply_normalisation_override(config_json, config_name, normalisation)
-    apply_batch_overrides(config_json, config_name, batch_size, n_workers, tolerance_explore)
+    apply_batch_overrides(config_json, config_name, batch_size, n_workers, tolerance_explore, seed_rng)
+    apply_solver_threads_override(config_json, config_name, solver_threads)
     validate_plugin_config(config_json, config_name)
 
     # --- 2. Stage a PRIVATE copy of the dataset (safe for parallel array tasks) --

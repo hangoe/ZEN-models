@@ -1037,19 +1037,29 @@ def _calibrate_cum_seconds(mode: str, cum_seconds: np.ndarray) -> np.ndarray:
 def load_native_ci_history(run_dir: Path, mode: str, folder_mode: str,
                            points: list[tuple[str, np.ndarray, float]],
                            batch_size: int | None = None) -> pd.DataFrame:
-    """[n_queries, seconds, ci_lower, ci_upper], read directly off run_dir's
-    own diagnostics.csv at full per-iteration density -- no LP solving here
-    at all. "seconds" is batch-aware wall-clock via _cum_seconds_wallclock
+    """[n_queries, seconds, ci_lower, ci_upper, iteration, wall_time_seconds,
+    implied_threshold_for_tolerance], read directly off run_dir's own
+    diagnostics.csv at full per-iteration density -- no LP solving here at
+    all. "seconds" is batch-aware wall-clock via _cum_seconds_wallclock
     (batch_size's parallel workers, not a plain per-point sum -- see that
     function), then calibrated against `mode`'s own real elapsed time via
-    _calibrate_cum_seconds -- see that function's docstring for why. Every
-    supf-mode run already evaluates ci_convergence_metric
+    _calibrate_cum_seconds -- see that function's docstring for why.
+    "wall_time_seconds" is the *other*, simpler wall-clock column
+    diagnostics.csv already carries natively (cumulative sum of each row's
+    own elapsed time, timed directly around that outer iteration's
+    concurrent batch_size-worker round -- see batch_driver.py's own
+    docstring): unlike "seconds" it needs no benchmarking.json/points
+    reconstruction at all, so it's available even for a run whose individual
+    solve folders never got synced down from Euler (only 3ts currently has
+    both). Every supf-mode run already evaluates ci_convergence_metric
     (pyoNearOpt.metrics.fraction_well_explored) against its own live
     approximation once per iteration as its convergence check, and every
     batch-mode run does the same via batch_ORACLE's own per-iteration
     sample_statistics -- both log the resulting ci_lower/ci_upper straight
     into diagnostics.csv, so reading that column back is exact, not an
-    approximation of a re-sampled version.
+    approximation of a re-sampled version. "implied_threshold_for_tolerance"
+    is only logged when the run's config had track_implied_threshold: true
+    (see mga.rst) -- NaN otherwise, or if the column is absent entirely.
 
     Same "checked before this iteration's own point(s) are added" convention
     as oracle's max_min_distance: diagnostics row `iteration=i` (0-indexed)
@@ -1066,15 +1076,22 @@ def load_native_ci_history(run_dir: Path, mode: str, folder_mode: str,
     step = batch_size or 1
     n_initial_points = sum(1 for lab, _, _ in points if lab != "iterate")
     cum_seconds = _calibrate_cum_seconds(mode, _cum_seconds_wallclock(points, batch_size))
+    has_implied_threshold = "implied_threshold_for_tolerance" in diagnostics.columns
+    cum_wall_time_seconds = diagnostics["wall_time_seconds"].cumsum()
 
     rows = []
-    for _, row in diagnostics.iterrows():
+    for i, row in diagnostics.iterrows():
         n_queries = n_initial_points + int(row["iteration"]) * step
         if not (1 <= n_queries <= len(cum_seconds)):
             continue
+        implied_threshold = float("nan")
+        if has_implied_threshold and pd.notna(row["implied_threshold_for_tolerance"]):
+            implied_threshold = float(row["implied_threshold_for_tolerance"])
         rows.append({
             "n_queries": n_queries, "seconds": cum_seconds[n_queries - 1],
             "ci_lower": float(row["ci_lower"]), "ci_upper": float(row["ci_upper"]),
+            "iteration": int(row["iteration"]), "wall_time_seconds": float(cum_wall_time_seconds[i]),
+            "implied_threshold_for_tolerance": implied_threshold,
         })
     return pd.DataFrame(rows)
 
