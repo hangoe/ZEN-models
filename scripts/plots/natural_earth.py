@@ -2,8 +2,8 @@
 
 Country borders come from Natural Earth's 50m admin-0-countries dataset,
 downloaded once and cached under data/naturalearth/ (gitignored). Used by
-plot_country_groups_map.py and plot_mga_investment_map.py, which previously
-each carried their own identical copy of this block.
+plot_country_groups_map.py, which previously carried its own identical copy
+of this block.
 """
 
 import io

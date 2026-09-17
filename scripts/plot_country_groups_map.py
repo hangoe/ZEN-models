@@ -30,7 +30,7 @@ from plots.natural_earth import EUROPE_EXTENT, ISO_A2_EH_OVERRIDES, ensure_natur
 apply_font_mode()
 
 NODES_CSV = REPO_ROOT / "data" / "Crystal_Ball" / "energy_system" / "set_nodes.csv"
-FIGURES_DIR = REPO_ROOT / "data" / "outputs" / "figures" / "mga_investment"
+FIGURES_DIR = REPO_ROOT / "data" / "outputs" / "figures" / "mga"
 
 # Placeholder region groups -- sorted by rough geography, to be replaced once
 # the user specifies real groups.

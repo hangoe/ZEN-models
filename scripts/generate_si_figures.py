@@ -42,19 +42,18 @@ SI_results/ (results, renumbered fig1-fig10):
                                           stock/additions panels below it
   fig15b_heat_supply_output_full_flexibility_twh (new, fig9c) — same as fig15a, for the Full
                                           flexibility scenario (was the sole fig15 before fig15a was added)
-  fig10_power_and_storage_impact — power generation capacity (top) & storage annual energy discharged
-                                          (bottom), each a single plot with Crystal Ball base / No flexibility /
-                                          Full flexibility as 3 adjacent bars per year, 3 snapshot years
-                                          (2030/2040/2050) — generation fleet SCALES UP with mix barely
-                                          shifting; storage capacity stays near-identical across scenarios
-                                          but discharge (utilization) doesn't
-  fig11_power_and_storage_impact_with_dsm — exactly fig10's template, with Full flexibility's storage bars
-                                          also stacking its DSM discharge (all 10 products; ammonia/methanol
-                                          natively GWh, the other 8 mass-carrier products converted via their
-                                          own system-wide production energy intensity that year) on top of
-                                          the same 5 power-sector storage techs — see fig11's own section
-                                          comment for the per-product methodology
-  fig12_capacity_and_storage_base_and_delta — same 2 quantities as fig10, but as Crystal Ball base
+  fig11_power_and_storage_impact_with_dsm — power generation capacity (top) & storage annual energy
+                                          discharged (bottom), each a single plot with Crystal Ball base / No
+                                          flexibility / Full flexibility as 3 adjacent bars per year, 3
+                                          snapshot years (2030/2040/2050) — generation fleet SCALES UP with mix
+                                          barely shifting; storage capacity stays near-identical across
+                                          scenarios but discharge (utilization) doesn't. Full flexibility's
+                                          storage bars also stack its DSM discharge (all 10 products;
+                                          ammonia/methanol natively GWh, the other 8 mass-carrier products
+                                          converted via their own system-wide production energy intensity
+                                          that year) on top of the same 5 power-sector storage techs — see
+                                          fig11's own section comment for the per-product methodology
+  fig12_capacity_and_storage_base_and_delta — same 2 quantities as fig11, but as Crystal Ball base
                                           (absolute stack) + a floating Δ No flexibility bar per year
   fig13_regional_capacity_delta_map      — that same Δ No flexibility, per node, as area-scaled pie
                                           glyphs on a map of the modeled European regions
@@ -139,7 +138,7 @@ directly from the "No flexibility" scenario's own
 benchmarking.json/system.json/solver.json (found via _search_var_dict under
 SCENARIOS[0], the same lookup load_results() uses) rather than hardcoded,
 so they can't silently drift from that run. Generated unconditionally in
-main(); skipped gracefully (like fig10) if that scenario isn't under
+main(); skipped gracefully (like fig11) if that scenario isn't under
 EULER_ROOT yet.
 
 fig13 (method/fig7), like fig11, is a pure method illustration with no
@@ -170,8 +169,7 @@ unconditionally in main(), independent of which Euler runs are loaded. fig8's
 JSON is produced by extract_industry_sector_emissions.py (run under
 zen-creator-env, same env-split reason as extract_heat_demand_by_sector.py);
 fig9 reads sector_emissions_2022.csv directly (a plain CSV, no openpyxl
-needed) from the sibling ZEN-creator repo, the same cross-repo convention
-plot_carrier_flows.py uses for ZEN-creator's outputs/.
+needed) from the sibling ZEN-creator repo.
 
 fig4a is the odd one out: unlike every other figure here, it does NOT come from
 a solved model run. It plots the exogenous low-temperature heat-demand
@@ -600,7 +598,7 @@ def fig1a_cost_delta(metrics: pd.DataFrame) -> None:
 
 # ── 1b: Industry capacity, 2050 ─────────────────────────────────────────────
 
-_eth_tint = eth_tint  # moved to figure_settings.py so plot_carrier_flows.py can share it
+_eth_tint = eth_tint  # alias -- eth_tint itself now lives in figure_settings.py
 
 
 # Print-figure-specific palette (does NOT touch the shared, dashboard-wide
@@ -2244,7 +2242,7 @@ def fig0b_emissions_source_comparison(base_run: Run, no_flex_run: Run, full_run:
     uses the requested grey/dark-blue/magenta ETH triad
     (_ETH_GREY/_ETH_BLUE/_ETH_PURPLE) instead of each run's globally
     assigned SCENARIO_PALETTE slot, since "Full flexibility"'s global slot
-    is petrol/turquoise elsewhere (fig10/fig11 etc. never key off
+    is petrol/turquoise elsewhere (fig11 etc. never key off
     run.color, so this local override has no cross-figure effect).
 
     Panel A originally used a single year (the earliest one present in both
@@ -2680,8 +2678,8 @@ def _cost_and_emissions_totals(runs: list[Run], base_for: dict[str, str], delta_
 # sectoral scope, per user request — generated unconditionally in main().
 
 INDUSTRY_SECTOR_EMISSIONS_JSON = FIGURES_DIR / "industry_sector_emissions_input.json"
-# Sibling-repo convention (see plot_carrier_flows.py's ZEN_CREATOR_OUTPUTS):
-# a plain CSV, so no openpyxl/env-split bridge is needed unlike fig8's JSON.
+# Sibling-repo convention: a plain CSV, so no openpyxl/env-split bridge is
+# needed unlike fig8's JSON.
 MODEL_SCOPE_CSV = REPO_ROOT.parent / "ZEN-creator" / "input_data" / "Emissionbudget" / "sector_emissions_2022.csv"
 
 _SCOPE_COLOR = {"old": _ETH_BLUE, "new": _ETH_GREEN, None: _ETH_GREY}
@@ -3182,20 +3180,19 @@ def _plot_grouped_stacked_bars(
 
 
 def _power_and_storage_dfs(
-    runs: list[Run], full_run: Run, include_dsm: bool,
+    runs: list[Run], full_run: Run,
 ) -> tuple[dict[int, pd.DataFrame], dict[int, pd.DataFrame]]:
-    """Shared data prep for fig10/fig11: gen_by_year (generation capacity,
-    GW) and disch_by_year (storage annual discharge, GWh), each {year:
-    DataFrame(index=technology, columns=scenario label)}. include_dsm=True
-    appends a single aggregated "DSM" row (summed across all 10
-    DSM_ENERGY_STACK_ORDER techs) to disch_by_year, nonzero only in
-    full_run's column (Base/No flexibility have no industry-heat sector) —
-    via get_dsm_energy_equivalent, see that section's comment for the
+    """Data prep for fig11: gen_by_year (generation capacity, GW) and
+    disch_by_year (storage annual discharge, GWh), each {year:
+    DataFrame(index=technology, columns=scenario label)}. disch_by_year
+    gets a single aggregated "DSM" row appended (summed across all 10
+    DSM_ENERGY_STACK_ORDER techs), nonzero only in full_run's column
+    (Base/No flexibility have no industry-heat sector) — via
+    get_dsm_energy_equivalent, see that section's comment for the
     per-product methodology behind the number being summed here."""
     gen_by_year: dict[int, pd.DataFrame] = {}
     disch_by_year: dict[int, pd.DataFrame] = {}
-    dsm_total_by_year = get_dsm_energy_equivalent(full_run.results, DSM_ENERGY_STACK_ORDER, SNAPSHOT_YEARS_POWER) \
-        .sum() if include_dsm else None
+    dsm_total_by_year = get_dsm_energy_equivalent(full_run.results, DSM_ENERGY_STACK_ORDER, SNAPSHOT_YEARS_POWER).sum()
     for year in SNAPSHOT_YEARS_POWER:
         gen_series = [(r.label, get_capacity(r.results, POWER_GEN_TECHS, "power")
                        .get(year, pd.Series(dtype=float))) for r in runs]
@@ -3206,10 +3203,8 @@ def _power_and_storage_dfs(
 
         disch_series = [(r.label, get_storage_flows(r.results, BULK_STORAGE_TECHS, "flow_storage_discharge")
                          .get(year, pd.Series(dtype=float))) for r in runs]
-        stack_order = STORAGE_STACK_ORDER + ["DSM"] if include_dsm else STORAGE_STACK_ORDER
-        disch_df = build_comparison_df(disch_series).reindex(stack_order).fillna(0.0)
-        if include_dsm:
-            disch_df.loc["DSM", full_run.label] = dsm_total_by_year[year]
+        disch_df = build_comparison_df(disch_series).reindex(STORAGE_STACK_ORDER + ["DSM"]).fillna(0.0)
+        disch_df.loc["DSM", full_run.label] = dsm_total_by_year[year]
         disch_by_year[year] = disch_df
     return gen_by_year, disch_by_year
 
@@ -3218,8 +3213,8 @@ def _render_power_and_storage_figure(
     gen_by_year: dict[int, pd.DataFrame], disch_by_year: dict[int, pd.DataFrame],
     filename: str, storage_color_map: dict, storage_hatch_map: dict,
 ) -> None:
-    """Shared 2-row (generation top, storage discharge bottom) rendering for
-    fig10/fig11 — wide, ~16:9-ish (PowerPoint-slide-ish) aspect ratio. No
+    """2-row (generation top, storage discharge bottom) rendering for
+    fig11 — wide, ~16:9-ish (PowerPoint-slide-ish) aspect ratio. No
     figure-level suptitle (each row's own title carries it); segment labels
     are off on both rows (only the bar's total, matching the generation
     row) since the storage row's segments are dense enough to overlap."""
@@ -3236,57 +3231,10 @@ def _render_power_and_storage_figure(
     savefig(fig, filename)
 
 
-def fig10_power_and_storage_impact(base_run: Run, no_flex_run: Run, full_run: Run) -> None:
-    """Power-sector generation capacity (top) and storage annual energy
-    discharged (bottom), Crystal Ball base / No flexibility / Full
-    flexibility shown as 3 adjacent bars per year, in a single combined
-    figure spanning 3 snapshot years (2030/2040/2050) — one plot per row,
-    not one per scenario, so all 9 (scenario x year) bars are directly
-    comparable at a glance.
-
-    Isolates finding #1 (top row): adding electrified (but inflexible)
-    industry heat demand does NOT change the generation TECHNOLOGY mix —
-    every technology's SHARE of total capacity stays roughly the same across
-    scenarios — it just scales the whole fleet up (+11% total capacity at
-    2036 for No flexibility vs base, driven almost entirely by proportionally
-    more VRE: +19% PV, +12% offshore wind, +4% onshore wind, vs. essentially
-    flat dispatchable/fossil capacity). Capacity factors on the existing
-    fleet barely move either (e.g. wind onshore 0.191 vs 0.192, nuclear 0.523
-    vs 0.529 at 2036) — confirming this is a pure scale effect, not a
-    dispatch-pattern change. The mechanism: the added load is a flat,
-    non-dispatchable draw with no diurnal/seasonal shape at all (see fig7's
-    docstring for the same underlying fact about the industry-heat carriers),
-    so the optimizer meets it by building more of whatever is already
-    cheapest at the margin (predominantly VRE), not by adding new
-    technologies or new dispatchable/peaking capacity. Full flexibility is
-    included as a 3rd bar to see whether shifting the industry load itself
-    (via DSM/TES) reduces this fleet scale-up relative to No flexibility.
-
-    Isolates finding #3 (bottom row): No flexibility DISCHARGES ~16% more
-    from battery and ~16% more from salt-cavern (H2) storage than Crystal
-    Ball base at 2036 — the existing storage fleet is cycled harder to
-    buffer the added flat industry-heat electricity load. (Storage POWER
-    CAPACITY itself barely differs across scenarios — battery/pumped-hydro
-    within a few % everywhere — so that panel is omitted here; utilization
-    is where the difference actually shows up.) Full flexibility's discharge
-    sitting between No flexibility and base would mean industry-side
-    flexibility substitutes for power-sector storage cycling; sitting
-    at/above No flexibility would mean it doesn't. fig11 is exactly this
-    figure with Full flexibility's DSM discharge added on top of its storage
-    bars — see fig11_power_and_storage_impact_with_dsm.
-    """
-    runs = [base_run, no_flex_run, full_run]
-    gen_by_year, disch_by_year = _power_and_storage_dfs(runs, full_run, include_dsm=False)
-    _render_power_and_storage_figure(
-        gen_by_year, disch_by_year,
-        "fig10_power_and_storage_impact", STORAGE_COLOR_MAP, {},
-    )
-
-
 # ── SI fig11: DSM discharge translated into an energy (GWh) equivalent ─────
 # ammonia_DSM/methanol_DSM already store an energy carrier (GWh) natively —
 # used as-is. The other 8 INDUSTRY_DSM_TECHS store a MASS carrier
-# (kt-of-product, see fig10's/fig2's docstrings for why they can't just be
+# (kt-of-product, see fig11's/fig2's docstrings for why they can't just be
 # summed into a GWh total): this figure instead converts each product's
 # DSM-shifted kt into an implied GWh using that PRODUCT's own system-wide
 # energy intensity in the same year — total energy input (GWh, summed across
@@ -3362,17 +3310,49 @@ def get_dsm_energy_equivalent(r, dsm_techs: list[str], years: list[int]) -> pd.D
 
 
 def fig11_power_and_storage_impact_with_dsm(base_run: Run, no_flex_run: Run, full_run: Run) -> None:
-    """Exactly fig10_power_and_storage_impact's template (same 2-row layout,
-    same 3-scenario x 3-year grouped bars, same generation panel on top) —
-    the only difference is that Full flexibility's storage-discharge bars
-    here also stack a single "DSM" segment on top of the same 5
-    power-sector storage techs fig10 shows alone: all 10 DSM products
-    summed into one number via get_dsm_energy_equivalent (see that
-    section's comment for the per-product methodology behind the sum), one
-    color, no per-product breakdown. Base / No flexibility get 0 (no
-    industry-heat sector)."""
+    """Power-sector generation capacity (top) and storage annual energy
+    discharged (bottom), Crystal Ball base / No flexibility / Full
+    flexibility shown as 3 adjacent bars per year, in a single combined
+    figure spanning 3 snapshot years (2030/2040/2050) — one plot per row,
+    not one per scenario, so all 9 (scenario x year) bars are directly
+    comparable at a glance.
+
+    Isolates finding #1 (top row): adding electrified (but inflexible)
+    industry heat demand does NOT change the generation TECHNOLOGY mix —
+    every technology's SHARE of total capacity stays roughly the same across
+    scenarios — it just scales the whole fleet up (+11% total capacity at
+    2036 for No flexibility vs base, driven almost entirely by proportionally
+    more VRE: +19% PV, +12% offshore wind, +4% onshore wind, vs. essentially
+    flat dispatchable/fossil capacity). Capacity factors on the existing
+    fleet barely move either (e.g. wind onshore 0.191 vs 0.192, nuclear 0.523
+    vs 0.529 at 2036) — confirming this is a pure scale effect, not a
+    dispatch-pattern change. The mechanism: the added load is a flat,
+    non-dispatchable draw with no diurnal/seasonal shape at all (see fig7's
+    docstring for the same underlying fact about the industry-heat carriers),
+    so the optimizer meets it by building more of whatever is already
+    cheapest at the margin (predominantly VRE), not by adding new
+    technologies or new dispatchable/peaking capacity. Full flexibility is
+    included as a 3rd bar to see whether shifting the industry load itself
+    (via DSM/TES) reduces this fleet scale-up relative to No flexibility.
+
+    Isolates finding #3 (bottom row): No flexibility DISCHARGES ~16% more
+    from battery and ~16% more from salt-cavern (H2) storage than Crystal
+    Ball base at 2036 — the existing storage fleet is cycled harder to
+    buffer the added flat industry-heat electricity load. (Storage POWER
+    CAPACITY itself barely differs across scenarios — battery/pumped-hydro
+    within a few % everywhere — so that panel is omitted here; utilization
+    is where the difference actually shows up.) Full flexibility's storage
+    discharge bar here also stacks a single "DSM" segment on top of the
+    same 5 power-sector storage techs, all 10 DSM products summed into one
+    number via get_dsm_energy_equivalent (see that section's comment for
+    the per-product methodology behind the sum), one color, no per-product
+    breakdown — Base / No flexibility get 0 (no industry-heat sector).
+    Full flexibility's combined discharge sitting between No flexibility
+    and base would mean industry-side flexibility substitutes for
+    power-sector storage cycling; sitting at/above No flexibility would
+    mean it doesn't."""
     runs = [base_run, no_flex_run, full_run]
-    gen_by_year, disch_by_year = _power_and_storage_dfs(runs, full_run, include_dsm=True)
+    gen_by_year, disch_by_year = _power_and_storage_dfs(runs, full_run)
     combined_color_map = {**STORAGE_COLOR_MAP, "DSM": DSM_TOTAL_COLOR}
     _render_power_and_storage_figure(
         gen_by_year, disch_by_year,
@@ -3391,7 +3371,7 @@ def fig11_power_and_storage_impact_with_dsm(base_run: Run, no_flex_run: Run, ful
 #
 # fig12 (capacity | storage discharge, side by side) went through 2 rounds
 # of this feedback: v1 put base/no-flex/full-flex as 3 absolute bars
-# (fig10's own template) — too much eyeballing required. v2 added a 2nd,
+# (fig11's own template) — too much eyeballing required. v2 added a 2nd,
 # separate delta bar starting at y=0 next to the base bar — better, but the
 # delta bar was visually dwarfed sitting next to a much taller base bar
 # (e.g. +250 GW next to a 2,707 GW base). v3 (this one): the delta bar
@@ -3522,7 +3502,7 @@ def _plot_base_and_floating_delta(
 def fig12_capacity_and_storage_base_and_delta(base_run: Run, no_flex_run: Run) -> None:
     """Power generation capacity (left) and storage annual energy discharged
     (right), side by side, 3 snapshot years each (2030/2040/2050, same
-    SNAPSHOT_YEARS_POWER/tech scope as fig10) — each year cluster is base
+    SNAPSHOT_YEARS_POWER/tech scope as fig11) — each year cluster is base
     (absolute stack) + delta (floating from the base bar's own top, see
     _plot_base_and_floating_delta) with a "+X.X%" label. Replaces 2 earlier
     separate figures (one per panel) per user request to show both side by
@@ -3570,9 +3550,9 @@ def fig12_capacity_and_storage_base_and_delta(base_run: Run, no_flex_run: Run) -
 # capacity).
 #
 # Storage is DISCHARGE (GWh), not capacity (GW) — same quantity as fig12's
-# storage panel / fig10's bottom row, for consistency, and for a real
+# storage panel / fig11's bottom row, for consistency, and for a real
 # reason: storage POWER capacity barely differs across scenarios (see
-# fig10's own docstring) and salt_cavern_storage/natural_gas_storage's
+# fig11's own docstring) and salt_cavern_storage/natural_gas_storage's
 # power capacity specifically has capex_specific_storage == 0 EUR/GW
 # (confirmed directly against a solved run) — an unconstrained, free
 # "artifact" dimension, same pattern already documented for
@@ -3580,7 +3560,7 @@ def fig12_capacity_and_storage_base_and_delta(base_run: Run, no_flex_run: Run) -
 # file, that swamped every real signal in an earlier capacity-based draft
 # of this map by 2 orders of magnitude. Discharge doesn't have this
 # problem (it's bounded by each tech's real, costed ENERGY/reservoir
-# capacity) and is what fig10/11/fig12 already use for storage throughout.
+# capacity) and is what fig11/fig12 already use for storage throughout.
 _REGIONAL_YEAR = 2050  # final modeled year: full build-out, clearest spatial signal
 _NODE_BAR_MIN_SHARE = 0.05  # techs below this share of a node's own bar total are grouped into "Other"
 _NODE_BAR_OTHER_COLOR = "#bbbbbb"
@@ -4204,7 +4184,7 @@ def fig12_lp_formulation() -> None:
 # are crossed: (1) 3 technology-group axes alone; (2) x 4 regions (the real
 # north/west/south/east geography, drawn the same way
 # plot_country_groups_map.py / fig_country_groups_map.svg in
-# data/outputs/figures/mga_investment/ does — same Natural Earth polygons,
+# data/outputs/figures/mga/ does — same Natural Earth polygons,
 # same region split, same colors — rather than embedding that SVG file
 # directly, which would need a working SVG rasterizer this environment
 # doesn't have); (3) x 3 cumulative-CAPEX horizons too, all three dimensions
@@ -4220,7 +4200,7 @@ def fig12_lp_formulation() -> None:
 # neutral-grey with just the pictogram identity panels 2-3 reuse.
 #
 # The map needs geopandas + the cached Natural Earth shapefile (data/
-# naturalearth/, already downloaded by the mga_investment scripts) — a new
+# naturalearth/, already downloaded by plot_country_groups_map.py) — a new
 # dependency for this otherwise data-free figure, added deliberately per
 # user request for the real geography instead of an abstract icon. Falls
 # back to a simple 4-wedge compass (this figure's previous approach) if
@@ -4244,9 +4224,7 @@ _MGA_AXIS_GROUP_LABEL = {"power": "Power", "hydrogen": "H2", "carbon": "Carbon"}
 
 
 def _mga_lightning_marker() -> MplPath:
-    """Lightning-bolt Path marker for the 'power' technology group — same
-    hand-drawn-Path convention as the wind/sun/gear markers in
-    plot_mga_investment_map.py."""
+    """Lightning-bolt Path marker for the 'power' technology group."""
     verts = [(0.15, 1.0), (-0.55, 0.05), (-0.05, 0.05), (-0.35, -1.0),
               (0.55, -0.05), (0.0, -0.05), (0.15, 1.0)]
     codes = [MplPath.MOVETO] + [MplPath.LINETO] * 5 + [MplPath.CLOSEPOLY]
@@ -4606,15 +4584,14 @@ def main() -> None:
                 full_run = by_label(runs, "Full flexibility")
                 fig0b_emissions_source_comparison(base_run, no_flex_run, full_run)
                 fig1b_cost_and_emissions_totals(base_run, no_flex_run, full_run)
-                fig10_power_and_storage_impact(base_run, no_flex_run, full_run)
                 fig11_power_and_storage_impact_with_dsm(base_run, no_flex_run, full_run)
             else:
                 print("  skipping fig0b_emissions_source_comparison/fig1b_cost_and_emissions_totals/"
-                      "fig10/fig11_power_and_storage_impact: 'Full flexibility' scenario not loaded")
+                      "fig11_power_and_storage_impact_with_dsm: 'Full flexibility' scenario not loaded")
         else:
-            print("  skipping fig0b/fig5/fig10/fig11/fig12/fig13: 'No flexibility' scenario not loaded")
+            print("  skipping fig0b/fig5/fig11/fig12/fig13: 'No flexibility' scenario not loaded")
     else:
-        print(f"  skipping fig0a/fig0b/fig5/fig10/fig11/fig12/fig13: "
+        print(f"  skipping fig0a/fig0b/fig5/fig11/fig12/fig13: "
               f"{BASE_SCENARIO[0]} not yet under {EULER_ROOT}")
     fig1a_cost_delta(metrics)
     fig1b_industry_capacity(runs)

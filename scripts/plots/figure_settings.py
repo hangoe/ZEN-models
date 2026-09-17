@@ -17,9 +17,9 @@ HOURS_PER_YEAR = 8760
 
 # ── Font mode ────────────────────────────────────────────────────────────────
 # Every figure script in this repo (generate_si_figures.py, compare_version_v8_
-# v9.py, plot_mga_results.py, plot_mga_cum_regional_capex.py, plot_mga_regional_
-# investment.py, plot_mga_investment_map.py) used to inline its own identical
-# rcParams block for this. Centralized here so switching every script's fonts
+# v9.py, plot_mga_results.py, plot_mga_cum_regional_capex.py) used to inline
+# its own identical rcParams block for this. Centralized here so switching
+# every script's fonts
 # at once is a ONE-LINE change: flip FONT_MODE below, nothing else. Each
 # figure's own fontsize=N calls are untouched by this toggle either way —
 # only the font FAMILY (and matching mathtext glyph set) changes.
@@ -112,8 +112,7 @@ def eth_tint(hex_color: str, pct: float) -> str:
     """Blend hex_color toward white by pct (0=original, 1=white) — mirrors
     ETH's documented 20/40/60/80% corporate-design tint system. Shared by
     every script that needs a lighter/darker variant of an ETH color rather
-    than inventing an off-palette one (see generate_si_figures.py,
-    plot_carrier_flows.py)."""
+    than inventing an off-palette one (see generate_si_figures.py)."""
     from matplotlib.colors import to_rgb
     r, g, b = to_rgb(hex_color)
     r, g, b = (c + (1 - c) * pct for c in (r, g, b))

@@ -94,7 +94,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from matplotlib.colors import TwoSlopeNorm
-from matplotlib.lines import Line2D
 from matplotlib.patches import Patch
 
 from plots.figure_settings import SCENARIO_PALETTE, apply_font_mode, eth_tint
@@ -354,74 +353,11 @@ def fig_temporal_range_distribution(axis_idx, origin, phys, base) -> None:
     savefig(fig, "fig12_temporal_range_distribution")
 
 
-# ── fig15: same fig12 data (baseline + own-axis min/max), alternate encoding ─
-# Same region/horizon grid as fig12, but the baseline is no longer a solid
-# bar-from-zero and the range is no longer an errorbar on top of it. Instead:
-#   - the achievable range is a floating "bin" -- a bar drawn from lo to hi
-#     directly (bottom=lo, height=hi-lo), rather than from 0 to baseline with
-#     whiskers layered on;
-#   - the baseline (z*) is a horizontal tick at its own height, spanning the
-#     bar's width, capped with a star marker, rather than the bar's own
-#     height.
-# This separates "where is the reference case" (tick + star) from "how far
-# can this axis move" (the bin) as two distinct marks instead of one bar
-# doing both jobs. Year labels sit above north's bins only (same as fig12);
-# region names are ordinary x-tick labels below the axis.
-def fig_temporal_range_bins(axis_idx, origin, phys, base) -> None:
-    fig, ax = plt.subplots(figsize=(9.5, 5.5))
-    x = np.arange(len(REGIONS))
-    n = len(UNTIL_YEARS)
-    gap = 0.05
-    width = (0.85 - (n - 1) * gap) / n
-    tints = _horizon_tints(n)
-
-    for i, until_year in enumerate(UNTIL_YEARS):
-        offset = (i - (n - 1) / 2) * (width + gap)
-        cols = [axis_idx[f"{r}_{until_year}"] for r in REGIONS]
-        baseline = np.array([base[c] for c in cols]) / 1000
-        lo = np.array([phys[origin.index(f"min:{r}_{until_year}")][c]
-                       for r, c in zip(REGIONS, cols)]) / 1000
-        hi = np.array([phys[origin.index(f"max:{r}_{until_year}")][c]
-                       for r, c in zip(REGIONS, cols)]) / 1000
-        colors = [REGION_COLOR[r] if tints[i] == 0 else eth_tint(REGION_COLOR[r], tints[i]) for r in REGIONS]
-
-        # Range bin: a bar spanning [lo, hi] rather than [0, baseline].
-        ax.bar(x + offset, hi - lo, bottom=lo, width=width, color=colors,
-               edgecolor="black", linewidth=0.6, zorder=3)
-        # Baseline marker: a horizontal tick spanning the bar's own width at
-        # the baseline's height, capped with a star -- drawn on top of the bin.
-        ax.hlines(baseline, x + offset - width / 2, x + offset + width / 2,
-                   color="black", linewidth=1.2, zorder=4)
-        ax.scatter(x + offset, baseline, marker="*", s=140, color="white",
-                    edgecolor="black", linewidth=0.8, zorder=5)
-
-        # Year label on north's bin only, above its own max -- same role as
-        # fig12's year label, now that there's no legend either.
-        ax.text(x[0] + offset, hi[0], until_year[-4:], ha="center", va="bottom",
-                 fontsize=9, rotation=0)
-
-    ax.set_xticks(x)
-    ax.set_xticklabels([r.capitalize() for r in REGIONS], fontsize=11)
-    ax.set_ylim(bottom=0)
-    ax.set_ylabel("Cumulative regional CAPEX by that year (bn EUR)", fontsize=10)
-    ax.set_title("CAPEX Range by Horizon Year and Region",
-                 fontsize=11, fontweight="bold")
-    ax.legend(handles=[
-        Patch(facecolor="#333333", edgecolor="black", label="near-optimal range"),
-        Line2D([0], [0], marker="*", linestyle="None", markersize=12, markerfacecolor="white",
-               markeredgecolor="black", label="baseline (z*)"),
-    ], fontsize=9, loc="upper left")
-    ax.grid(axis="y", alpha=0.3)
-    fig.tight_layout()
-    savefig(fig, "fig15_temporal_range_bins")
-
-
 def main() -> None:
     poly, names, units, axis_idx, origin, phys, base = load_batch4_data()
     fig_temporal_crosseffects(names, units, axis_idx, origin, phys, base)
     fig_temporal_range_absolute(axis_idx, origin, phys, base)
     fig_temporal_range_distribution(axis_idx, origin, phys, base)
-    fig_temporal_range_bins(axis_idx, origin, phys, base)
 
 
 if __name__ == "__main__":

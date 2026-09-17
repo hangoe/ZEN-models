@@ -43,34 +43,22 @@
 # instead of dividing a flat core count. mem-per-cpu=4G (160G total): task_id
 # 10/13 (the former share/tolerance_explore rows, same normalisation as
 # today's rows) were OOM-killed at 40 cpus x 1G on 2026-08-28 (jobs
-# 12067246_10/_13), so don't drop below 4G/cpu. --time=8-00:00:00 is the
-# profile that actually completed the former task_id 17 -- config-identical
-# to today's task_id 1 -- in 8d (job 12374944 retry); the #SBATCH block below
-# is that profile, i.e. the default for a bare `sbatch submit_euler_mga.sh`:
-#   sbatch --array=0-3                                                     \
-#          --time=8-00:00:00 --cpus-per-task=40 --mem-per-cpu=4G           \
-#          submit_euler_mga.sh                # all 4 rows, batch4/share/tol002
-#                                              # (task_id 1 is the proven 8d
-#                                              #  profile; 0/2/3 untested at
-#                                              #  this profile -- task_id 2's
-#                                              #  10ts/year aggregation adds
-#                                              #  per-solve cost vs. 1, so pad
-#                                              #  --time further if it runs
-#                                              #  long; task_id 0's 1ts/year
-#                                              #  should be cheaper if
-#                                              #  anything, and task_id 3's
-#                                              #  4a/10a schedule has fewer
-#                                              #  periods than 1's 7a/5a.
-#                                              #  normal.120h partition allows
-#                                              #  up to 15d if more padding is
-#                                              #  needed)
+# 12067246_10/_13), so don't drop below 4G/cpu. --time=14-00:00:00: the
+# former task_id 17 (config-identical to today's task_id 1) completed in 8d
+# at this cpu/mem profile (job 12374944 retry); 14d is the standard padding
+# used for every row since, so this is the #SBATCH default below -- no need
+# to pass --time/--cpus-per-task/--mem-per-cpu on the command line, just:
+#   sbatch --array=0-3 submit_euler_mga.sh    # all 4 rows, batch4/share/tol002
+# Override on the command line (CLI flags win over #SBATCH) only if a
+# specific row needs something other than the 14d/40cpu/4G standard --
+# normal.120h partition allows up to 15d if more padding is ever needed.
 ###############################################################################
 
 #SBATCH --job-name=zen_run_mga
-#SBATCH --time=8-00:00:00            # TUNABLE: proven profile for task_id 1 (see above); pad for 0/2/3 if needed
+#SBATCH --time=14-00:00:00           # TUNABLE: standard profile (see above); this is the default now, no need to override
 #SBATCH --ntasks=1                   # one process per array task -> keep at 1
-#SBATCH --cpus-per-task=40           # TUNABLE: batch4 profile (4 workers x 10 threads)
-#SBATCH --mem-per-cpu=4G              # TUNABLE: batch4 profile (160GB total); don't drop below 4G/cpu, see above
+#SBATCH --cpus-per-task=40           # TUNABLE: standard profile (4 workers x 10 threads)
+#SBATCH --mem-per-cpu=4G             # TUNABLE: standard profile (160GB total); don't drop below 4G/cpu, see above
 #SBATCH --output=zen_run_mga_%A_%a.out   # %A = array id, %a = task id
 #SBATCH --error=zen_run_mga_%A_%a.err
 #SBATCH --mail-type=END,FAIL         # email when a task ends/fails (ETH address)

@@ -2,21 +2,21 @@
 
 Calls each folder's own orchestrator in turn; each one remains independently
 runnable (python scripts/generate_si_figures.py,
-python scripts/generate_mga_investment_figures.py,
+python scripts/plot_country_groups_map.py,
 python scripts/generate_mga_tests_figures.py) for a single-folder rebuild.
 
 Usage:
     python scripts/generate_all_figures.py
 """
 
-import generate_mga_investment_figures
 import generate_mga_tests_figures
 import generate_si_figures
+import plot_country_groups_map
 
 
 def main() -> None:
     generate_si_figures.main()
-    generate_mga_investment_figures.main()
+    plot_country_groups_map.main()
     generate_mga_tests_figures.main()
 
 
