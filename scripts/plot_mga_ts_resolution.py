@@ -60,6 +60,43 @@ elapsed time timed directly around each iteration's worker round, and
 synced down, so it's available for all three TS_RUNS regardless of fig3b's
 per-run skips.
 
+fig6_polytope_size_vs_resolution answers a different question from fig3a/3b:
+not how FAST each ts-resolution's MGA run converges, but how BIG the
+near-optimal space it converges to actually is -- does a coarser timestep
+resolution make the near-optimal region larger or smaller? pyoNearOpt has no
+single polytope-volume function, so this uses two of its metrics on each
+run's own outer approximation (the same A/b halfspaces, in the same
+share-normalised coordinates, that plot_mga_results.py already builds its
+own `approximation` objects from for fig1/fig2 -- see that module's
+docstring on the "share" normalisation convention, which already makes the
+13 axes comparable across runs without further rescaling):
+`effective_variable_ranges()` (13 fast per-axis LPs, min/max projection of
+the outer polytope onto each coordinate) and `calc_diameter_outer(norm=
+"l2")` (the single max-pairwise-distance scalar over the whole polytope, a
+non-convex QCQP). The latter needs a real global solver -- scipy.shgo over
+26 dimensions is what pyoNearOpt itself falls back to and warns against --
+so this passes a licensed local Gurobi solver (verified available) with
+NonConvex=2 explicitly set, since Gurobi's own default handling of a
+non-convex quadratic maximisation objective isn't guaranteed across
+versions. In practice Gurobi finds a solution within a fraction of a
+percent of optimal in seconds but then spends many more minutes closing the
+remaining branch-and-bound gap to certify true optimality (verified: each of
+the three TS_RUNS entries was still short of a 1% gap after 5 minutes) --
+since this diameter is a comparison metric, not a certified bound, TimeLimit
+and MIPGap are both set (see DIAMETER_SOLVER_OPTIONS below) so each run
+reports Gurobi's best incumbent after a bounded wait rather than blocking
+indefinitely; a per-run note prints if the limit was hit before MIPGap was
+reached, so a reader can see how tight (or not) that incumbent actually is.
+fig6 itself only plots effective_variable_ranges and diameter_l2 (per-axis
+ranges panel + diameter panel); _polytope_size_metrics also computes
+log10_bbox_volume (log-space sum of each axis's effective range, i.e. log of
+the bounding-box volume this bounding box proxy implies -- sidesteps the
+float underflow a direct 13-axis product would risk, since each
+share-normalised range is well under 1) and prints it to console, but it's a
+much weaker/noisier signal than the two plotted metrics (it conflates 13
+independent per-axis LPs into one number, ignoring inter-axis correlation)
+so it's left out of the figure itself.
+
 Usage:
     python scripts/plot_mga_ts_resolution.py
 """
@@ -75,6 +112,10 @@ from plots.figure_settings import SCENARIO_PALETTE, apply_font_mode
 apply_font_mode()
 
 import numpy as np
+import pandas as pd
+import pyomo.environ as pyo
+
+from pyoNearOpt.polytope_approximation.approximation_class import approximation
 
 from plot_mga_results import (
     FIGURES_DIR,
@@ -85,6 +126,19 @@ from plot_mga_results import (
     savefig,
     try_load_run_polytope,
 )
+
+# calc_diameter_outer's non-convex QCQP (see module docstring): Gurobi finds
+# an incumbent within ~1% of optimal in well under a minute but then spends
+# many more minutes closing the branch-and-bound gap the rest of the way to
+# a certified optimum -- MIPGap lets it stop as soon as it's within 2% (this
+# is a comparison metric across ts-resolutions, not a certified bound;
+# verified against the 3ts run, whose gap was already 1.6% at 10s and 0.9%
+# at 60s). TimeLimit is a hard safety net in case MIPGap is never reached
+# quickly for some run; approximation.calc_diameter_outer raises ValueError
+# if that triggers before MIPGap does (its own optimal-termination check),
+# which _polytope_size_metrics catches and reports as a per-run skip rather
+# than blocking the whole script.
+DIAMETER_SOLVER_OPTIONS = {"NonConvex": 2, "MIPGap": 0.02, "TimeLimit": 180}
 
 # interval_<N>ts run-folder suffix, same CAPEX-CUM/share/tol002/bbo
 # configuration otherwise (see module docstring) -- despite the name, this
@@ -244,6 +298,181 @@ def _figure_implied_threshold(histories: dict) -> None:
     savefig(fig, "fig4_implied_threshold_for_tolerance")
 
 
+def load_polytope_approx(ts: str, suffix: str) -> approximation | None:
+    """This TS_RUNS entry's outer/inner polytope wrapped as a pyoNearOpt
+    `approximation`, built the same way plot_mga_results.py's own fig1/fig2
+    do (A/X/b/name_list straight off polytope.npz, share-normalised, see
+    module docstring), or None (logged) if its polytope.npz isn't on disk
+    yet -- same skip convention as load_ts_history. Carries a licensed local
+    Gurobi solver with NonConvex=2 set, needed by _polytope_size_metrics'
+    calc_diameter_outer call (see module docstring)."""
+    run_dir = MGA_ROOT / f"{MODEL}_{suffix}"
+    run_poly = try_load_run_polytope(run_dir, ts, folder_mode="batch")
+    if run_poly is None:
+        print(f"  {ts}: no usable polytope.npz under {run_dir.relative_to(REPO_ROOT)} (skipping fig6)")
+        return None
+    return approximation(
+        A=run_poly.A, X=run_poly.X, b=run_poly.b, name_list=run_poly.names,
+        print_lv=0, solver=pyo.SolverFactory("gurobi", options=DIAMETER_SOLVER_OPTIONS),
+    )
+
+
+def _polytope_size_metrics(approx: approximation, ts: str) -> dict:
+    """Two of pyoNearOpt's metrics on approx's outer polytope, standing in
+    for a volume it has no direct function for (see module docstring):
+    per-axis effective_variable_ranges (a DataFrame, one row per axis, with
+    an added "range" = max - min column), log10_bbox_volume (sum of
+    log10(range) across axes -- the log of the bounding-box volume those
+    ranges imply, avoiding the underflow a direct 13-axis product of
+    sub-1 shares would risk), and diameter_l2 (calc_diameter_outer's single
+    max-pairwise-distance scalar, NaN if DIAMETER_SOLVER_OPTIONS'
+    TimeLimit was hit before MIPGap -- see that constant's docstring)."""
+    ranges = pd.DataFrame(approx.effective_variable_ranges())
+    ranges["range"] = ranges["max"] - ranges["min"]
+    log10_bbox_volume = float(np.log10(ranges["range"]).sum())
+    try:
+        diameter_l2 = float(approx.calc_diameter_outer(norm="l2"))
+        diameter_note = f"diameter_l2={diameter_l2:.4g}"
+    except ValueError as exc:
+        diameter_l2 = float("nan")
+        diameter_note = f"diameter_l2 skipped ({exc})"
+    print(f"  {ts}: log10_bbox_volume={log10_bbox_volume:.3f}, {diameter_note}")
+    return {"ranges": ranges, "log10_bbox_volume": log10_bbox_volume, "diameter_l2": diameter_l2}
+
+
+def _find_axis_break(values: np.ndarray) -> tuple[float, float] | None:
+    """(lo_max, hi_min) to split `values`' range at its single largest gap
+    between consecutive sorted values, or None if no gap is large relative
+    to the overall span (a quarter of it or more) -- i.e. a plain,
+    un-broken axis already shows `values` clearly and a break would just add
+    visual noise. Used by _figure_polytope_size's per-axis range panel,
+    where most axes' ranges cluster well below 1 but net_present_cost's own
+    range sits near 1 (see module docstring's "share" normalisation note),
+    so a single linear x-axis wastes most of its width on that one gap."""
+    v = np.sort(np.unique(values))
+    if len(v) < 2:
+        return None
+    span = v[-1] - v[0]
+    if span <= 0:
+        return None
+    gaps = np.diff(v)
+    i = int(np.argmax(gaps))
+    if gaps[i] < 0.25 * span:
+        return None
+    return float(v[i]), float(v[i + 1])
+
+
+def _figure_polytope_size(sizes: dict) -> None:
+    """fig6_polytope_size_vs_resolution -- see module docstring. Panel 1
+    shows every axis's own effective range (one row per axis, one marker per
+    ts) so a resolution effect that only shows up on some axes isn't hidden
+    by panel 2's single aggregate diameter scalar; its x-axis is broken (see
+    _find_axis_break) when net_present_cost's own near-1 range would
+    otherwise squeeze every other axis's much smaller range into a sliver
+    near 0. log10_bbox_volume is computed and printed per ts (see
+    _polytope_size_metrics) but not plotted here -- a much noisier aggregate
+    than either of these two."""
+    axis_names = None
+    for ts, size in sizes.items():
+        names = list(size["ranges"]["variable"])
+        if axis_names is None:
+            axis_names = names
+        elif names != axis_names:
+            common = [n for n in axis_names if n in names]
+            print(f"  fig6: {ts}'s axes differ from the first loaded run -- "
+                  f"aligning all runs to the {len(common)} axes they share")
+            axis_names = common
+    if not axis_names:
+        print("  skipping fig6: no shared axes across the loaded ts-resolution runs")
+        return
+
+    all_ranges = np.concatenate([
+        size["ranges"].set_index("variable")["range"].reindex(axis_names).to_numpy()
+        for size in sizes.values()
+    ])
+    x_min, x_max = float(np.nanmin(all_ranges)), float(np.nanmax(all_ranges))
+    pad = 0.05 * (x_max - x_min)
+    split = _find_axis_break(all_ranges)
+
+    fig = plt.figure(figsize=(10, 5), constrained_layout=True)
+    outer = fig.add_gridspec(1, 2, width_ratios=[2.2, 1])
+    if split is None:
+        ax_lo = fig.add_subplot(outer[0])
+        ax_hi = None
+    else:
+        ranges_gs = outer[0].subgridspec(1, 2, width_ratios=[3, 1], wspace=0.08)
+        ax_lo = fig.add_subplot(ranges_gs[0])
+        ax_hi = fig.add_subplot(ranges_gs[1], sharey=ax_lo)
+    ax_diameter = fig.add_subplot(outer[1])
+
+    y = np.arange(len(axis_names))
+    for ts, size in sizes.items():
+        ranges_by_name = size["ranges"].set_index("variable")["range"].reindex(axis_names)
+        ax_lo.scatter(ranges_by_name, y, color=TS_COLOR[ts], label=ts, s=24, zorder=3)
+        if ax_hi is not None:
+            ax_hi.scatter(ranges_by_name, y, color=TS_COLOR[ts], s=24, zorder=3)
+    ax_lo.set_yticks(y)
+    ax_lo.set_yticklabels(axis_names, fontsize=7)
+    ax_lo.invert_yaxis()
+    ax_lo.set_title("per-axis spread", fontsize=10)
+    ax_lo.grid(alpha=0.3, axis="x")
+    ax_lo.legend(fontsize=8, frameon=False)
+
+    if ax_hi is None:
+        ax_lo.set_xlim(x_min - pad, x_max + pad)
+        ax_lo.set_xlabel("effective range (share-normalised)")
+    else:
+        lo_max, hi_min = split
+        ax_lo.set_xlim(x_min - pad, lo_max + pad)
+        ax_hi.set_xlim(hi_min - pad, x_max + pad)
+        ax_hi.grid(alpha=0.3, axis="x")
+        ax_lo.spines["right"].set_visible(False)
+        ax_hi.spines["left"].set_visible(False)
+        ax_hi.tick_params(left=False, labelleft=False)
+        ax_hi.set_xticks([1.0])
+        ax_hi.set_xticklabels(["1.00"])
+        ax_lo.set_xlabel("effective range (share-normalised)", x=1.0)
+        # Diagonal "-//-" break marks on the two spines that meet at the cut.
+        # ax_lo and ax_hi have very different widths (width_ratios=[3, 1]
+        # above) but the same height, so a naive equal-fraction d (same
+        # dx=dy in each axes' OWN transAxes units) draws marks at different
+        # physical angles on each side -- not parallel. Sizing dx/dy in
+        # physical inches instead (via each axes' actual on-figure size)
+        # keeps both marks the same physical length and 45-degree slope
+        # regardless of that width mismatch.
+        fig.canvas.draw()  # finalise constrained_layout's axes positions first
+        fig_w, fig_h = fig.get_size_inches()
+        mark_in = 0.09  # half-length, in inches, of each mark's x/y extent
+
+        def _mark_d(ax) -> tuple[float, float]:
+            bbox = ax.get_position()
+            return mark_in / (bbox.width * fig_w), mark_in / (bbox.height * fig_h)
+
+        dx_lo, dy_lo = _mark_d(ax_lo)
+        dx_hi, dy_hi = _mark_d(ax_hi)
+        kwargs = dict(color="k", clip_on=False, lw=1)
+        ax_lo.plot((1 - dx_lo, 1 + dx_lo), (-dy_lo, +dy_lo), transform=ax_lo.transAxes, **kwargs)
+        ax_lo.plot((1 - dx_lo, 1 + dx_lo), (1 - dy_lo, 1 + dy_lo), transform=ax_lo.transAxes, **kwargs)
+        ax_hi.plot((-dx_hi, +dx_hi), (-dy_hi, +dy_hi), transform=ax_hi.transAxes, **kwargs)
+        ax_hi.plot((-dx_hi, +dx_hi), (1 - dy_hi, 1 + dy_hi), transform=ax_hi.transAxes, **kwargs)
+
+    # diameter_l2 can be NaN (see _polytope_size_metrics) if its Gurobi solve
+    # hit DIAMETER_SOLVER_OPTIONS' TimeLimit before MIPGap -- drop those ts
+    # from this bar chart rather than plotting a NaN-height bar.
+    ts_order = [ts for ts in sizes if ts in TS_COLOR]
+    plotted = [ts for ts in ts_order if not np.isnan(sizes[ts]["diameter_l2"])]
+    plotted_vals = [sizes[ts]["diameter_l2"] for ts in plotted]
+    bars = ax_diameter.bar(plotted, plotted_vals, color=[TS_COLOR[ts] for ts in plotted])
+    ax_diameter.bar_label(bars, fmt="%.4g", padding=3, fontsize=8)
+    if plotted_vals:
+        ax_diameter.set_ylim(0, max(plotted_vals) * 1.12)
+    ax_diameter.set_ylabel("L2 diameter")
+    ax_diameter.set_title("outer-polytope diameter", fontsize=10)
+    ax_diameter.grid(alpha=0.3, axis="y")
+
+    savefig(fig, "fig6_polytope_size_vs_resolution")
+
+
 def main() -> None:
     print("Loading ts-resolution runs...")
     histories = {}
@@ -270,6 +499,17 @@ def main() -> None:
         print("  skipping fig3b: no ts-resolution run has per-point solving times on disk")
 
     _figure_implied_threshold(histories)
+
+    print("Computing near-optimal-space size (fig6)...")
+    sizes = {}
+    for ts, suffix in TS_RUNS.items():
+        approx = load_polytope_approx(ts, suffix)
+        if approx is not None:
+            sizes[ts] = _polytope_size_metrics(approx, ts)
+    if sizes:
+        _figure_polytope_size(sizes)
+    else:
+        print("  skipping fig6: no ts-resolution run has a usable polytope.npz")
 
     stale = FIGURES_DIR / "fig4_exploration_coverage_vs_queries.svg"
     if stale.exists():
