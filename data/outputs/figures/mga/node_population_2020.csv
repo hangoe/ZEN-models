@@ -1,0 +1,31 @@
+# Source: World Bank, World Development Indicators, "Population, total" (indicator SP.POP.TOTL), https://data.worldbank.org/indicator/SP.POP.TOTL, retrieved 2026-09-17. Countries correspond to the nodes in data/Crystal_Ball/energy_system/set_nodes.csv (node codes follow EU statistical convention: EL = Greece, UK = United Kingdom).
+node,country,iso_a3,population_2020
+AT,Austria,AUT,8916864
+BE,Belgium,BEL,11538604
+BG,Bulgaria,BGR,6550696
+CH,Switzerland,CHE,8638167
+CZ,Czechia,CZE,10697858
+DE,Germany,DEU,83160871
+DK,Denmark,DNK,5831404
+EE,Estonia,EST,1329522
+EL,Greece,GRC,10698599
+ES,Spain,ESP,47359424
+FI,Finland,FIN,5529543
+FR,France,FRA,67601110
+HR,Croatia,HRV,3914206
+HU,Hungary,HUN,9670419
+IE,Ireland,IRL,5039747
+IT,Italy,ITA,59438851
+LT,Lithuania,LTU,2810369
+LU,Luxembourg,LUX,630419
+LV,Latvia,LVA,1900449
+NL,Netherlands,NLD,17441500
+NO,Norway,NOR,5379475
+PL,Poland,POL,37515748
+PT,Portugal,PRT,10297081
+RO,Romania,ROU,19265250
+SE,Sweden,SWE,10353442
+SI,Slovenia,SVN,2102419
+SK,Slovak Republic,SVK,5458827
+UK,United Kingdom,GBR,66740000
+TOTAL,,,525810864
