@@ -85,7 +85,7 @@ DATASET_SEARCH_DIRS = [
 META_COLUMNS = {
     "my_dataset", "my_comment", "config", "normalisation", "batch_size",
     "n_workers", "axes_config", "tolerance_explore", "seed_rng",
-    "solver_threads",
+    "solver_threads", "epsilon",
 }
 
 # Fallback system.json overrides, used for any of these keys a CSV row
@@ -149,6 +149,32 @@ def apply_normalisation_override(config_json: dict, config_name: str, normalisat
             f"{config_name} has no plugins.mga block to apply it to."
         )
     mga_cfg["normalisation"] = normalisation
+
+
+def apply_epsilon_override(config_json: dict, config_name: str, epsilon) -> None:
+    """Overwrite plugins.mga.epsilon in-place with the CSV row's value.
+
+    epsilon sets the near-optimality budget the MGA search explores within:
+    total_cost <= (1 + epsilon) * NPC*. The shared config_mga_*.json files
+    default this to 0.01 (1%), an arbitrary tight budget. For the
+    per_axes-normalised total-axes run, epsilon is instead sized from a
+    welfare-tolerance estimate:
+        525e6 inhabitants x 30 years x 100 EUR/inhabitant/year
+            = ~1.575e12 EUR (~1.5 trillion EUR) -- the aggregate extra
+            spend society might plausibly accept over the horizon.
+        NPC* (this dataset's cost-optimal net present cost) ~= 22e12 EUR.
+        epsilon = 1.5e12 / 22e12 ~= 0.068 -> rounded to 0.07 (7%).
+    Same private-staged-copy pattern as apply_normalisation_override(): lets
+    one config_mga_batch_*.json be swept over different epsilon values from
+    parameters_mga.csv without touching the shared data/*.json file.
+    """
+    mga_cfg = config_json.get("plugins", {}).get("mga")
+    if mga_cfg is None:
+        raise SystemExit(
+            f"[run_model] row sets epsilon={epsilon!r} but "
+            f"{config_name} has no plugins.mga block to apply it to."
+        )
+    mga_cfg["epsilon"] = epsilon
 
 
 def apply_batch_overrides(config_json: dict, config_name: str, batch_size, n_workers, tolerance_explore, seed_rng) -> None:
@@ -306,6 +332,9 @@ def main() -> None:
     solver_threads = None
     if "solver_threads" in table.columns and pd.notna(row["solver_threads"]) and str(row["solver_threads"]).strip():
         solver_threads = to_native(row["solver_threads"])
+    epsilon = None
+    if "epsilon" in table.columns and pd.notna(row["epsilon"]) and str(row["epsilon"]).strip():
+        epsilon = to_native(row["epsilon"])
     system_overrides = {
         **DEFAULT_SYSTEM_OVERRIDES,
         **{col: to_native(row[col]) for col in table.columns if col not in META_COLUMNS},
@@ -314,7 +343,7 @@ def main() -> None:
     print(f"[run_model] task_id={args.task_id}  dataset={my_dataset}  comment={my_comment}")
     print(f"[run_model] config={config_name}  axes_config={axes_config_path.name}  normalisation={normalisation}")
     print(f"[run_model] batch_size={batch_size}  n_workers={n_workers}  tolerance_explore={tolerance_explore}  "
-          f"seed_rng={seed_rng}  solver_threads={solver_threads}")
+          f"seed_rng={seed_rng}  solver_threads={solver_threads}  epsilon={epsilon}")
     print(f"[run_model] system_overrides={system_overrides}")
 
     with open(DATA_DIR_CONFIG / config_name) as f:
@@ -324,6 +353,8 @@ def main() -> None:
         apply_normalisation_override(config_json, config_name, normalisation)
     apply_batch_overrides(config_json, config_name, batch_size, n_workers, tolerance_explore, seed_rng)
     apply_solver_threads_override(config_json, config_name, solver_threads)
+    if epsilon is not None:
+        apply_epsilon_override(config_json, config_name, epsilon)
     validate_plugin_config(config_json, config_name)
 
     # --- 2. Stage a PRIVATE copy of the dataset (safe for parallel array tasks) --

@@ -1,0 +1,57 @@
+{
+  "node_capex_cumulative": {
+    "nodes": [
+      {"north": ["DK", "EE", "FI", "IE", "LT", "LV", "NO", "SE", "UK"]},
+      {"west": ["AT", "BE", "CH", "DE", "FR", "LU", "NL"]},
+      {"south": ["ES", "EL", "HR", "IT", "PT", "SI"]},
+      {"east": ["BG", "CZ", "HU", "PL", "RO", "SK"]}
+    ],
+    "until_years": [2030, 2040, 2050]
+  },
+  "node_capacity_ratio": {
+    "nodes": [
+      {"north": ["DK", "EE", "FI", "IE", "LT", "LV", "NO", "SE", "UK"]},
+      {"west": ["AT", "BE", "CH", "DE", "FR", "LU", "NL"]},
+      {"south": ["ES", "EL", "HR", "IT", "PT", "SI"]},
+      {"east": ["BG", "CZ", "HU", "PL", "RO", "SK"]}
+    ],
+    "years": [2030, 2040, 2050],
+    "ratio_groups": [
+      {"road_electrification": {
+        "numerator": ["BEV", "HDT_BET"],
+        "denominator": ["BEV", "ICE_petrol", "ICE_diesel", "HDT_BET", "HDT_diesel", "HDT_FCEV"]
+      }},
+      {"heating_electrification": {
+        "numerator": [
+          "electrode_boiler", "heat_pump",
+          "electrode_boiler_DH", "heat_pump_DH",
+          "electrode_boiler_industry",
+          "heat_pump_industry_0_100_water", "heat_pump_industry_0_100_waste_heat",
+          "heat_pump_industry_100_150_water", "heat_pump_industry_100_150_waste_heat",
+          "heat_pump_industry_150_200_water", "heat_pump_industry_150_200_waste_heat"
+        ],
+        "denominator": [
+          "electrode_boiler", "heat_pump", "natural_gas_boiler", "oil_boiler", "biomass_boiler",
+          "electrode_boiler_DH", "heat_pump_DH", "natural_gas_boiler_DH", "oil_boiler_DH",
+          "biomass_boiler_DH", "hard_coal_boiler_DH", "waste_boiler_DH",
+          "electrode_boiler_industry",
+          "heat_pump_industry_0_100_water", "heat_pump_industry_0_100_waste_heat",
+          "heat_pump_industry_100_150_water", "heat_pump_industry_100_150_waste_heat",
+          "heat_pump_industry_150_200_water", "heat_pump_industry_150_200_waste_heat",
+          "natural_gas_boiler_industry", "oil_boiler_industry", "biomass_boiler_industry",
+          "coal_boiler_industry", "waste_boiler_industry"
+        ]
+      }}
+    ]
+  },
+  "node_carbon_emissions_cumulative": {
+    "nodes": [
+      {"north_co2": ["DK", "EE", "FI", "IE", "LT", "LV", "NO", "SE", "UK"]},
+      {"west_co2": ["AT", "BE", "CH", "DE", "FR", "LU", "NL"]},
+      {"south_co2": ["ES", "EL", "HR", "IT", "PT", "SI"]},
+      {"east_co2": ["BG", "CZ", "HU", "PL", "RO", "SK"]}
+    ],
+    "until_years": [2030, 2040, 2050]
+  },
+  "include_cost": true
+}
