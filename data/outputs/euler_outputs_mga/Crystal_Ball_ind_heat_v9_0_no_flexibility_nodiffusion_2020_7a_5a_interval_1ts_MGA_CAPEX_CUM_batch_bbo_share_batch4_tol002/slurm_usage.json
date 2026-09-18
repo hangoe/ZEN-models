@@ -1,0 +1,12 @@
+{
+  "job_id": "14373821_0",
+  "task_id": 0,
+  "elapsed": "02:23:18",
+  "elapsed_seconds": 8598,
+  "total_cpu": "07:31:43",
+  "total_cpu_seconds": 27103,
+  "max_rss_kb": 29903200,
+  "alloc_cpus": 40,
+  "req_mem": "160G",
+  "state": "COMPLETED"
+}
