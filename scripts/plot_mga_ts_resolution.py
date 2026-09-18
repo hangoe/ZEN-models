@@ -107,7 +107,7 @@ REPO_ROOT = Path(__file__).parent.parent
 
 import matplotlib.pyplot as plt
 
-from plots.figure_settings import SCENARIO_PALETTE, apply_font_mode
+from plots.figure_settings import SCENARIO_PALETTE, apply_font_mode, eth_tint
 
 apply_font_mode()
 
@@ -143,34 +143,56 @@ DIAMETER_SOLVER_OPTIONS = {"NonConvex": 2, "MIPGap": 0.02, "TimeLimit": 180}
 # interval_<N>ts run-folder suffix, same CAPEX-CUM/share/tol002/bbo
 # configuration otherwise (see module docstring) -- despite the name, this
 # now also holds non-ts comparison runs against the 1ts/7a/5a baseline
-# (task_id 0 in parameters_mga.csv): a fixed-seed_rng rerun and two bigger-
-# batch_size reruns, added 2026-09-17 (see submit_euler_mga.sh's task_id
-# 4-6 header comment) so they land on fig3a/3b once downloaded. All three
-# are still #-commented out here: main()'s load_ts_history already skips
-# (with a printed reason) any entry whose run_dir isn't on disk yet, so
-# each just needs uncommenting once its own _batch_summary/ syncs down from
-# Euler -- no other code change needed, same convention "1ts" itself was
-# added under before its run finished.
+# (task_id 0 in parameters_mga.csv): a fixed-seed_rng rerun, two bigger-
+# batch_size reruns (task_id 4-6, added 2026-09-17, see submit_euler_mga.sh's
+# task_id 4-6 header comment) and a 4a/10a period-schedule rerun (task_id 3,
+# added 2026-09-16 alongside the original task_id 0-3 sweep). task_id 4/3
+# converged and synced down 2026-09-18 (jobs 14437483/14432297); task_id 5
+# (batch16) converged and synced down the same day (job 14437485). task_id 6
+# (batch32) has no completed run yet -- main()'s load_ts_history already
+# skips (with a printed reason) any entry whose run_dir isn't on disk yet, so
+# it just needs uncommenting once its own _batch_summary/ syncs down from
+# Euler -- no other code change needed, same convention every other entry
+# here was added under before its own run finished.
+#
+# Every key spells out its own aggregated_time_steps_per_year (all these
+# non-ts comparison runs are 1ts, same as the "1ts" baseline -- see each
+# entry's own comment for what else varies) so that's visible directly in
+# fig3a/3b/4's legend, not just implied by "same config as 1ts". Dict order
+# below is legend/plot draw order (matplotlib draws/lists in insertion
+# order): "1ts" and "1ts_seed42" first (the seed-rng comparison pair), then
+# "1ts_batch16" right after (batch_size comparison against the same 1ts/7a/5a
+# baseline), then the ts-resolution trio "3ts"/"10ts"/"1ts_4a_10a".
 TS_RUNS: dict[str, str] = {
     "1ts": "2020_7a_5a_interval_1ts_MGA_CAPEX_CUM_batch_bbo_share_batch4_tol002",
-    "3ts": "2020_7a_5a_interval_3ts_MGA_CAPEX_CUM_batch_bbo_share_batch4_tol002",
-    "10ts": "2020_7a_5a_interval_10ts_MGA_CAPEX_CUM_batch_bbo_share_batch4_tol002",
-    # task_id 4: same batch4/share/tol002 config as "1ts" above, but with
+    # task_id 4: same batch4/share/tol002/1ts config as "1ts" above, but with
     # seed_rng=42 pinned (task_id 0/"1ts" itself has no seed_rng set, so
     # this is an explicit-seed run to compare against its unpinned draw).
-    # "1ts_seed42": "2020_7a_5a_interval_1ts_MGA_CAPEX_CUM_batch_bbo_share_batch4_tol002_seed42",
-    # task_id 5: batch_size=n_workers=16 (vs. 4), solver_threads=2.
-    # "batch16": "2020_7a_5a_interval_1ts_MGA_CAPEX_CUM_batch_bbo_share_batch16_tol002",
-    # task_id 6: batch_size=n_workers=32 (vs. 4), solver_threads=2.
-    # "batch32": "2020_7a_5a_interval_1ts_MGA_CAPEX_CUM_batch_bbo_share_batch32_tol002",
+    "1ts_seed42": "2020_7a_5a_interval_1ts_MGA_CAPEX_CUM_batch_bbo_share_batch4_tol002_seed42",
+    # task_id 5: batch_size=n_workers=16 (vs. 4), solver_threads=2, still
+    # 1ts/7a/5a otherwise.
+    "1ts_batch16": "2020_7a_5a_interval_1ts_MGA_CAPEX_CUM_batch_bbo_share_batch16_tol002",
+    "3ts": "2020_7a_5a_interval_3ts_MGA_CAPEX_CUM_batch_bbo_share_batch4_tol002",
+    "10ts": "2020_7a_5a_interval_10ts_MGA_CAPEX_CUM_batch_bbo_share_batch4_tol002",
+    # task_id 3: same batch4/share/tol002/1ts config as "1ts" above, but a
+    # 4a/10a period schedule (4 periods every 10y, 2020->2050) instead of
+    # "1ts"'s 7a/5a (7 periods every 5y, same end year).
+    "1ts_4a_10a": "2020_4a_10a_interval_1ts_MGA_CAPEX_CUM_batch_bbo_share_batch4_tol002",
+    # task_id 6: batch_size=n_workers=32 (vs. 4), solver_threads=2, still
+    # 1ts/7a/5a otherwise.
+    # "1ts_batch32": "2020_7a_5a_interval_1ts_MGA_CAPEX_CUM_batch_bbo_share_batch32_tol002",
 }
 TS_COLOR: dict[str, str] = {
-    "3ts": SCENARIO_PALETTE[2],
-    "10ts": SCENARIO_PALETTE[0],
     "1ts": SCENARIO_PALETTE[3],
     "1ts_seed42": SCENARIO_PALETTE[5],
-    "batch16": SCENARIO_PALETTE[4],
-    "batch32": SCENARIO_PALETTE[1],
+    "1ts_batch16": SCENARIO_PALETTE[4],
+    "3ts": SCENARIO_PALETTE[2],
+    "10ts": SCENARIO_PALETTE[0],
+    # Tint of "1ts"'s own bronze -- same batch4/share/tol002/1ts config,
+    # only the period schedule differs (see TS_RUNS above), so this stays in
+    # the same color family as "1ts" rather than taking a genuinely new hue.
+    "1ts_4a_10a": eth_tint(SCENARIO_PALETTE[3], 0.5),
+    "1ts_batch32": SCENARIO_PALETTE[1],
 }
 
 
@@ -251,13 +273,22 @@ def _figure_implied_threshold(histories: dict) -> None:
     titles/labels, one small line-style legend): the full explanation lives
     in the module docstring and the chat message that introduced this
     figure, not on the canvas. Only includes TS_RUNS entries with
-    has_implied_threshold True (see load_ts_history)."""
+    has_implied_threshold True (see load_ts_history).
+
+    Each run uses its own TS_COLOR for BOTH its ci_lower line (solid) and its
+    implied_threshold line (dashed) -- same color-per-run convention as
+    fig3a/fig3b (_figure), so a run reads as one color across all three
+    figures. The two fixed reference lines (95% ci_lower target and the
+    configured tolerance_explore) aren't run-specific, so they're drawn in
+    ETH grey instead of a run's color, deduplicated per unique value (every
+    current TS_RUNS entry shares the same 0.95/0.02, so this draws one line
+    of each, not one per run)."""
     implied = {ts: r for ts, r in histories.items() if r[4]}
     if not implied:
         print("  skipping fig4: no ts-resolution run has implied_threshold_for_tolerance logged")
         return
 
-    CI_LOWER_COLOR = SCENARIO_PALETTE[2]  # ETH green
+    GREY = SCENARIO_PALETTE[6]  # ETH grey, reserved for the fixed target/tolerance reference lines
 
     fig, (ax_iter, ax_time) = plt.subplots(1, 2, figsize=(11, 4.5), constrained_layout=True)
     for ax, x_column, x_label, title in (
@@ -265,12 +296,18 @@ def _figure_implied_threshold(histories: dict) -> None:
         (ax_time, "wall_time_seconds", "wall time [s]", "vs. wall time"),
     ):
         ax_r = ax.twinx()
+        thresholds, tolerances = set(), set()
         for ts, (history, _label, threshold, _hst, _hit, tolerance_explore) in implied.items():
-            ax.plot(history[x_column], history["ci_lower"], color=CI_LOWER_COLOR, lw=1.5)
-            ax.axhline(threshold, color=CI_LOWER_COLOR, ls="--", lw=1)
+            color = TS_COLOR[ts]
+            ax.plot(history[x_column], history["ci_lower"], color=color, lw=1.5)
             ax_r.plot(history[x_column], history["implied_threshold_for_tolerance"],
-                      color=TS_COLOR[ts], lw=1.5, ls="--")
-            ax_r.axhline(tolerance_explore, color=TS_COLOR[ts], ls=":", lw=1)
+                      color=color, lw=1.5, ls="--")
+            thresholds.add(threshold)
+            tolerances.add(tolerance_explore)
+        for threshold in thresholds:
+            ax.axhline(threshold, color=GREY, ls="--", lw=1)
+        for tolerance_explore in tolerances:
+            ax_r.axhline(tolerance_explore, color=GREY, ls=":", lw=1)
         ax.set_title(title, fontsize=10)
         ax.set_xlabel(x_label)
         ax.set_ylabel("ci_lower")
@@ -281,10 +318,10 @@ def _figure_implied_threshold(histories: dict) -> None:
     ax_time.set_xscale("log")
 
     legend_lines = [
-        plt.Line2D([0], [0], color=CI_LOWER_COLOR, lw=1.5, label="ci_lower"),
-        plt.Line2D([0], [0], color=CI_LOWER_COLOR, lw=1, ls="--", label="95% target"),
-        plt.Line2D([0], [0], color="grey", lw=1.5, ls="--", label="implied tolerance"),
-        plt.Line2D([0], [0], color="grey", lw=1, ls=":", label="actual tolerance_explore"),
+        plt.Line2D([0], [0], color="black", lw=1.5, label="ci_lower"),
+        plt.Line2D([0], [0], color="black", lw=1.5, ls="--", label="implied tolerance"),
+        plt.Line2D([0], [0], color=GREY, lw=1, ls="--", label="95% target"),
+        plt.Line2D([0], [0], color=GREY, lw=1, ls=":", label="actual tolerance_explore"),
     ]
     if len(implied) > 1:
         legend_lines += [plt.Line2D([0], [0], color=TS_COLOR[ts], lw=1.5, label=ts) for ts in implied]
