@@ -1,24 +1,30 @@
 #!/bin/bash
 ###############################################################################
-# check_mga_convergence.sh — convergence snapshot for the historical MGA
-# batch sweep still tracked from parameters_mga.csv (batch_bbo / minmax).
+# check_mga_convergence.sh — convergence snapshot for task_id 7 of
+# parameters_mga.csv (batch_bbo / per_axes / config_mga_axes_total.json,
+# added 2026-09-18: "new run with 48 axes added for testing" +
+# "adapt solver threads").
 #
-# Uses config_mga_batch_bbo.json (max_iterations: 5000, cap confirmed live
-# in-log — NOT the 800 used by earlier sampling/bbo configs), so the log
-# reports convergence as "CI: [...] | target: 0.95".
-#   task 7 — row 7: batch_bbo minmax batch4, axes_config override
-#            (config_mga_axes_capex_periods.json), 2020_7a_5a_interval_3ts
-#            (historical — left untouched by the 2026-08-27 cum_capex
-#            cleanup; row 3, formerly also tracked here, was removed from
-#            parameters_mga.csv in that cleanup)
+# Uses config_mga_batch_bbo.json (max_iterations: 5000, tolerance_prob: 0.95
+# -- both left at their config defaults; task_id 7 only overrides
+# normalisation=per_axes, tolerance_explore=0.1, epsilon=0.07,
+# batch_size=n_workers=16, solver_threads=2), so the log reports convergence
+# as "CI: [...] | target: 0.95".
+#   task 7 — row 7: batch_bbo, per_axes normalisation, batch16,
+#            axes_config=config_mga_axes_total.json (48 axes: node_capex_
+#            cumulative + node_carbon_emissions_cumulative + node_capacity_
+#            ratio), 2020_7a_5a_interval_1ts, tolerance_explore=0.1,
+#            epsilon=0.07 -- no prior completed run, so there's no default
+#            job id to fall back to; pass the one sbatch actually gave you.
 #
-# Usage: ./check_mga_convergence.sh [JOBID_TASK7]
-#   Defaults to the job id running as of 2026-08-25: task 7 -> 11644976
-#   Pass an override positionally if that run finishes and gets resubmitted:
-#     ./check_mga_convergence.sh 11644976
+# Usage: ./check_mga_convergence.sh JOBID_TASK7
 ###############################################################################
 
-JOBID_T7="${1:-11644976}"
+if [[ -z "${1:-}" ]]; then
+  echo "Usage: $0 JOBID_TASK7  (job id sbatch printed when you submitted task_id 7)" >&2
+  exit 1
+fi
+JOBID_T7="$1"
 MAXITER=5000
 
 check_task () {
@@ -28,7 +34,7 @@ check_task () {
   sacct -j "$jobid" --format=JobID,Elapsed,State 2>/dev/null | grep -v "^$"
   echo
 
-  echo "=== task $task: batch_bbo minmax ($label, cap $MAXITER) ==="
+  echo "=== task $task: batch_bbo per_axes ($label, cap $MAXITER) ==="
   f="zen_run_mga_${jobid}_${task}.out"
   if [[ -f "$f" ]]; then
     awk -v cap="$MAXITER" '
@@ -47,4 +53,4 @@ check_task () {
   echo
 }
 
-check_task "$JOBID_T7" 7 "batch4, axes_config=config_mga_axes_capex_periods.json"
+check_task "$JOBID_T7" 7 "batch16, per_axes, axes_config=config_mga_axes_total.json"

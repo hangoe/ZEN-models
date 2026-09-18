@@ -49,6 +49,24 @@
 #   task_id 6 = batch_size=n_workers=32, solver_threads=2 -- same reasoning
 #               as task_id 5, needs its own #SBATCH profile too.
 #
+# task_id 7 added 2026-09-18 (commits "new run with 48 axes added for
+# testing" + "adapt solver threads") -- a different axes config from
+# task_id 0-6, not another share/capex_cum variant:
+#   task_id 7 = axes_config=config_mga_axes_total.json (48 axes: node_capex_
+#               cumulative and node_carbon_emissions_cumulative each give
+#               4 regions x 3 until_years, node_capacity_ratio gives 4
+#               regions x 3 years x 2 ratio_groups -- vs. task_id 0-6's
+#               12-axis config_mga_axes_capex_cum.json), normalisation=
+#               per_axes (not share/minmax), tolerance_explore=0.1 (vs.
+#               0.02), epsilon=0.07 (vs. the config's default 0.01),
+#               batch_size=n_workers=16, solver_threads=2 -- same batch/
+#               thread shape as task_id 5, so it needs task_id 5's #SBATCH
+#               profile below, not the 40cpu/4G standard. No prior
+#               completed run at any profile for this row, and 4x the axes
+#               of task_id 0-6 means more per_axes directions to explore
+#               per batch -- treat --time as unverified too, not just
+#               --mem-per-cpu/--cpus-per-task.
+#
 # Requires the MGA install step in setup_euler_env.sh to have been run once
 # (clones + installs ZEN-garden-plugins and near_optimal_tools/pyoNearOpt,
 # incl. the "bbo" extra needed by batch bbo mode).
@@ -78,9 +96,17 @@
 # 2 rows don't fit the 40cpu/4G standard profile:
 #   sbatch --array=5 --cpus-per-task=32 --mem-per-cpu=6G submit_euler_mga.sh   # task_id 5: batch16, 32cpu/192GB
 #   sbatch --array=6 --cpus-per-task=64 --mem-per-cpu=6G submit_euler_mga.sh   # task_id 6: batch32, 64cpu/384GB
-# Neither has a prior completed run at this profile (unlike the 14d/40cpu/4G
-# standard, backed by job 12374944_17's own 8d completion) -- watch their
-# first attempts and adjust --time/--mem-per-cpu if they OOM or run long.
+# None of task_id 5/6/7 has a prior completed run at this profile (unlike
+# the 14d/40cpu/4G standard, backed by job 12374944_17's own 8d completion)
+# -- watch their first attempts and adjust --time/--mem-per-cpu if they OOM
+# or run long.
+#
+# task_id 7 shares task_id 5's batch16/solver_threads=2 shape, so the same
+# 32cpu/192GB override applies -- but it's also the first run of the
+# per_axes/axes_total (48-axis) combination, so --time=14-00:00:00 (the
+# #SBATCH default) is an untested guess here, not a validated floor like it
+# is for task_id 0-4:
+#   sbatch --array=7 --cpus-per-task=32 --mem-per-cpu=6G submit_euler_mga.sh   # task_id 7: batch16/per_axes/axes_total, 32cpu/192GB, time unverified
 ###############################################################################
 
 #SBATCH --job-name=zen_run_mga
