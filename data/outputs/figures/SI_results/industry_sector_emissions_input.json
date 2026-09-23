@@ -49,28 +49,8 @@
     {
       "sheet": "FC_IND_PPP_E",
       "label": "Paper, pulp & printing",
-      "scope": "mixed",
-      "emissions_kt_co2": 21292.007233390603,
-      "subsplit": [
-        {
-          "sheet": "FC_IND_PPP_PA_E",
-          "label": "Paper",
-          "scope": "new",
-          "emissions_kt_co2": 16992.724149165417
-        },
-        {
-          "sheet": "FC_IND_PPP_PU_E",
-          "label": "Pulp",
-          "scope": null,
-          "emissions_kt_co2": 3839.0378767572993
-        },
-        {
-          "sheet": "FC_IND_PPP_PR_E",
-          "label": "Printing",
-          "scope": null,
-          "emissions_kt_co2": 460.2452074678854
-        }
-      ]
+      "scope": "new",
+      "emissions_kt_co2": 21292.007233390603
     },
     {
       "sheet": "FC_IND_FBT_E",

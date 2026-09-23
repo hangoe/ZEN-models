@@ -25,10 +25,13 @@ into second-level sheets purely to LABEL which slice is already inside Crystal
 Ball's existing (Mannhardt) scope vs. genuinely new (industry-heat extension):
   - FC_IND_NMM_E (Non-metallic minerals) -> CM (cement, old), GL (glass, new),
     CR (ceramics, new)
-  - FC_IND_PPP_E (Paper, pulp & printing) -> PA (paper, new); PU (pulp) and PR
-    (printing) are adjacent NACE activities Crystal Ball does not model at all.
   - FC_IND_CPC_E (Chemical & petrochemical) is entirely "old" (Mannhardt's
     "chemicals"), no further split needed.
+FC_IND_PPP_E (Paper, pulp & printing) is plotted as a single "new" bar (per
+user request) rather than split by its PA/PU/PR second-level sheets -- Paper
+is the industry-heat-extension sector Crystal Ball models, and Pulp/Printing
+are adjacent NACE activities it doesn't, but the bar is colored as a whole
+rather than partially grey.
 FC_IND_IS_E (Iron & steel) is entirely "old" ("steel"). FC_IND_FBT_E (Food,
 beverages & tobacco) is entirely "new" ("food"). The remaining 8 subsectors
 (non-ferrous metals, textile & leather, machinery, transport equipment, wood,
@@ -58,7 +61,7 @@ SUBSECTORS = [
     ("FC_IND_NFM_E", "Non-ferrous metals", None),
     ("FC_IND_CPC_E", "Chemical & petrochemical", "old"),
     ("FC_IND_NMM_E", "Non-metallic minerals", "mixed"),  # cement (old) + glass/ceramic (new)
-    ("FC_IND_PPP_E", "Paper, pulp & printing", "mixed"),  # paper (new) + pulp/printing (not modeled)
+    ("FC_IND_PPP_E", "Paper, pulp & printing", "new"),  # plotted as a single new-scope bar
     ("FC_IND_FBT_E", "Food, beverages & tobacco", "new"),
     ("FC_IND_TE_E", "Textiles & leather", None),
     ("FC_IND_MAC_E", "Machinery", None),
@@ -76,9 +79,6 @@ SUBSPLITS = {
     "FC_IND_NMM_E": [("FC_IND_NMM_CM_E", "Cement", "old"),
                       ("FC_IND_NMM_GL_E", "Glass", "new"),
                       ("FC_IND_NMM_CR_E", "Ceramics", "new")],
-    "FC_IND_PPP_E": [("FC_IND_PPP_PA_E", "Paper", "new"),
-                      ("FC_IND_PPP_PU_E", "Pulp", None),
-                      ("FC_IND_PPP_PR_E", "Printing", None)],
 }
 
 

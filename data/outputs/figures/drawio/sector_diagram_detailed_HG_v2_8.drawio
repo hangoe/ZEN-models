@@ -5480,9 +5480,6 @@
         <mxCell id="sIzcW78jNGWMeYsV0PqM-115" parent="sIzcW78jNGWMeYsV0PqM-1" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=5.904785156250057;fontFamily=Arial;" value="&lt;span style=&quot;color: rgb(181, 115, 157);&quot;&gt;TES: Steam&lt;/span&gt;" vertex="1">
           <mxGeometry height="40" width="70" x="1968.79" y="641.34" as="geometry" />
         </mxCell>
-        <mxCell id="SNLy8T9Nxr9TszzMtC7B-0" edge="1" parent="sIzcW78jNGWMeYsV0PqM-1" source="sIzcW78jNGWMeYsV0PqM-116" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="sIzcW78jNGWMeYsV0PqM-119" value="">
-          <mxGeometry relative="1" as="geometry" />
-        </mxCell>
         <mxCell id="sIzcW78jNGWMeYsV0PqM-116" parent="sIzcW78jNGWMeYsV0PqM-1" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=5.904785156250057;fontFamily=Arial;" value="&lt;span style=&quot;color: rgb(181, 115, 157);&quot;&gt;TES: Water&lt;/span&gt;" vertex="1">
           <mxGeometry height="40" width="70" x="1968.7899999999997" y="802.3399999999999" as="geometry" />
         </mxCell>
@@ -5498,7 +5495,7 @@
             <mxPoint x="2003.5900000000001" y="610.18" as="targetPoint" />
           </mxGeometry>
         </mxCell>
-        <mxCell id="sIzcW78jNGWMeYsV0PqM-119" parent="sIzcW78jNGWMeYsV0PqM-1" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=5.904785156250057;fontFamily=Arial;" value="&lt;span style=&quot;color: rgb(181, 115, 157);&quot;&gt;TES: water&lt;/span&gt;" vertex="1">
+        <mxCell id="sIzcW78jNGWMeYsV0PqM-119" parent="sIzcW78jNGWMeYsV0PqM-1" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=5.904785156250057;fontFamily=Arial;" value="&lt;span style=&quot;color: rgb(181, 115, 157);&quot;&gt;TES: Water&lt;/span&gt;" vertex="1">
           <mxGeometry height="40" width="70" x="1969.6599999999999" y="886.34" as="geometry" />
         </mxCell>
         <mxCell id="sIzcW78jNGWMeYsV0PqM-120" edge="1" parent="sIzcW78jNGWMeYsV0PqM-1" style="endArrow=none;html=1;rounded=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;entryPerimeter=0;fontFamily=Arial;" target="sIzcW78jNGWMeYsV0PqM-119" value="">

@@ -2695,13 +2695,14 @@ def fig8_industry_sector_emissions_context() -> None:
     industry-heat extension) model, relative to the rest of European
     industry": each bar is colored/stacked by whether that slice is inside
     Mannhardt's original 11-sector scope (blue), the four new industry-heat
-    sectors added here (turquoise), or not modeled at all (grey). Three
-    subsectors are split into their JRC-IDEES second-level components so this
-    line can be drawn correctly INSIDE a bar rather than per whole subsector:
-    "Non-metallic minerals" -> cement (old) + glass/ceramics (new); "Paper,
-    pulp & printing" -> paper (new) + pulp/printing (not modeled). See
-    extract_industry_sector_emissions.py for the extraction and the full
-    scope-mapping rationale.
+    sectors added here (turquoise), or not modeled at all (grey). One
+    subsector, "Non-metallic minerals", is split into its JRC-IDEES
+    second-level components so this line can be drawn correctly INSIDE the
+    bar rather than per whole subsector: cement (old) + glass/ceramics (new).
+    "Paper, pulp & printing" is plotted as a single new-scope bar instead
+    (per user request), rather than splitting out its unmodeled pulp/printing
+    slice. See extract_industry_sector_emissions.py for the extraction and
+    the full scope-mapping rationale.
 
     CAVEAT: these are JRC-IDEES's energy-related (fuel combustion) emissions
     only — the IPCC 1.A methodology JRC-IDEES itself uses — and do NOT
