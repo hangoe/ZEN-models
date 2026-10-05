@@ -56,6 +56,16 @@ CHANGES:
 Run one row by hand (local test):   python run_model.py --task_id 0 --run_on local
 On Euler it is launched by submit_euler.sh (or submit_euler_mga.sh) via the
 SLURM array.
+KNOWN ISSUE (ZEN-garden, not patched here): for interval_between_years (dy) > 1,
+`constraint_technology_diffusion_limit` in zen_garden/model/technology/technology.py
+scales the growth term correctly ((1+max_diffusion_rate)**dy - 1) but NOT the
+"unbounded" terms -- `market_share_unbounded * capacity_previous` and
+`capacity_addition_unbounded` are per-year amounts, while capacity additions are
+per investment period. The docstring states dy*(xi*sum(S) + zeta), but the code
+omits the factor dy, so at dy=2 the unbounded diffusion allowance is effectively
+halved (no effect at dy=1). Results at dy > 1 (e.g. v9 and the 2a v10 runs) are
+therefore slightly more diffusion-constrained than intended. Left unfixed on purpose.
+
 """
 
 import argparse

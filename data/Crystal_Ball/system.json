@@ -122,8 +122,8 @@
     "UK"
   ],
   "reference_year": 2020,
-  "optimized_years": 31,
-  "interval_between_years": 1,
+  "optimized_years": 15,
+  "interval_between_years": 2,
   "use_rolling_horizon": false,
   "aggregated_time_steps_per_year": 10,
   "conduct_time_series_aggregation": true

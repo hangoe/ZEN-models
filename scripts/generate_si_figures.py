@@ -305,6 +305,7 @@ from plots.figure_settings import (
     HOURS_PER_YEAR,
     Run,
     SCENARIO_PALETTE,
+    COLOR_MAP,
     _apply_shared_ylim,
     _search_var_dict,
     _text_color_for_bg,
@@ -439,15 +440,25 @@ def by_label(runs: list[Run], label: str) -> Run:
     return next(r for r in runs if r.label == label)
 
 
-def savefig(fig: plt.Figure, name: str, subdir: str | None = None) -> None:
+def savefig(fig: plt.Figure, name: str, subdir: str | None = None, extra_artists=None) -> None:
     """subdir=None writes straight into FIGURES_DIR (SI_results/) as before;
     subdir="method" (or "archive") writes into that subfolder instead — see
     the module docstring's "Figure organization" note for which figures use
-    which."""
+    which.
+
+    extra_artists: pass any Legend created via ax.add_artist() (i.e. every
+    legend after the first on a given axes) here. bbox_inches="tight"'s own
+    tight-bbox pass only walks each axes' *current* ax.legend_, so a second
+    legend added via add_artist is silently excluded from the sizing
+    calculation — its content still renders but gets cropped off by the
+    canvas bbox_inches="tight" computes. bbox_extra_artists is matplotlib's
+    documented fix: it folds these into that same bbox calculation. Found via
+    fig7_retrofit_ccs_comparison's two side-by-side (Scenario/Year) legends
+    being clipped despite fitting comfortably within the figure's own size."""
     directory = FIGURES_DIR / subdir if subdir else FIGURES_DIR
     directory.mkdir(parents=True, exist_ok=True)
     path = directory / f"{name}.svg"
-    fig.savefig(path, bbox_inches="tight")
+    fig.savefig(path, bbox_inches="tight", bbox_extra_artists=extra_artists)
     plt.close(fig)
     print(f"  wrote {path.relative_to(REPO_ROOT)}")
 
@@ -1233,10 +1244,12 @@ def _ccs_captured_by_tech(r, year: int) -> pd.Series:
 
 
 def fig5_retrofit_ccs_comparison(no_flex_run: Run, base_run: Run) -> None:
-    """CO2 actually captured that year (kt CO2eq) by each retrofit-CCS
-    technology, "No flexibility" (v9_0) vs. "Crystal Ball (base)", year YEAR.
-    See RETROFIT_CCS_TECHS above for which technologies count as "retrofit"
-    and why DAC/carbon_storage/carbon_pipeline are excluded.
+    """CO2 actually captured (kt CO2eq) by each retrofit-CCS technology,
+    "No flexibility" (v9_0) vs. "Crystal Ball (base)", for 2030/2040/2050 —
+    one axes, grouped bars (per tech: base 2030/2040/2050, then no-flex
+    2030/2040/2050). See RETROFIT_CCS_TECHS above for which technologies
+    count as "retrofit" and why DAC/carbon_storage/carbon_pipeline are
+    excluded.
 
     This used to be a 2-panel figure (installed capture CAPACITY alongside
     captured CO2). The capacity panel was dropped per user question ("are you
@@ -1280,30 +1293,46 @@ def fig5_retrofit_ccs_comparison(no_flex_run: Run, base_run: Run) -> None:
     """
     runs = [(base_run.label, base_run, SCENARIO_PALETTE[6]),
             (no_flex_run.label, no_flex_run, SCENARIO_PALETTE[0])]
+    years = [2030, 2040, 2050]
+    year_alphas = [0.45, 0.7, 1.0]  # lighter = earlier year, full color = 2050
 
-    df = pd.DataFrame({label: _ccs_captured_by_tech(run.results, YEAR) for label, run, _ in runs})
-    df = df.reindex(RETROFIT_CCS_TECHS).fillna(0.0)
-    df = df[(df.abs() > 1e-6).any(axis=1)]
+    dfs = {year: pd.DataFrame({label: _ccs_captured_by_tech(run.results, year) for label, run, _ in runs})
+                   .reindex(RETROFIT_CCS_TECHS).fillna(0.0)
+           for year in years}
+    keep_techs = [t for t in RETROFIT_CCS_TECHS if any((dfs[y].loc[t].abs() > 1e-6).any() for y in years)]
 
-    fig, ax = plt.subplots(figsize=(9, 6))
-    n = len(runs)
-    width = 0.8 / n
-    x = np.arange(len(df))
-    for i, (label, _, color) in enumerate(runs):
-        offsets = x + (i - (n - 1) / 2) * width
-        ax.bar(offsets, df[label].to_numpy(), width, label=label, color=color, edgecolor="white")
+    # 6 narrow bars per tech cluster: base 2030/2040/2050, gap, no-flex 2030/2040/2050.
+    bar_w = 0.11
+    pad = 0.02
+    group_gap = 0.08
+    unit = bar_w + pad
+    raw_positions = np.array([0, 1, 2, 3, 4, 5], dtype=float)
+    raw_positions[3:] += group_gap / unit
+    raw_positions -= raw_positions.mean()
+    offsets = raw_positions * unit
+
+    x = np.arange(len(keep_techs))
+    fig, ax = plt.subplots(figsize=(13, 5.5))
+    for s, (label, _, color) in enumerate(runs):
+        for j, (year, alpha) in enumerate(zip(years, year_alphas)):
+            vals = dfs[year].loc[keep_techs, label].to_numpy()
+            ax.bar(x + offsets[s * 3 + j], vals, bar_w, color=color, alpha=alpha, edgecolor="white", linewidth=0.5)
     ax.set_xticks(x)
-    ax.set_xticklabels([RETROFIT_CCS_LABELS[t] for t in df.index], fontsize=8.5)
-    ax.set_ylabel(f"CO$_2$ captured, {YEAR} [ktCO$_2$eq]")
+    ax.set_xticklabels([RETROFIT_CCS_LABELS[t] for t in keep_techs], fontsize=8.5)
+    ax.set_ylabel("CO$_2$ captured [ktCO$_2$eq]")
     ax.grid(axis="y", alpha=0.3)
-    ax.legend(fontsize=9, frameon=False, loc="upper left")
-    fig.suptitle(f"Retrofit Carbon-Capture: CO$_2$ Actually Captured - Year {YEAR}", fontsize=13, fontweight="bold")
-    ax.text(0.5, -0.14,
-             "Installed capacity omitted: shared regardless of cost by a deployment-rate ceiling from a zero\n"
-             "real-world base, and 2 of 8 techs cost literally $0 to build in this dataset - see docstring.",
-             transform=ax.transAxes, ha="center", va="top", fontsize=7.5, style="italic", color="#555555")
-    fig.tight_layout(rect=[0, 0, 1, 0.95])
-    savefig(fig, "fig7_retrofit_ccs_comparison")
+
+    scenario_handles = [Patch(facecolor=color, alpha=1.0, label=label) for label, _, color in runs]
+    year_handles = [Patch(facecolor="#555555", alpha=a, label=str(year)) for year, a in zip(years, year_alphas)]
+    leg1 = ax.legend(handles=scenario_handles, fontsize=9, frameon=False,
+                      loc="upper left", bbox_to_anchor=(1.01, 1.0), title="Scenario", title_fontsize=9)
+    ax.add_artist(leg1)
+    leg2 = ax.legend(handles=year_handles, fontsize=9, frameon=False,
+                      loc="upper left", bbox_to_anchor=(1.01, 0.72), title="Year", title_fontsize=9)
+
+    fig.suptitle("Retrofit Carbon-Capture: CO$_2$ Capture", fontsize=13, fontweight="bold")
+    fig.tight_layout(rect=[0, 0, 0.8, 0.96])
+    savefig(fig, "fig7_retrofit_ccs_comparison", extra_artists=[leg1, leg2])
 
 
 # ── 2: DSM cycles by product, 2050 ──────────────────────────────────────────
@@ -1374,6 +1403,46 @@ def fig2_dsm_cycles_by_product(runs: list[Run]) -> None:
     ax.grid(axis="y", alpha=0.3)
     fig.tight_layout()
     savefig(fig, "fig5_dsm_cycles_by_product")
+
+
+def fig5b_dsm_discharge_by_product(runs: list[Run]) -> None:
+    # Companion to fig5: absolute annual DSM throughput per product over the
+    # whole horizon, stacked by product, optimistic vs pessimistic. Charge and
+    # discharge are identical (no storage losses), so only discharge is shown.
+    # Products keep their ETH COLOR_MAP colors; ammonia/methanol (GWh) are
+    # hatched as in fig5 since they are not directly comparable with kt.
+    scenarios = ["Full flexibility", "DSM pessimistic"]
+    titles = {"Full flexibility": "Optimistic (Full flexibility)",
+              "DSM pessimistic": "Pessimistic (DSM pessimistic)"}
+    pretty = lambda t: t.replace("_DSM", "").replace("_", " ")
+    color_map = {pretty(t): COLOR_MAP[t] for t in INDUSTRY_DSM_TECHS}
+    hatch_map = {pretty(t): "//" for t in DSM_ENERGY_CARRIER_TECHS}
+
+    dfs = []
+    for label in scenarios:
+        r = by_label(runs, label).results
+        df = get_storage_flows(r, INDUSTRY_DSM_TECHS, "flow_storage_discharge")
+        years = get_available_years(r)
+        df = df.reindex(columns=years).fillna(0.0)
+        df.index = [pretty(t) for t in df.index]
+        dfs.append(df)
+    # Stack order: largest total over both scenarios at the bottom.
+    order = pd.concat(dfs).groupby(level=0).sum().sum(axis=1).sort_values(ascending=False).index
+    dfs = [d.reindex([t for t in order if t in d.index]) for d in dfs]
+
+    fig, axes = plt.subplots(2, 1, figsize=(0.8 * len(dfs[0].columns) + 3, 11))
+    with plt.rc_context({"hatch.linewidth": 0.5}):
+        for i, (ax, df, label) in enumerate(zip(axes, dfs, scenarios)):
+            plot_stacked_bars(df, f"DSM Charge/Discharge by Product - {titles[label]}",
+                              "Annual charge = discharge (kt product; GWh for ammonia, methanol)",
+                              ax, show_segment_labels=False, show_legend=(i == 0),
+                              color_map=color_map, hatch_map=hatch_map)
+    _apply_shared_ylim(list(axes), dfs)
+    for ax in axes:
+        plt.setp(ax.get_xticklabels(), rotation=0)
+        ax.set_ylabel(ax.get_ylabel(), fontsize=8)
+    fig.tight_layout()
+    savefig(fig, "fig5b_dsm_discharge_by_product")
 
 
 # ── 3b: Direct vs temperature-conversion heat pathway, 2050 ─────────────────
@@ -4831,6 +4900,7 @@ def main() -> None:
     fig1a_cost_delta(metrics)
     fig1b_industry_capacity(runs)
     fig2_dsm_cycles_by_product(runs)
+    fig5b_dsm_discharge_by_product(runs)
     if any(r.label == "Single temperature level" for r in runs):
         fig3b_heat_pathway(runs)
         # fig14a/fig14b: No flexibility vs. its single-temp counterpart AND
