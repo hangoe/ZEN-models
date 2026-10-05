@@ -2189,6 +2189,237 @@ def fig6_diffusion_mechanisms(runs: list[Run]) -> None:
     savefig(fig, "fig8_diffusion_mechanisms")
 
 
+# ── 8a: Same diffusion-limit decomposition, for the 6 industry heat pumps ──
+# Built to diagnose the "0-100/100-150 °C HPs jump to full deployment in
+# 2022" pattern. Finding (verified by reconstructing the constraint RHS
+# exactly - HPs have no existing capacity and a zero unbounded floor, so
+# unlike fig8's wind/PV case the reconstruction has no approximation and
+# matches the solver to rounding wherever it binds, e.g. 150-200 °C: 0.65 GW
+# in 2020 = 0.02 x 32.7 GW of boilers): the diffusion constraint itself is
+# implemented as documented, but the MARKET-SHARE term for the 0-100 and
+# 100-150 °C bands is fed by heat_industry_temp_conversion_100/150. Those
+# share the HPs' reference carrier and conversion class, have capex=0 and
+# max_diffusion_rate=inf, so their capacity is degenerate (any size is
+# cost-free) and the solver returns 54,000-150,000 GW - ~5,000x their actual
+# peak flow (~11-31 GW). 2% of that makes the HP constraint inactive from
+# 2022 on. In 2020 temp-conversion has no existing capacity, so the same term
+# is exactly 0 and the HPs are blocked - hence "nothing in 2020, everything
+# economic in 2022". The size of the 2022 jump is then set by the waste-heat
+# HPs' capacity_limit and by band demand, not by diffusion. The 150-200 °C
+# band has a real boiler fleet as its peer group and is correctly
+# diffusion-bound. Same loophole exists for natural_gas_to_kilnfuel vs. the
+# electricity/hydrogen kiln-fuel techs (not plotted here).
+DIFFUSION_HP_TECHS = [
+    ("heat_pump_industry_0_100_waste_heat", "HP 0-100 °C (waste heat)", _ETH_BLUE),
+    ("heat_pump_industry_0_100_water", "HP 0-100 °C (water)", _ETH_BLUE),
+    ("heat_pump_industry_100_150_waste_heat", "HP 100-150 °C (waste heat)", _ETH_TURQUOISE),
+    ("heat_pump_industry_100_150_water", "HP 100-150 °C (water)", _ETH_TURQUOISE),
+    ("heat_pump_industry_150_200_waste_heat", "HP 150-200 °C (waste heat)", _ETH_RED),
+    ("heat_pump_industry_150_200_water", "HP 150-200 °C (water)", _ETH_RED),
+]
+
+
+def _zero_cost_unlimited_techs(r) -> set[str]:
+    """Conversion techs with capex_specific_conversion=0 AND
+    max_diffusion_rate=inf - i.e. pure bookkeeping/pass-through techs whose
+    installed capacity is cost-free and therefore degenerate (the solver may
+    return any value >= peak flow). In this dataset: the 2 temp-conversion
+    techs and natural_gas_to_kilnfuel."""
+    capex = r.get_total("capex_specific_conversion").groupby(level="technology").mean().iloc[:, 0]
+    mdr = r.get_total("max_diffusion_rate").iloc[:, 0]
+    return {t for t, c in capex.items() if c == 0 and not np.isfinite(mdr.get(t, np.inf))}
+
+
+def _market_share_term_split(r, tech: str, years: list[int]) -> tuple[pd.Series, pd.Series, list[str]]:
+    """Same quantity as _market_share_term, split into (real peers, zero-cost/
+    unlimited peers) so the degenerate-capacity contribution can be shown
+    separately. Also returns the zero-cost peer names. Unlike
+    _market_share_term, the peer set INCLUDES `tech` itself - matching
+    technology.py, whose class set contains the technology's own
+    capacity_previous (immaterial for fig8's wind/PV, not for a cold-start HP)."""
+    msu = float(r.get_total("market_share_unbounded").iloc[0])
+    ref_carriers = r.get_df("set_reference_carriers")
+    peers = [t for t, c in ref_carriers.items() if c == ref_carriers.get(tech)]
+    free = _zero_cost_unlimited_techs(r)
+    real, artifact = pd.Series(0.0, index=years), pd.Series(0.0, index=years)
+    for peer in peers:
+        s = _series_by_tech(r, "capacity_previous", peer).reindex(years).fillna(0.0)
+        if peer in free:
+            artifact += s
+        else:
+            real += s
+    return real * msu, artifact * msu, [p for p in peers if p in free]
+
+
+def _peak_output_by_year(r, tech: str, years: list[int]) -> pd.Series:
+    """Sum over nodes of each node's maximum hourly flow_conversion_output,
+    per year: the capacity `tech` would need if it were sized to what it
+    actually delivers (i.e. if its capacity were not cost-free/degenerate)."""
+    fo = r.get_full_ts("flow_conversion_output")
+    sub = fo[fo.index.get_level_values("technology") == tech]
+    n = sub.shape[1] // len(years)
+    assert n * len(years) == sub.shape[1], "full time series not evenly divisible into years"
+    return pd.Series({y: float(sub.iloc[:, i * n:(i + 1) * n].max(axis=1).sum()) for i, y in enumerate(years)})
+
+
+def fig8a_diffusion_mechanisms_heat_pumps(runs: list[Run]) -> None:
+    """fig8's layout applied to the 6 industry heat pumps, "No flexibility".
+
+    Row 1: installed capacity vs. capacity_limit (finite only for the
+    waste-heat HPs - a waste-heat-source potential, not a diffusion bound).
+
+    Row 2: actual capacity addition vs. the exact diffusion-limit RHS,
+    stacked: knowledge/history term, market-share term from real peers
+    (boilers, the HPs themselves) and market-share term from zero-cost/
+    unlimited peers (temp-conversion - grey, hatched). The unbounded-addition
+    floor is 0 for every HP and omitted. Bars above the y-limit are clipped
+    and their range annotated (they are 100-1000x the axis). Dashed line, 0-
+    150 °C bands only: the market-share term if temp-conversion were sized to
+    its actual peak flow instead of its degenerate capacity - what the
+    constraint would allow with a physically meaningful peer capacity.
+
+    Row 3: annual heat output per temperature band (TWh) - shows the 0-100 °C
+    band switching 100% from temp-conversion (cascaded boiler heat) to HPs
+    within one period (2020 -> 2022). 150-200 °C output includes heat later
+    cascaded down to the lower bands.
+
+    See the module comment above DIFFUSION_HP_TECHS for the finding."""
+    run = by_label(runs, "No flexibility")
+    r = run.results
+    years = get_available_years(r)
+    msu = float(r.get_total("market_share_unbounded").iloc[0])
+    xw = 1.6
+
+    fig = plt.figure(figsize=(22, 13))
+    gs = fig.add_gridspec(3, 6, height_ratios=[1, 1.15, 1], hspace=0.55, wspace=0.28)
+    for col, (tech, label, color) in enumerate(DIFFUSION_HP_TECHS):
+        installed = _series_by_tech(r, "capacity", tech).reindex(years).fillna(0.0)
+        addition = _series_by_tech(r, "capacity_addition", tech).reindex(years).fillna(0.0)
+        potential = _site_potential(r, tech)
+        tint = 0.0 if "waste_heat" in tech else 0.35
+
+        ax1 = fig.add_subplot(gs[0, col])
+        ax1.bar(years, installed, width=xw, color=_eth_tint(color, tint),
+                label="Installed capacity" if col == 0 else None)
+        if np.isfinite(potential):
+            ax1.axhline(potential, color=color, linestyle="--", linewidth=1.2,
+                        label="capacity_limit" if col == 0 else None)
+            ax1.set_title(f"{label}\n(capacity_limit: {potential:,.2f} GW)", fontsize=9.5)
+        else:
+            ax1.set_title(f"{label}\n(capacity_limit = inf)", fontsize=9.5)
+        if col == 0:
+            ax1.set_ylabel("Installed capacity [GW]")
+            ax1.legend(fontsize=7.5, frameon=True, facecolor="white", framealpha=0.9,
+                       edgecolor="none", loc="lower right")
+        ax1.grid(axis="y", alpha=0.25)
+
+        ax2 = fig.add_subplot(gs[1, col])
+        knowledge = _knowledge_history_term(r, tech, years).reindex(years).fillna(0.0)
+        real, artifact, free_peers = _market_share_term_split(r, tech, years)
+        segments = [
+            (knowledge.to_numpy(), "Knowledge/history term", _eth_tint(color, 0.05), None),
+            (real.to_numpy(), "Market-share term: real peers", _eth_tint(color, 0.5), None),
+            (artifact.to_numpy(), "Market-share term: zero-cost temp-conversion capacity",
+             _eth_tint(_ETH_GREY, 0.55), "////"),
+        ]
+        stack_top = knowledge + real + artifact
+        clipped = artifact.max() > 0
+        ylim = (max(addition.max(), (knowledge + real).max()) * 1.6) if clipped else None
+        bottom = np.zeros(len(years))
+        with plt.rc_context({"hatch.linewidth": 0.5}):
+            for vals, comp_label, comp_color, hatch in segments:
+                ax2.bar(years, vals, width=xw, bottom=bottom, color=comp_color, hatch=hatch,
+                        edgecolor="white", linewidth=0.4, label=comp_label if col in (0, 2) else None)
+                bottom += vals
+        ax2.plot(years, addition.to_numpy(), color="black", marker="o", markersize=3.5,
+                 linewidth=1.2, label="Actual capacity addition" if col == 0 else None)
+        if clipped:
+            ax2.set_ylim(0, ylim)
+            off = stack_top[stack_top > ylim]
+            ax2.text(0.97, 0.97,
+                     f"bars off-scale from {off.index[0]}:\n{off.min():,.0f}-{off.max():,.0f} GW\n"
+                     f"({artifact[off.index].sum() / off.sum():.1%} from {', '.join(free_peers)})",
+                     transform=ax2.transAxes, ha="right", va="top", fontsize=7,
+                     bbox=dict(facecolor="white", edgecolor="none", alpha=0.85))
+            for peer in free_peers:
+                peak = _peak_output_by_year(r, peer, years)
+                hp_prev = (real / msu)  # real peers' capacity_previous
+                ax2.plot(years, msu * (peak + hp_prev).to_numpy(), color=_ETH_GREY,
+                         linestyle="--", linewidth=1.2,
+                         label="Market-share term if temp-conversion\nsized to its actual peak flow"
+                         if col == 0 else None)
+        if col == 0:
+            ax2.set_ylabel("Capacity added per period [GW]")
+        ax2.set_xlabel("Year")
+        ax2.grid(axis="y", alpha=0.25)
+        if col == 0:
+            row2_axes = [ax2]
+        else:
+            row2_axes.append(ax2)
+
+    # One shared row-2 legend (collected across columns: the zero-cost
+    # segment only exists for columns 0-3) placed between rows 2 and 3, so
+    # it never covers the off-scale annotation.
+    handles, labels = {}, []
+    for ax in row2_axes:
+        for h, lbl in zip(*ax.get_legend_handles_labels()):
+            if lbl not in handles:
+                handles[lbl] = h
+                labels.append(lbl)
+    fig.legend([handles[l] for l in labels], labels, loc="center", ncol=len(labels),
+               bbox_to_anchor=(0.5, 0.345), fontsize=8, frameon=False)
+
+    # Temp-conversion is (near-)lossless 1:1, so a band's own net heat =
+    # supplier output minus the output of the temp-conversion tech that
+    # passes heat on to the next-lower band. Without this, 2020's 100-150 °C
+    # bar would also contain the 0-100 °C band's entire cascaded heat.
+    band_specs = [
+        ("0-100 °C", ["heat_industry_temp_conversion_100"], None,
+         DIFFUSION_HP_TECHS[0:2], _ETH_BLUE),
+        ("100-150 °C", ["heat_industry_temp_conversion_150"], "heat_industry_temp_conversion_100",
+         DIFFUSION_HP_TECHS[2:4], _ETH_TURQUOISE),
+        ("150-200 °C", [t for t in INDUSTRY_HEAT_TECHS_BOILERS_HP if "boiler" in t],
+         "heat_industry_temp_conversion_150", DIFFUSION_HP_TECHS[4:6], _ETH_RED),
+    ]
+    for i, (band, other_techs, cascade_out, hp_specs, color) in enumerate(band_specs):
+        ax3 = fig.add_subplot(gs[2, 2 * i:2 * i + 2])
+        other = _output_annual_twh(run, other_techs).sum(axis=0).reindex(years).fillna(0.0)
+        hps = _output_annual_twh(run, [t for t, _, _ in hp_specs]).reindex(
+            [t for t, _, _ in hp_specs]).fillna(0.0)
+        if cascade_out is not None:
+            passed_on = _output_annual_twh(run, [cascade_out]).sum(axis=0).reindex(years).fillna(0.0)
+            # Attribute the passed-on heat to the non-HP supplier first (HPs
+            # are 100% of a band's net output only if they exceed it).
+            other = (other - passed_on).clip(lower=0.0)
+        other_label = "Temp-conversion (cascaded boiler heat)" if i < 2 else "Boilers (all fuels)"
+        ax3.bar(years, other, width=xw, color=_eth_tint(_ETH_GREY, 0.55), label=other_label)
+        bottom = other.to_numpy().copy()
+        for t, lbl, _ in hp_specs:
+            vals = hps.loc[t].reindex(years).fillna(0.0).to_numpy() if t in hps.index else np.zeros(len(years))
+            ax3.bar(years, vals, width=xw, bottom=bottom,
+                    color=_eth_tint(color, 0.0 if "waste_heat" in t else 0.35), label=lbl)
+            bottom += vals
+        ax3.set_title(f"Annual heat output, {band} band"
+                      + (" (net of heat cascaded to lower bands)" if cascade_out else ""), fontsize=9.5)
+        if i == 0:
+            ax3.set_ylabel("Heat output [TWh/yr]")
+        ax3.set_xlabel("Year")
+        ax3.legend(fontsize=7, frameon=True, facecolor="white", framealpha=0.9,
+                   edgecolor="none", loc="upper right")
+        ax3.grid(axis="y", alpha=0.25)
+
+    fig.suptitle("Technology-Diffusion Limit for Industrial Heat Pumps\n"
+                 f"No flexibility, {years[0]}-{years[-1]} - row 2 is the exact diffusion-limit RHS "
+                 "(no approximation: HPs have no existing capacity)", fontsize=12.5)
+    fig.text(0.5, 0.035,
+             "Temp-conversion techs have capex = 0 and max_diffusion_rate = inf, so their capacity is "
+             "degenerate (~5,000x peak flow). Because they share the 0-100/100-150 °C HPs' reference "
+             "carrier, 2% of that capacity enters the HPs' market-share term and makes the diffusion "
+             "limit non-binding from 2022 on.",
+             ha="center", va="bottom", fontsize=8, style="italic", color="#555555", wrap=True)
+    savefig(fig, "fig8a_diffusion_mechanisms_heat_pumps")
+
+
 # ── 0b: Emissions-source comparison, Full flexibility vs Crystal Ball base ──
 
 # Print-figure-specific ETH palette (does NOT touch the shared, dashboard-wide
@@ -4624,6 +4855,7 @@ def main() -> None:
     fig4b_industry_fuel_demand_comparison(runs)
     if any(r.label == "No flexibility" for r in runs):
         fig6_diffusion_mechanisms(runs)
+        fig8a_diffusion_mechanisms_heat_pumps(runs)
         fig7_heat_supply_trajectory(runs)
         fig9c_heat_supply_output_twh_for(runs, "No flexibility",
                                           "fig15a_heat_supply_output_no_flexibility_twh")
