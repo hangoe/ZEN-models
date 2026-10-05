@@ -3,6 +3,8 @@ discovery, Results loading, and matplotlib plotting primitives. Used by both
 the Streamlit dashboard (streamlit/app.py) and standalone figure-generation
 scripts (e.g. generate_si_figures.py) — this module owns no UI logic itself."""
 
+import re
+import textwrap
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -66,14 +68,12 @@ def apply_font_mode() -> None:
 # (see parameters.csv). The 7th, the unmodified "Crystal Ball (base)" dataset
 # (data/Crystal_Ball, run as bare "Crystal_Ball" with no Crystal_Ball_HG_v7_0
 # prefix — see run_model.py), is the pre-industry-heat-extension reference
-# point and is intentionally NOT in this list: it has no industry heat/DSM/TES
-# sector, doesn't match this prefix scheme, and its euler run hadn't completed
-# as of this writing. Once its output folder exists, it needs deliberate
-# handling in generate_si_figures.py rather than folding it in here — see the
-# comment on SCENARIOS in that file.
-# Order matches Table SIScenarios (excluding "Crystal Ball (base)", the row
-# before "No flexibility" there — see the module docstring above).
+# point: it has no industry heat/DSM/TES sector at all, so it's labeled
+# "Baseline" here (distinct from "Full Flexibility" below, which HAS the
+# industry-heat sector with every flexibility option available). Listed first
+# since it's the row before "No flexibility" in Table~SIScenarios.
 EULER_SCENARIO_ORDER = [
+    "Crystal_Ball",
     "Crystal_Ball_ind_heat_v9_0_no_flexibility",
     "Crystal_Ball_ind_heat_v9_0",
     "Crystal_Ball_ind_heat_v9_0_DSM_pessimistic",
@@ -84,18 +84,26 @@ EULER_SCENARIO_ORDER = [
     # (technology diffusion-rate constraint disabled entirely). Listed here,
     # even though generate_si_figures.py's SCENARIOS doesn't include it,
     # purely so _match_scenario_base's longest-prefix-wins logic doesn't
-    # mis-sort/mislabel it as "Baseline" (it otherwise shares the
-    # "Crystal_Ball_ind_heat_v9_0_" prefix with the base run).
+    # mis-sort/mislabel it as "Full Flexibility" (it otherwise shares the
+    # "Crystal_Ball_ind_heat_v9_0_" prefix with that base run).
     "Crystal_Ball_ind_heat_v9_0_nodiffusion",
+    # No-flexibility + single-temp combo run. Also not a Table~SIScenarios
+    # entry — same reasoning as nodiffusion above: without a dedicated entry
+    # here, this collapses onto the bare "Crystal_Ball_ind_heat_v9_0" base
+    # (its folder name doesn't contain "no_flexibility_" as a sub-prefix) and
+    # mislabels as "Full Flexibility", indistinguishable from that base run.
+    "Crystal_Ball_ind_heat_v9_0_no_flex_single_temp",
 ]
 EULER_SCENARIO_LABELS = {
+    "Crystal_Ball": "Baseline",
     "Crystal_Ball_ind_heat_v9_0_no_flexibility": "No Flexibility",
-    "Crystal_Ball_ind_heat_v9_0": "Baseline",
+    "Crystal_Ball_ind_heat_v9_0": "Full Flexibility",
     "Crystal_Ball_ind_heat_v9_0_DSM_pessimistic": "DSM Pessimistic",
     "Crystal_Ball_ind_heat_v9_0_DSM_only": "DSM Only",
     "Crystal_Ball_ind_heat_v9_0_TES_only": "TES Only",
     "Crystal_Ball_ind_heat_v9_0_single_temp": "Single-Temp",
     "Crystal_Ball_ind_heat_v9_0_nodiffusion": "No Diffusion Limit",
+    "Crystal_Ball_ind_heat_v9_0_no_flex_single_temp": "No Flexibility, Single-Temp",
 }
 # Positional per-run colors (run slot -> color), independent of the
 # technology-keyed COLOR_MAP below. Used for run-identity lines/swatches only
@@ -509,10 +517,23 @@ def sort_euler_scenarios(names: list[str]) -> list[str]:
 
 
 def euler_label(name: str) -> str:
+    """Human label for a euler folder name, plus any run-comment suffix info
+    (timestep count, standalone "nodiffusion" tag) the base scenario label
+    alone would otherwise hide — needed because several scenarios exist in
+    multiple timestep/no-diffusion variants that would else render identically
+    in the dashboard's model picker."""
     base = _match_scenario_base(name)
-    if base is not None:
-        return EULER_SCENARIO_LABELS[base]
-    return name.replace("Crystal_Ball_HG_", "")
+    label = EULER_SCENARIO_LABELS[base] if base is not None else name.replace("Crystal_Ball_HG_", "")
+
+    extras = []
+    if re.search(r"(?:^|_)nodiffusion(?:_|$)", name) and "nodiffusion" not in (base or ""):
+        extras.append("No Diffusion")
+    ts_match = re.search(r"_interval_(\d+)ts(?:_|$)", name)
+    if ts_match:
+        extras.append(f"{ts_match.group(1)}ts")
+    if extras:
+        label = f"{label} ({', '.join(extras)})"
+    return label
 
 
 @dataclass(frozen=True)
@@ -524,9 +545,35 @@ class Run:
     color: str          # positional slot color from SCENARIO_PALETTE
 
 
-def fig_width_for_runs(n_runs: int, per_run: float = 3.4, legend_margin: float = 2.5) -> float:
-    """Total figure width for a rows x n_runs comparison grid."""
+def fig_width_for_runs(n_runs: int, per_run: float | None = None, legend_margin: float = 1.0) -> float:
+    """Total figure width for a rows x n_runs comparison grid.
+
+    `per_run` defaults wide (6.0") for the common 1-2 run case — with the
+    per-row legend now living ABOVE each row (see
+    `plot_stacked_bars_years_n`/`finalize_figure`) instead of squeezed into a
+    fixed right-hand margin, columns can be much wider, which also keeps a
+    row's merged legend from wrapping into many lines. It tapers down as
+    `n_runs` grows (e.g. the "all euler scenarios" 13-way view) so the whole
+    figure doesn't balloon to ~80" wide and get rendered illegibly small once
+    Streamlit scales it down to fit the screen."""
+    if per_run is None:
+        per_run = 6.0 if n_runs <= 2 else max(3.2, 6.0 - 0.35 * (n_runs - 2))
     return legend_margin + per_run * max(n_runs, 1)
+
+
+def fig_height_for_rows(n_rows: int, per_row: float) -> float:
+    """Total figure height for `n_rows` stacked `plot_stacked_bars_years_n`
+    comparison rows, each `per_row` inches tall. No extra legend headroom is
+    added here — `_add_row_legends` attaches each row's legend as a real
+    child artist of that row's first axis (via `ax.legend`, not `fig.legend`)
+    BEFORE the final `tight_layout()` pass, so `tight_layout` sees it like
+    any other title/tick-label artist and grows the row to fit natively.
+    (An earlier version tried reserving a flat extra height per row instead —
+    it didn't work: `tight_layout` doesn't turn unused figure height into a
+    gap for an artist it doesn't know about, it just enlarges each axes'
+    plot area to fill the available space, so the legend still collided with
+    whatever was already there.)"""
+    return n_rows * per_row
 
 
 def get_available_years(r: Results) -> list[int]:
@@ -549,6 +596,139 @@ def get_available_years(r: Results) -> list[int]:
 
 # ── Plotting primitives ───────────────────────────────────────────────────────
 
+def fit_title(ax: plt.Axes, text: str, fontsize: float) -> str:
+    """Wrap each line of `text` so it doesn't overflow this axis's own column
+    width. In a multi-run grid, adjacent axes sit close together, so a title
+    wider than its axis bleeds into the neighboring axis's title rather than
+    just looking cramped — matplotlib's own `Text(wrap=True)` doesn't help
+    here, since it only guards against overflowing the whole *figure*, not a
+    single subplot column.
+
+    Must be called with `ax`'s FINAL, post-layout position (see
+    `finalize_figure` below) — before `fig.tight_layout()` runs, every axis
+    still has its naive equal-share GridSpec width, which is typically much
+    wider than what's left once per-row legends (added via `bbox_to_anchor`,
+    which `tight_layout` reserves space for only at draw time) eat into the
+    figure's right margin. Wrapping against that pre-layout width badly
+    under-wraps and titles overflow into the neighboring column anyway."""
+    ax_width_in = ax.get_position().width * ax.figure.get_figwidth()
+    avg_char_width_in = fontsize / 72 * 0.62
+    max_chars = max(int(ax_width_in / avg_char_width_in), 10)
+    lines = [textwrap.fill(line, width=max_chars) if line else "" for line in text.split("\n")]
+    return "\n".join(lines)
+
+
+def _add_row_legends(fig: plt.Figure) -> None:
+    """Attach one merged, horizontal legend above each row of axes registered
+    by `plot_stacked_bars_years_n`, spanning that row's current width.
+
+    Deliberately attached via `axes[0].legend(...)` (a real child artist of
+    that axis), NOT `fig.legend(...)` (a figure-level artist with no axis
+    owner) — `tight_layout()` only reserves space for a row based on each of
+    its axes' own `get_tightbbox()`, which includes that axis's child
+    artists (title, ticks, and now this legend) but has no idea a bare
+    `fig.legend()` exists at all. Attaching to one specific axis is enough
+    even though the legend visually spans the whole row (bbox_to_anchor in
+    figure-fraction coords): `tight_layout` takes the MAX top-padding
+    requirement across all axes in a row and applies it to the whole row, so
+    axis[0] alone needing more headroom already grows the row correctly.
+
+    Must run BEFORE the final `tight_layout()` pass (see `finalize_figure`)
+    so that pass actually sees this legend and grows the row to fit it,
+    and AFTER titles already have their final (post-`fit_title`) text, so
+    the legend is anchored above each column's actual (possibly wrapped)
+    title rather than a stale pre-wrap estimate.
+
+    `ncol` is picked from the row's available width divided by the AVERAGE
+    label's measured render width (not a flat column count) — a flat count
+    works for a row with 2-3 short technology names but overlaps badly for
+    e.g. the ~17-technology boiler/HP row, where entries like
+    "heat_pump_industry_150_200_waste_heat" are far longer than most of
+    their row-mates. Averaging packs more columns in (fewer, shorter legend
+    rows) since most labels are shorter than the one or two outliers —
+    `mode="expand"` then forces every column to that uniform width, so only
+    an outlier-length entry risks looking a little cramped, instead of the
+    whole legend needing as many rows as the longest entry alone would.
+
+    Positioned via `axes[0].transAxes` (the default `ax.legend()` transform),
+    NOT an absolute figure-fraction transform — so when the subsequent
+    `tight_layout()` pass repositions/resizes axis[0] to make room for this
+    legend, the legend (defined relative to axis[0]'s own box) automatically
+    follows rather than staying frozen at its now-stale original spot."""
+    renderer = fig.canvas.get_renderer()
+    legend_fs = 8
+    from matplotlib.font_manager import FontProperties
+    font_prop = FontProperties(size=legend_fs)
+    for axes in getattr(fig, "_legend_rows", []):
+        seen: dict = {}
+        for ax in axes:
+            for handle, label in zip(*ax.get_legend_handles_labels()):
+                seen.setdefault(label, handle)
+        if not seen:
+            continue
+        pos0 = axes[0].get_position()
+        x0_fig, x1_fig = pos0.x0, axes[-1].get_position().x1
+        row_width_in = (x1_fig - x0_fig) * fig.get_figwidth()
+        # Row span expressed in axis[0]-widths, since the legend's transform
+        # is axis[0].transAxes (1.0 = axis[0]'s own width).
+        row_width_ax0 = (x1_fig - x0_fig) / pos0.width
+        y_top_fig = max(
+            ax.title.get_window_extent(renderer=renderer)
+              .transformed(fig.transFigure.inverted()).y1
+            for ax in axes
+        )
+        y_top_ax0 = (y_top_fig - pos0.y0) / pos0.height
+        label_widths_in = [
+            renderer.get_text_width_height_descent(lbl.replace("_", " "), font_prop, False)[0] / fig.dpi
+            for lbl in seen
+        ]
+        entry_w_in = (sum(label_widths_in) / len(label_widths_in)) + 0.5  # + swatch/column padding
+        ncol = max(1, min(len(seen), int(row_width_in / entry_w_in)))
+        axes[0].legend(
+            list(seen.values()), list(seen.keys()),
+            loc="lower left", bbox_to_anchor=(0, y_top_ax0 + 0.02, row_width_ax0, 0.001),
+            mode="expand", ncol=ncol, fontsize=legend_fs, frameon=False, borderaxespad=0,
+        )
+    fig._legend_rows = []
+
+
+# Figure-top headroom reserved for fig.suptitle() alone — any per-row legend
+# space is handled separately, natively, by tight_layout (see
+# _add_row_legends). Expressed in inches, not a rect fraction: these
+# figures' total height varies a lot (fig_height_for_rows), so a fixed
+# fraction either under- or over-reserves wildly depending on row count.
+SUPTITLE_RESERVE_IN = 0.5
+
+
+def finalize_figure(fig: plt.Figure, rect: tuple[float, float, float, float] | None = None) -> None:
+    """Run `tight_layout`, re-wrap every axis title against its now-accurate
+    final column width, attach each registered row's merged legend (as a
+    real child artist — see `_add_row_legends`), then run `tight_layout`
+    once more so it grows each row to fit both the (re-wrapped) title and
+    the (newly attached) legend together. Call this instead of
+    `fig.tight_layout(rect=...)` at the end of every figure function that
+    uses `plot_stacked_bars_years`/`_n`.
+
+    `rect` is normally left as None: the top margin is then computed from
+    the figure's actual height (see `SUPTITLE_RESERVE_IN` above) so every
+    figure gets the same physical headroom regardless of its row count.
+    Pass an explicit `rect` only to override this (e.g. a figure with extra
+    figure-level annotations needing more room)."""
+    if rect is None:
+        top = 1 - SUPTITLE_RESERVE_IN / max(fig.get_figheight(), 1.0)
+        rect = (0, 0, 1, max(top, 0.5))
+    fig.tight_layout(rect=rect)
+    fig.canvas.draw()
+    for ax in fig.axes:
+        text = ax.title.get_text()
+        if not text:
+            continue
+        ax.title.set_text(fit_title(ax, text, ax.title.get_fontsize()))
+    fig.canvas.draw()
+    _add_row_legends(fig)
+    fig.tight_layout(rect=rect)
+
+
 def plot_stacked_bars_years(
     df: pd.DataFrame,
     title: str,
@@ -563,6 +743,8 @@ def plot_stacked_bars_years(
     total_fs = 6 if compact else 7
 
     if df.empty:
+        # Not yet wrapped to its final column width — finalize_figure() does
+        # that globally once the figure's layout is settled.
         ax.set_title(title, fontsize=title_fs - 1, fontweight="bold")
         ax.text(0.5, 0.5, "No data", ha="center", va="center", transform=ax.transAxes)
         return
@@ -571,6 +753,14 @@ def plot_stacked_bars_years(
     techs = df.index.tolist()
     bar_width = 0.6
     labeled: set[str] = set()
+
+    # With many year-columns packed into one narrow axis, horizontal per-bar
+    # text (x-tick labels, total-value labels) collides into an unreadable
+    # smear — rotate it vertical instead, which only needs ~bar_width of
+    # horizontal room regardless of how many bars there are.
+    dense = len(years) > 8
+    total_rotation = 90 if dense else 0
+    total_va = "top" if dense else "bottom"
 
     for year_idx, year in enumerate(years):
         bottom = 0.0
@@ -591,11 +781,16 @@ def plot_stacked_bars_years(
                         color=_text_color_for_bg(color))
             bottom += val
             labeled.add(tech)
-        ax.text(year_idx, bottom, f"{bottom:,.0f}",
-                ha="center", va="bottom", fontsize=total_fs, fontweight="bold")
+        # Total label sits just inside the bar top (not above it) when rotated
+        # vertical, so it doesn't collide with the next bar's label.
+        label_y = bottom * 0.98 if dense and bottom > 0 else bottom
+        ax.text(year_idx, label_y, f"{bottom:,.0f}",
+                ha="center", va=total_va, fontsize=total_fs, fontweight="bold",
+                rotation=total_rotation)
 
     ax.set_xticks(range(len(years)))
-    ax.set_xticklabels([str(y) for y in years], fontsize=tick_fs)
+    ax.set_xticklabels([str(y) for y in years], fontsize=tick_fs,
+                       rotation=90 if dense else 0)
     ax.set_ylabel(unit, fontsize=title_fs - 1)
     ax.set_title(title, fontsize=title_fs, fontweight="bold")
     ax.axhline(0, color="black", linewidth=0.5)
@@ -659,9 +854,13 @@ def plot_stacked_bars_years_n(
     """Plot the same time-series chart for N runs in adjacent axes.
 
     Each run's name is put on its own title line (below the metric name) so
-    titles stay short and don't force the subplot to shrink. Legend is only
-    drawn on the last axis to avoid duplicating it, since all axes share the
-    same technology categories.
+    titles stay short and don't force the subplot to shrink. No per-axis
+    legend is drawn here — this row's axes are registered on the figure
+    instead, and `finalize_figure` adds ONE merged, horizontal legend above
+    the whole row (deduplicated across axes, in case different runs have a
+    different subset of technologies present). That's both less repetitive
+    than a per-column legend and frees the horizontal space a fixed
+    right-hand legend margin used to eat — see `fig_width_for_runs`.
 
     All axes are given a shared y-limit (computed from the per-year stacked
     totals across *all* dataframes) so runs are directly comparable by eye.
@@ -670,12 +869,16 @@ def plot_stacked_bars_years_n(
     """
     n = len(axes)
     compact = n > 2
-    for i, (ax, df, name) in enumerate(zip(axes, dfs, names)):
+    for ax, df, name in zip(axes, dfs, names):
         plot_stacked_bars_years(df, f"{title}\n{name}", unit, ax,
-                                show_legend=(i == n - 1),
+                                show_legend=False,
                                 show_segment_labels=show_segment_labels,
                                 compact=compact)
     _apply_shared_ylim(list(axes), list(dfs))
+    fig = axes[0].figure
+    if not hasattr(fig, "_legend_rows"):
+        fig._legend_rows = []
+    fig._legend_rows.append(list(axes))
 
 
 def plot_stacked_bars_years_pair(

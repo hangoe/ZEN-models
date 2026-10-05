@@ -101,24 +101,25 @@ def _swatch(color: str) -> str:
 
 
 @st.cache_resource(show_spinner="Loading model data…")
-def cached_load(comparison_mode: str, model_name: str) -> Results:
-    root = LOCAL_ROOT if comparison_mode == "local" else EULER_ROOT
+def cached_load(source: str, model_name: str) -> Results:
+    root = LOCAL_ROOT if source == "local" else EULER_ROOT
     return load_results(root, model_name)
 
 
-def build_runs(comparison_mode: str, model_names: list[str]) -> list[Run]:
-    """Load each model, skipping (with a sidebar warning) any that fail —
-    e.g. a euler scenario whose var_dict.h5 hasn't finished downloading yet."""
+def build_runs(sources_and_names: list[tuple[str, str]]) -> list[Run]:
+    """Load each (source, model_name) pair, skipping (with a sidebar warning)
+    any that fail — e.g. a euler scenario whose var_dict.h5 hasn't finished
+    downloading yet. `source` is "local" or "euler", independently per run."""
     runs = []
-    for i, name in enumerate(model_names):
+    for i, (source, name) in enumerate(sources_and_names):
         try:
-            results = cached_load(comparison_mode, name)
+            results = cached_load(source, name)
         except Exception as exc:
             st.sidebar.warning(f"Could not load **{name}**: {exc}")
             continue
-        label = euler_label(name) if comparison_mode == "euler" else short(name)
+        label = euler_label(name) if source == "euler" else short(name)
         color = SCENARIO_PALETTE[i % len(SCENARIO_PALETTE)]
-        runs.append(Run(name=name, label=label, mode=comparison_mode, results=results, color=color))
+        runs.append(Run(name=name, label=label, mode=source, results=results, color=color))
     return runs
 
 
@@ -138,7 +139,7 @@ with st.sidebar:
         if not euler_available:
             st.error("No euler model outputs found under `data/outputs/euler_outputs/`.")
             st.stop()
-        runs = build_runs("euler", euler_available)
+        runs = build_runs([("euler", name) for name in euler_available])
         if not runs:
             st.error("None of the euler scenarios could be loaded yet.")
             st.stop()
@@ -149,19 +150,45 @@ with st.sidebar:
             st.markdown(f"{_swatch(r.color)}**{r.label}**", unsafe_allow_html=True)
     else:
         st.header("Model Selection")
+
         local_available = get_available_models(LOCAL_ROOT)
-        if not local_available:
-            st.error("No local model outputs found under `data/outputs/local_outputs/`.")
+        euler_available = sort_euler_scenarios(get_available_models(EULER_ROOT))
+
+        def _model_picker(slot: str, default_source: str, default_index: int = 0) -> tuple[str, str] | None:
+            """Source + model dropdown for one of the two run slots."""
+            st.markdown(f"**{slot}**")
+            available_sources = [s for s, lst in
+                                  (("local", local_available), ("euler", euler_available)) if lst]
+            if not available_sources:
+                st.error("No model outputs found under `data/outputs/local_outputs/` "
+                         "or `data/outputs/euler_outputs/`.")
+                return None
+            idx = available_sources.index(default_source) if default_source in available_sources else 0
+            source = st.radio(
+                f"{slot} source", available_sources, index=idx,
+                format_func=lambda s: "Local" if s == "local" else "Euler",
+                horizontal=True, key=f"src_{slot}", label_visibility="collapsed",
+            )
+            options = local_available if source == "local" else euler_available
+            fmt = short if source == "local" else euler_label
+            sel_index = min(default_index, len(options) - 1)
+            name = st.selectbox(f"{slot} model", options, index=sel_index,
+                                format_func=fmt, key=f"sel_{slot}", label_visibility="collapsed")
+            return source, name
+
+        col_a, col_b = st.columns(2)
+        with col_a:
+            picked_a = _model_picker("Model A", "euler", default_index=0)
+        with col_b:
+            picked_b = _model_picker("Model B", "euler", default_index=1)
+
+        if picked_a is None or picked_b is None:
             st.stop()
-        model_a = st.selectbox("Model A", local_available, index=0,
-                               format_func=short, key="sel_a")
-        model_b = st.selectbox("Model B", local_available, index=min(1, len(local_available) - 1),
-                               format_func=short, key="sel_b")
-        if model_a == model_b:
+        if picked_a == picked_b:
             st.warning("Both selections are the same model.")
-        runs = build_runs("local", [model_a, model_b])
+        runs = build_runs([picked_a, picked_b])
         if not runs:
-            st.error("Could not load the selected local models.")
+            st.error("Could not load the selected models.")
             st.stop()
 
     years_per_run = [get_available_years(r.results) for r in runs]

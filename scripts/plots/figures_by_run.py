@@ -20,7 +20,9 @@ from .figure_settings import (
     HOURS_PER_YEAR,
     Run,
     add_price_line,
+    fig_height_for_rows,
     fig_width_for_runs,
+    finalize_figure,
     get_available_years,
     plot_stacked_bars_years_n,
 )
@@ -210,7 +212,7 @@ def fig_carrier_energy_all(runs: list[Run]) -> plt.Figure:
     names = [r.label for r in runs]
     n = len(INDUSTRY_HEAT_CARRIERS_ENERGY)
     rows = n * 2
-    fig, axes = plt.subplots(rows, len(runs), figsize=(fig_width_for_runs(len(runs)), 6.5 * rows),
+    fig, axes = plt.subplots(rows, len(runs), figsize=(fig_width_for_runs(len(runs)), fig_height_for_rows(rows, 6.5)),
                              squeeze=False)
     fig.suptitle("Industry Heat Carriers — Production & Consumption",
                  fontsize=13, fontweight="bold")
@@ -223,7 +225,7 @@ def fig_carrier_energy_all(runs: list[Run]) -> plt.Figure:
                                   f"{label} — Production", "GWh", names)
         plot_stacked_bars_years_n(list(axes[row_cons, :]), cons_dfs,
                                   f"{label} — Consumption", "GWh", names)
-    fig.tight_layout(rect=[0, 0, 1, 0.98])
+    finalize_figure(fig)
     return fig
 
 
@@ -232,14 +234,14 @@ def fig_carrier_products_production(runs: list[Run]) -> plt.Figure:
     names = [r.label for r in runs]
     n = len(INDUSTRY_HEAT_CARRIERS_PRODUCT)
     # Half-height rows (3.25 * n instead of 6.5 * n) so product plots stay compact.
-    fig, axes = plt.subplots(n, len(runs), figsize=(fig_width_for_runs(len(runs)), 3.25 * n),
+    fig, axes = plt.subplots(n, len(runs), figsize=(fig_width_for_runs(len(runs)), fig_height_for_rows(n, 3.25)),
                              squeeze=False)
     fig.suptitle("Industry Product Carriers — Annual Production",
                  fontsize=13, fontweight="bold")
     for row, carrier in enumerate(INDUSTRY_HEAT_CARRIERS_PRODUCT):
         prod_dfs = [get_carrier_production(r.results, carrier) for r in runs]
         plot_stacked_bars_years_n(list(axes[row, :]), prod_dfs, carrier.title(), "GWh-eq", names)
-    fig.tight_layout(rect=[0, 0, 1, 0.94])
+    finalize_figure(fig)
     return fig
 
 
@@ -248,7 +250,7 @@ def fig_boiler_hp_production(runs: list[Run]) -> plt.Figure:
     names = [r.label for r in runs]
     ng_prices = [get_import_price_eur_per_mwh(r.results, "natural_gas") for r in runs]
     n = len(INDUSTRY_HEAT_CARRIERS_ENERGY)
-    fig, axes = plt.subplots(n, len(runs), figsize=(fig_width_for_runs(len(runs)), 6.5 * n),
+    fig, axes = plt.subplots(n, len(runs), figsize=(fig_width_for_runs(len(runs)), fig_height_for_rows(n, 6.5)),
                              squeeze=False)
     fig.suptitle("Industry Heat — Boiler & HP Production (excl. temp conversion)\n"
                  "Right axis: natural gas import price [EUR/MWh]",
@@ -259,14 +261,14 @@ def fig_boiler_hp_production(runs: list[Run]) -> plt.Figure:
         plot_stacked_bars_years_n(list(axes[row, :]), prod_dfs, label, "GWh", names)
         for i, price in enumerate(ng_prices):
             add_price_line(axes[row, i], price, "NG import [EUR/MWh]", "#8b0000")
-    fig.tight_layout(rect=[0, 0, 1, 0.94])
+    finalize_figure(fig)
     return fig
 
 
 def fig_capacity_heat_supply(runs: list[Run]) -> plt.Figure:
     """4 rows x len(runs) cols: capacity addition & total for boilers+HPs and temp-conversion."""
     names = [r.label for r in runs]
-    fig, axes = plt.subplots(4, len(runs), figsize=(fig_width_for_runs(len(runs)), 26),
+    fig, axes = plt.subplots(4, len(runs), figsize=(fig_width_for_runs(len(runs)), fig_height_for_rows(4, 6.5)),
                              squeeze=False)
     fig.suptitle("Industry Heat Supply — Capacity Addition & Total",
                  fontsize=13, fontweight="bold")
@@ -290,14 +292,14 @@ def fig_capacity_heat_supply(runs: list[Run]) -> plt.Figure:
         [get_capacity(r.results, INDUSTRY_HEAT_TECHS_TEMP_CONV) for r in runs],
         "Total Capacity — Temp Conversion", "GW", names,
     )
-    fig.tight_layout(rect=[0, 0, 1, 0.97])
+    finalize_figure(fig)
     return fig
 
 
 def fig_capacity_production(runs: list[Run]) -> plt.Figure:
     """2 rows x len(runs) cols: capacity addition and total for production techs."""
     names = [r.label for r in runs]
-    fig, axes = plt.subplots(2, len(runs), figsize=(fig_width_for_runs(len(runs)), 13),
+    fig, axes = plt.subplots(2, len(runs), figsize=(fig_width_for_runs(len(runs)), fig_height_for_rows(2, 6.5)),
                              squeeze=False)
     fig.suptitle("Industry Production Technologies — Capacity",
                  fontsize=13, fontweight="bold")
@@ -311,14 +313,14 @@ def fig_capacity_production(runs: list[Run]) -> plt.Figure:
         [get_capacity(r.results, INDUSTRY_HEAT_TECHS_PRODUCTION) for r in runs],
         "Total Capacity", "ton/h", names,
     )
-    fig.tight_layout(rect=[0, 0, 1, 0.95])
+    finalize_figure(fig)
     return fig
 
 
 def fig_tes_capacity_addition(runs: list[Run]) -> plt.Figure:
     """2 rows x len(runs) cols: TES energy and power capacity addition."""
     names = [r.label for r in runs]
-    fig, axes = plt.subplots(2, len(runs), figsize=(fig_width_for_runs(len(runs)), 13),
+    fig, axes = plt.subplots(2, len(runs), figsize=(fig_width_for_runs(len(runs)), fig_height_for_rows(2, 6.5)),
                              squeeze=False)
     fig.suptitle("Industry TES — Capacity Addition", fontsize=13, fontweight="bold")
     plot_stacked_bars_years_n(
@@ -331,14 +333,14 @@ def fig_tes_capacity_addition(runs: list[Run]) -> plt.Figure:
         [get_capacity_addition(r.results, INDUSTRY_TES_TECHS, "power") for r in runs],
         "Power Capacity Addition", "GW", names,
     )
-    fig.tight_layout(rect=[0, 0, 1, 0.95])
+    finalize_figure(fig)
     return fig
 
 
 def fig_tes_charge_discharge(runs: list[Run]) -> plt.Figure:
     """2 rows x len(runs) cols: TES charge and discharge."""
     names = [r.label for r in runs]
-    fig, axes = plt.subplots(2, len(runs), figsize=(fig_width_for_runs(len(runs)), 13),
+    fig, axes = plt.subplots(2, len(runs), figsize=(fig_width_for_runs(len(runs)), fig_height_for_rows(2, 6.5)),
                              squeeze=False)
     fig.suptitle("Industry TES — Charge & Discharge", fontsize=13, fontweight="bold")
     plot_stacked_bars_years_n(
@@ -351,7 +353,7 @@ def fig_tes_charge_discharge(runs: list[Run]) -> plt.Figure:
         [get_storage_flows(r.results, INDUSTRY_TES_TECHS, "flow_storage_discharge") for r in runs],
         "Discharge", "GWh", names,
     )
-    fig.tight_layout(rect=[0, 0, 1, 0.95])
+    finalize_figure(fig)
     return fig
 
 
@@ -390,18 +392,18 @@ def fig_heat_demand_by_sector(runs: list[Run], year: int) -> plt.Figure:
     names = [r.label for r in runs]
     dfs = [build(r.results) for r in runs]
 
-    fig, axes = plt.subplots(1, len(runs), figsize=(fig_width_for_runs(len(runs)), 7), squeeze=False)
+    fig, axes = plt.subplots(1, len(runs), figsize=(fig_width_for_runs(len(runs)), fig_height_for_rows(1, 7)), squeeze=False)
     fig.suptitle(f"Industry Sectors — Heat Input by Temperature Level ({year})",
                  fontsize=13, fontweight="bold")
     plot_stacked_bars_years_n(list(axes[0, :]), dfs, "Heat Input by Sector", "GWh", names)
-    fig.tight_layout(rect=[0, 0, 1, 0.94])
+    finalize_figure(fig)
     return fig
 
 
 def fig_dsm_capacity_addition(runs: list[Run]) -> plt.Figure:
     """2 rows x len(runs) cols: DSM energy and power capacity addition."""
     names = [r.label for r in runs]
-    fig, axes = plt.subplots(2, len(runs), figsize=(fig_width_for_runs(len(runs)), 13),
+    fig, axes = plt.subplots(2, len(runs), figsize=(fig_width_for_runs(len(runs)), fig_height_for_rows(2, 6.5)),
                              squeeze=False)
     fig.suptitle("Industry DSM — Capacity Addition", fontsize=13, fontweight="bold")
     plot_stacked_bars_years_n(
@@ -414,14 +416,14 @@ def fig_dsm_capacity_addition(runs: list[Run]) -> plt.Figure:
         [get_capacity_addition(r.results, INDUSTRY_DSM_TECHS, "power") for r in runs],
         "Power Capacity Addition", "ktproduct/h", names,
     )
-    fig.tight_layout(rect=[0, 0, 1, 0.95])
+    finalize_figure(fig)
     return fig
 
 
 def fig_dsm_charge_discharge(runs: list[Run]) -> plt.Figure:
     """2 rows x len(runs) cols: DSM charge and discharge."""
     names = [r.label for r in runs]
-    fig, axes = plt.subplots(2, len(runs), figsize=(fig_width_for_runs(len(runs)), 13),
+    fig, axes = plt.subplots(2, len(runs), figsize=(fig_width_for_runs(len(runs)), fig_height_for_rows(2, 6.5)),
                              squeeze=False)
     fig.suptitle("Industry DSM — Charge & Discharge", fontsize=13, fontweight="bold")
     plot_stacked_bars_years_n(
@@ -434,14 +436,14 @@ def fig_dsm_charge_discharge(runs: list[Run]) -> plt.Figure:
         [get_storage_flows(r.results, INDUSTRY_DSM_TECHS, "flow_storage_discharge") for r in runs],
         "Discharge", "ktproduct", names,
     )
-    fig.tight_layout(rect=[0, 0, 1, 0.95])
+    finalize_figure(fig)
     return fig
 
 
 def fig_storage_comparison(runs: list[Run]) -> plt.Figure:
     """3 rows x len(runs) cols: capacity addition comparison across TES, battery, and DSM."""
     names = [r.label for r in runs]
-    fig, axes = plt.subplots(3, len(runs), figsize=(fig_width_for_runs(len(runs)), 19.5),
+    fig, axes = plt.subplots(3, len(runs), figsize=(fig_width_for_runs(len(runs)), fig_height_for_rows(3, 6.5)),
                              squeeze=False)
     fig.suptitle("Storage Technologies — Capacity Addition", fontsize=13, fontweight="bold")
     plot_stacked_bars_years_n(
@@ -460,7 +462,7 @@ def fig_storage_comparison(runs: list[Run]) -> plt.Figure:
         [get_capacity_addition(r.results, INDUSTRY_DSM_TECHS, "power") for r in runs],
         "DSM Power Capacity", "ktproduct/h", names,
     )
-    fig.tight_layout(rect=[0, 0, 1, 0.96])
+    finalize_figure(fig)
     return fig
 
 
@@ -555,7 +557,8 @@ def _plot_electricity_balance(
                color=_BALANCE_COLORS.get(comp), edgecolor="white", linewidth=0.4)
     ax.axhline(0, color="black", linewidth=0.6)
     ax.set_xticks(x)
-    ax.set_xticklabels([str(y) for y in years], fontsize=tick_fs)
+    ax.set_xticklabels([str(y) for y in years], fontsize=tick_fs,
+                       rotation=90 if len(years) > 8 else 0)
     ax.set_ylabel("GWh", fontsize=label_fs)
     ax.set_title(f"{title}\n{name}", fontsize=title_fs, fontweight="bold")
     ax.legend(fontsize=legend_fs, frameon=False)
@@ -565,7 +568,7 @@ def fig_electricity_capacity_production_consumption(runs: list[Run]) -> plt.Figu
     """3 rows x len(runs) cols: electricity generation capacity, production, consumption."""
     names = [r.label for r in runs]
     techs = [get_electricity_producing_techs(r.results) for r in runs]
-    fig, axes = plt.subplots(3, len(runs), figsize=(fig_width_for_runs(len(runs)), 19.5),
+    fig, axes = plt.subplots(3, len(runs), figsize=(fig_width_for_runs(len(runs)), fig_height_for_rows(3, 6.5)),
                              squeeze=False)
     fig.suptitle("Electricity System — Capacity, Production & Consumption",
                  fontsize=13, fontweight="bold")
@@ -584,7 +587,7 @@ def fig_electricity_capacity_production_consumption(runs: list[Run]) -> plt.Figu
         [get_carrier_consumption(r.results, "electricity") for r in runs],
         "Consumption by Technology", "GWh", names,
     )
-    fig.tight_layout(rect=[0, 0, 1, 0.97])
+    finalize_figure(fig)
     return fig
 
 
@@ -598,7 +601,7 @@ def fig_electricity_balance(runs: list[Run]) -> plt.Figure:
     for i, r in enumerate(runs):
         _plot_electricity_balance(axes[0, i], get_electricity_balance(r.results),
                                   "Net Balance", r.label, compact=compact)
-    fig.tight_layout(rect=[0, 0, 1, 0.93])
+    finalize_figure(fig)
     return fig
 
 
@@ -779,7 +782,7 @@ def fig_residual_load(runs: list[Run], year: int, mode: str = "total") -> plt.Fi
     for i, (run, comp) in enumerate(zip(runs, comps)):
         _plot_residual_chrono(axes[0, i], comp, load_col, "Chronological", run.label, compact=compact)
         _plot_residual_duration(axes[1, i], comp, load_col, "Duration curve", run.label, compact=compact)
-    fig.tight_layout(rect=[0, 0, 1, 0.96])
+    finalize_figure(fig)
     return fig
 
 
@@ -871,7 +874,7 @@ def fig_storage_use(runs: list[Run], year: int) -> plt.Figure:
     Row 2: chronological net electricity-storage dispatch for `year`.
     """
     names = [r.label for r in runs]
-    fig, axes = plt.subplots(2, len(runs), figsize=(fig_width_for_runs(len(runs)), 12),
+    fig, axes = plt.subplots(2, len(runs), figsize=(fig_width_for_runs(len(runs)), fig_height_for_rows(2, 6.0)),
                              squeeze=False)
     fig.suptitle(f"Storage Use  ·  net-power duration panel for {year}",
                  fontsize=13, fontweight="bold")
@@ -884,5 +887,5 @@ def fig_storage_use(runs: list[Run], year: int) -> plt.Figure:
     for i, r in enumerate(runs):
         _plot_storage_dispatch(axes[1, i], get_storage_net_ts(r.results, ELEC_STORAGE_TECHS, year),
                                "Electricity Storage — Net Power Duration", r.label, compact=compact)
-    fig.tight_layout(rect=[0, 0, 1, 0.96])
+    finalize_figure(fig)
     return fig

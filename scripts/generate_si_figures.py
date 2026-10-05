@@ -339,8 +339,11 @@ YEAR = 2036
 # that the actual final year is modeled.
 COMPARISON_YEARS = [2030, 2040, 2050]
 
-# Thesis-consistent scenario order/labels (Table~SIScenarios), distinct from
-# the dashboard's shorter "Baseline" label for the same run. Order matches
+# Thesis-consistent scenario order/labels (Table~SIScenarios) — matches the
+# dashboard's own "Full Flexibility" label for this run (figure_settings.
+# EULER_SCENARIO_LABELS; the dashboard separately labels the true
+# "Crystal Ball (base)" run "Baseline" — a different run from this one, not
+# to be confused with each other despite the overlapping word). Order matches
 # Table SIScenarios (excluding "Crystal Ball (base)", handled separately via
 # BASE_SCENARIO below) and figure_settings.EULER_SCENARIO_ORDER, so the same
 # scenario gets the same SCENARIO_PALETTE slot 0-5 everywhere; slot 6 (grey)
