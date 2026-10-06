@@ -20,7 +20,7 @@
 #SBATCH --time=08:00:00              # TUNABLE: max 15 days
 #SBATCH --ntasks=1                   # one process per array task -> keep at 1
 #SBATCH --cpus-per-task=16           # TUNABLE: cores 
-#SBATCH --mem-per-cpu=8G             # TUNABLE: RAM per core. Total = cpus-per-task x this (e.g. 16x8 = 128 GB)
+#SBATCH --mem-per-cpu=12G            # TUNABLE: RAM per core. Total = cpus-per-task x this (16x12 = 192 GB)
 #SBATCH --output=zen_run_%A_%a.out   # %A = array id, %a = task id
 #SBATCH --error=zen_run_%A_%a.err
 #SBATCH --mail-type=END,FAIL         # email when a task ends/fails (ETH address)

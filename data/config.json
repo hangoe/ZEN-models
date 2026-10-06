@@ -14,7 +14,15 @@
       "ScaleFlag": 2,
       "BarOrder": 0
     },
-    "save_duals": false,
+    "save_duals": true,
+    "selected_saved_duals": [
+      "constraint_technology_diffusion_limit_total",
+      "constraint_technology_capacity_limit_reached",
+      "constraint_technology_capacity_limit_not_reached",
+      "constraint_carbon_emissions_budget",
+      "constraint_carbon_emissions_annual",
+      "constraint_carbon_emissions_cumulative"
+    ],
     "use_scaling": false,
     "run_diagnostics": true,
     "scaling_include_rhs": true

@@ -561,8 +561,11 @@ def fig0a_cost_composition(components_with_base: pd.DataFrame) -> None:
     base_label = BASE_SCENARIO[1]
     baseline = components_with_base.loc[base_label]
     others = components_with_base.drop(base_label)
+    others = others.drop(index="Single temperature level", errors="ignore")
     delta = others.subtract(baseline, axis=1)
-    baseline_total_cost = baseline.sum()  # all 4 components, i.e. full net_present_cost
+    # Percentages are relative to "No flexibility" (first scenario), not the Crystal Ball base.
+    ref_label = SCENARIOS[0][1]
+    ref_total_cost = others.loc[ref_label].sum()  # all 4 components, i.e. full net_present_cost
 
     fig, ax = plt.subplots(figsize=(11, 6.5))
     x = np.arange(len(delta))
@@ -572,18 +575,23 @@ def fig0a_cost_composition(components_with_base: pd.DataFrame) -> None:
         vals = delta[comp_label].to_numpy()
         bottoms = np.where(vals >= 0, bottom_pos, bottom_neg)
         ax.bar(x, vals, bottom=bottoms, label=comp_label, color=color, edgecolor="white")
+        carrier_center = bottoms + vals / 2  # last plotted component = carrier (brown)
         bottom_pos += np.clip(vals, 0, None)
         bottom_neg += np.clip(vals, None, 0)
     totals = delta[[label for _, label in PLOTTED_COST_COMPONENTS]].sum(axis=1)
-    pct_of_baseline_total = totals / baseline_total_cost * 100
-    for xi, t, pct in zip(x, totals, pct_of_baseline_total):
-        ax.text(xi, t, f"{pct:+.2f}%", ha="center", va="bottom" if t >= 0 else "top",
-                fontsize=9, fontweight="bold")
+    pct_vs_ref = (totals - totals[ref_label]) / ref_total_cost * 100
+    for xi, lbl, t, pct in zip(x, delta.index, carrier_center, pct_vs_ref):
+        txt = "baseline" if lbl == ref_label else f"{pct:+.2f}%"
+        ax.text(xi, t, txt, ha="center", va="center", fontsize=9, fontweight="bold",
+                color="white", bbox=dict(boxstyle="round,pad=0.2", fc="black", ec="none", alpha=0.45))
+    ax.axhline(totals[ref_label], color="black", linewidth=1.0, linestyle="--",
+               label=f"{ref_label} (baseline for %)")
     ax.axhline(0, color="black", linewidth=0.8)
     ax.set_xticks(x)
     ax.set_xticklabels(delta.index, rotation=25, ha="right", fontsize=9)
     ax.set_ylabel(r"$\Delta$ discounted system cost vs Crystal Ball base [MEUR]")
-    ax.set_title("Non-Carbon Cost Increase vs Crystal Ball Base", fontsize=12, fontweight="bold")
+    ax.set_title("Non-Carbon Cost Increase vs Crystal Ball Base\n(% labels relative to No flexibility)",
+                 fontsize=12, fontweight="bold")
     ax.set_ylim(top=ax.get_ylim()[1] * 1.15)  # headroom so the legend clears the bars
     ax.legend(fontsize=9, frameon=True, facecolor="white", framealpha=0.9, loc="upper center", ncol=3)
     ax.grid(axis="y", alpha=0.3)
@@ -3721,7 +3729,8 @@ def fig11_power_and_storage_impact_with_dsm(base_run: Run, no_flex_run: Run, ful
 DELTA_LABEL = r"$\Delta$ No flexibility"
 
 
-def _base_and_delta_df(base_series: pd.Series, no_flex_series: pd.Series) -> pd.DataFrame:
+def _base_and_delta_df(base_series: pd.Series, no_flex_series: pd.Series,
+                       base_label: str | None = None, delta_label: str = DELTA_LABEL) -> pd.DataFrame:
     """Two-column DataFrame: [Crystal Ball (base) absolute, Δ No flexibility
     minus base — signed, both directions] — index is the union of both
     series' technologies, missing entries filled with 0 before subtracting
@@ -3729,7 +3738,7 @@ def _base_and_delta_df(base_series: pd.Series, no_flex_series: pd.Series) -> pd.
     all_idx = base_series.index.union(no_flex_series.index)
     base = base_series.reindex(all_idx, fill_value=0.0)
     no_flex = no_flex_series.reindex(all_idx, fill_value=0.0)
-    return pd.DataFrame({BASE_SCENARIO[1]: base, DELTA_LABEL: no_flex - base})
+    return pd.DataFrame({base_label or BASE_SCENARIO[1]: base, delta_label: no_flex - base})
 
 
 def _plot_base_and_floating_delta(
@@ -3855,6 +3864,44 @@ def fig12_capacity_and_storage_base_and_delta(base_run: Run, no_flex_run: Run) -
                                       color_map=STORAGE_COLOR_MAP, hatch_map={}, decimals=1)
     fig.tight_layout()
     savefig(fig, "fig12_capacity_and_storage_base_and_delta")
+
+
+def fig12a_capacity_and_storage_noflex_vs_full(no_flex_run: Run, full_run: Run) -> None:
+    """fig12's layout, but the reference bar is 'No flexibility' and the
+    floating delta is 'Full flexibility' minus 'No flexibility'.
+    -> SI_results/fig12a_capacity_and_storage_noflex_vs_full.svg
+    """
+    base_lbl = "No flexibility"
+    delta_lbl = r"$\Delta$ Full flexibility"
+    gen_by_year: dict[int, pd.DataFrame] = {}
+    disch_by_year: dict[int, pd.DataFrame] = {}
+    # Same single summed "DSM" segment as fig11 (GWh equivalent -> TWh);
+    # No flexibility has no industry DSM, so it only shows up in the delta.
+    dsm_total = get_dsm_energy_equivalent(full_run.results, DSM_ENERGY_STACK_ORDER, SNAPSHOT_YEARS_POWER).sum() / 1000.0
+    for year in SNAPSHOT_YEARS_POWER:
+        nf_gen = get_capacity(no_flex_run.results, POWER_GEN_TECHS, "power").get(year, pd.Series(dtype=float))
+        ff_gen = get_capacity(full_run.results, POWER_GEN_TECHS, "power").get(year, pd.Series(dtype=float))
+        gen_df = _base_and_delta_df(nf_gen, ff_gen, base_lbl, delta_lbl)
+        gen_by_year[year] = gen_df.reindex(
+            [t for t in POWER_GEN_STACK_ORDER if t in gen_df.index]
+            + [t for t in gen_df.index if t not in POWER_GEN_STACK_ORDER])
+        nf_disch = get_storage_flows(no_flex_run.results, BULK_STORAGE_TECHS, "flow_storage_discharge") \
+            .get(year, pd.Series(dtype=float)) / 1000.0
+        ff_disch = get_storage_flows(full_run.results, BULK_STORAGE_TECHS, "flow_storage_discharge") \
+            .get(year, pd.Series(dtype=float)) / 1000.0
+        disch_df = _base_and_delta_df(nf_disch, ff_disch, base_lbl, delta_lbl) \
+            .reindex(STORAGE_STACK_ORDER + ["DSM"]).fillna(0.0)
+        disch_df.loc["DSM", delta_lbl] = dsm_total[year]
+        disch_by_year[year] = disch_df
+
+    fig, axes = plt.subplots(1, 2, figsize=(16, 6))
+    with plt.rc_context({"hatch.linewidth": 0.5}):
+        _plot_base_and_floating_delta(gen_by_year, "Power Generation Capacity", "GW", axes[0],
+                                      color_map=POWER_GEN_COLOR_MAP, hatch_map=POWER_GEN_HATCH_MAP)
+        _plot_base_and_floating_delta(disch_by_year, "Storage Annual Energy Discharged", "TWh", axes[1],
+                                      color_map={**STORAGE_COLOR_MAP, "DSM": DSM_TOTAL_COLOR}, hatch_map={}, decimals=1)
+    fig.tight_layout()
+    savefig(fig, "fig12a_capacity_and_storage_noflex_vs_full")
 
 
 # ── fig13: regional map — per-node capacity | storage bar glyphs ───────────
@@ -5106,6 +5153,7 @@ def main() -> None:
                 fig0b_emissions_source_comparison(base_run, no_flex_run, full_run)
                 fig1b_cost_and_emissions_totals(base_run, no_flex_run, full_run)
                 fig11_power_and_storage_impact_with_dsm(base_run, no_flex_run, full_run)
+                fig12a_capacity_and_storage_noflex_vs_full(no_flex_run, full_run)
                 fig20_cost_breakdown_sector_industry_heating(base_run, no_flex_run, full_run)
             else:
                 print("  skipping fig0b_emissions_source_comparison/fig1b_cost_and_emissions_totals/"
