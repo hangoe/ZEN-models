@@ -296,6 +296,11 @@ from plots.figures_by_scenario import (
     build_comparison_df,
     get_annual_cost,
     get_annual_total_cost,
+    _discount_factors,
+    INDUSTRY_HEATING_TECHS,
+    INDUSTRY_TES_TECHS,
+    get_capex_by_technology,
+    get_opex_by_technology,
     get_emissions_by_carrier,
     get_emissions_by_technology,
     plot_stacked_bars,
@@ -939,12 +944,12 @@ def fig7_heat_supply_trajectory_for(runs: list[Run], label: str, fig_name: str) 
 
     heat_df = _ordered(get_capacity(r.results, INDUSTRY_HEAT_TECHS_BOILERS_HP, "power"))
     add_df = _ordered(get_capacity_addition(r.results, INDUSTRY_HEAT_TECHS_BOILERS_HP, "power"))
-    output_df = _ordered(_output_avg_gw(r, INDUSTRY_HEAT_TECHS_BOILERS_HP))
+    output_df = _ordered(_output_annual_twh(r, INDUSTRY_HEAT_TECHS_BOILERS_HP))
 
     fig, axes = plt.subplots(3, 1, figsize=(0.8 * len(heat_df.columns) + 3, 16))
     with plt.rc_context({"hatch.linewidth": 0.5}):
-        plot_stacked_bars(output_df, "Industry heat supply (GW)",
-                          "GW supplied", axes[0], show_segment_labels=False, show_legend=True,
+        plot_stacked_bars(output_df, "Industry heat supply (TWh)",
+                          "TWh supplied", axes[0], show_segment_labels=False, show_legend=True,
                           color_map=HEAT_SUPPLY_COLOR_MAP, hatch_map=HEAT_SUPPLY_HATCH_MAP)
         plot_stacked_bars(heat_df, f"Industry Heat Supply Capacity (stock) - {label}",
                           "GW", axes[1], show_segment_labels=False, show_legend=False,
@@ -1405,12 +1410,20 @@ def fig2_dsm_cycles_by_product(runs: list[Run]) -> None:
     savefig(fig, "fig5_dsm_cycles_by_product")
 
 
+# Literature lower heating values used to express the two energy-carrier DSM
+# products (ammonia, methanol — stored natively in GWh) in kt of product, so
+# all 10 products share one unit in fig5b. 1 GWh / (MWh/t) = 1 kt.
+DSM_LHV_MWH_PER_T = {"ammonia_DSM": 18.6 / 3.6,    # 18.6 MJ/kg
+                     "methanol_DSM": 19.9 / 3.6}   # 19.9 MJ/kg
+
+
 def fig5b_dsm_discharge_by_product(runs: list[Run]) -> None:
     # Companion to fig5: absolute annual DSM throughput per product over the
     # whole horizon, stacked by product, optimistic vs pessimistic. Charge and
     # discharge are identical (no storage losses), so only discharge is shown.
-    # Products keep their ETH COLOR_MAP colors; ammonia/methanol (GWh) are
-    # hatched as in fig5 since they are not directly comparable with kt.
+    # Products keep their ETH COLOR_MAP colors; ammonia/methanol are stored in
+    # GWh and converted to kt via DSM_LHV_MWH_PER_T (hatched as in fig5 to
+    # flag that they are LHV-derived).
     scenarios = ["Full flexibility", "DSM pessimistic"]
     titles = {"Full flexibility": "Optimistic (Full flexibility)",
               "DSM pessimistic": "Pessimistic (DSM pessimistic)"}
@@ -1424,6 +1437,9 @@ def fig5b_dsm_discharge_by_product(runs: list[Run]) -> None:
         df = get_storage_flows(r, INDUSTRY_DSM_TECHS, "flow_storage_discharge")
         years = get_available_years(r)
         df = df.reindex(columns=years).fillna(0.0)
+        for t, mwh_per_t in DSM_LHV_MWH_PER_T.items():
+            if t in df.index:
+                df.loc[t] = df.loc[t] / mwh_per_t
         df.index = [pretty(t) for t in df.index]
         dfs.append(df)
     # Stack order: largest total over both scenarios at the bottom.
@@ -1434,13 +1450,13 @@ def fig5b_dsm_discharge_by_product(runs: list[Run]) -> None:
     with plt.rc_context({"hatch.linewidth": 0.5}):
         for i, (ax, df, label) in enumerate(zip(axes, dfs, scenarios)):
             plot_stacked_bars(df, f"DSM Charge/Discharge by Product - {titles[label]}",
-                              "Annual charge = discharge (kt product; GWh for ammonia, methanol)",
+                              "Annual charge = discharge (kt product)",
                               ax, show_segment_labels=False, show_legend=(i == 0),
                               color_map=color_map, hatch_map=hatch_map)
     _apply_shared_ylim(list(axes), dfs)
     for ax in axes:
         plt.setp(ax.get_xticklabels(), rotation=0)
-        ax.set_ylabel(ax.get_ylabel(), fontsize=8)
+        ax.set_ylabel(ax.get_ylabel(), fontsize=10)
     fig.tight_layout()
     savefig(fig, "fig5b_dsm_discharge_by_product")
 
@@ -4856,6 +4872,207 @@ def fig14_mga_exploration_sequence() -> None:
     savefig(fig, "fig8_mga_exploration_sequence", subdir="method")
 
 
+# ── fig20: total system cost, drilled down sector → industries → low-T heat ─
+# Cumulative, discounted total system cost over the whole horizon (the
+# optimisation objective, net_present_cost). Technology CAPEX+OPEX are
+# discounted per year (same factor as get_annual_cost) and summed per
+# technology, then the ~110 technologies are grouped into sectors. Carrier
+# (fuel/import) and carbon-emission costs are not tied to a technology and form
+# their own "Imported carriers" group (carbon cost is ~0: the budget is a hard constraint); any technology NOT listed in a sector below
+# falls into "Others" (energy conversion/supply, CCS/DAC, hydrogen, heat for
+# buildings/district heat, ...).
+_FIG20_SECTOR_TECHS = {
+    "Transport": ["BEV", "ICE_diesel", "ICE_petrol", "HDT_BET", "HDT_diesel", "HDT_FCEV", "fuel_cell",  # road
+                  "ammonia_ICE_ship", "diesel_ICE_ship", "hydrogen_FC_ship", "methanol_ICE_ship"],  # ships
+    "Power generation": [
+        "photovoltaics", "wind_onshore", "wind_offshore", "nuclear", "reservoir_hydro", "run-of-river_hydro",
+        "lignite_coal_plant", "hard_coal_plant", "oil_plant", "natural_gas_turbine", "natural_gas_turbine_CCS",
+        "biomass_plant", "biomass_plant_CCS", "waste_plant",
+        "battery", "pumped_hydro", "power_line",  # storage + grid grouped with power
+    ],
+}
+# Industries, split by branch. Heating (+TES) and DSM are their own groups so
+# the flexibility options stay visible; DSM techs are therefore NOT counted in
+# their product's branch.
+_FIG20_LOWT_HEAT_TECHS = INDUSTRY_HEATING_TECHS + INDUSTRY_TES_TECHS
+_FIG20_INDUSTRY_GROUPS = {
+    "Steel": ["BF_BOF", "BF_BOF_CCS", "EAF", "NG_DRI", "NG_DRI_CCS", "H2_DRI"],
+    "Cement": ["cement_kiln", "cement_post_comb", "biomass_to_cement_fuel", "coal_to_cement_fuel",
+               "hydrogen_to_cement_fuel", "waste_to_cement_fuel"],
+    "Chemicals": ["haber_bosch", "olefin_from_methanol", "olefin_from_naphtha", "methanol_from_biomass",
+                  "methanol_from_hydrogen", "methanol_from_natural_gas"],
+    "Paper": ["paper_production"],
+    "Food": ["food_production"],
+    "Glass & ceramics": ["glass_production", "ceramic_production", "glass_post_comb", "ceramic_post_comb"],
+    "Low-T heating (incl. TES)": _FIG20_LOWT_HEAT_TECHS,
+    "DSM (all products)": INDUSTRY_DSM_TECHS,
+}
+_FIG20_SECTOR_COLORS = {
+    "Transport": _ETH_BLUE, "Power generation": _ETH_BRONZE,
+    "Industries": _ETH_RED, "Others": _eth_tint(_ETH_GREY, 0.45),
+    "Imported carriers": _ETH_GREEN,
+}
+_FIG20_INDUSTRY_COLORS = {
+    "Steel": _ETH_GREY, "Cement": _eth_tint(_ETH_GREY, 0.5), "Chemicals": _ETH_PURPLE,
+    "Paper": _ETH_TURQUOISE, "Food": _ETH_GREEN, "Glass & ceramics": _ETH_BRONZE,
+    "Low-T heating (incl. TES)": _ETH_RED, "DSM (all products)": _ETH_BLUE,
+}
+
+
+def fig20_cost_breakdown_sector_industry_heating(base_run: Run, no_flex_run: Run, full_run: Run) -> None:
+    """Cumulative discounted total system cost (the objective) for Crystal Ball base / No
+    flexibility / Full flexibility, drilled down in 3 panels: (A) the whole
+    system split into transport / power generation /
+    industries / others; (B) industries only, by branch; (C) low-temperature
+    industry heating only, by technology. Every bar is annotated with its
+    value and its share of the total system cost (panel C also its share of
+    industries); segment labels give the share of THAT panel's bar plus the
+    absolute cost in bn EUR. The top bars share one absolute bn-EUR axis; the
+    industry and heating rows are each zoomed by their own factor (identical
+    across scenarios, shown with a magnifier + scale bar). Each bar's total is
+    written behind it.
+
+    The base run has no industry-specific technologies (no paper/food/glass/
+    ceramic, no industry-specific heat pumps/boilers), so its industries and
+    heating bars are not like-for-like with the two industry-heat scenarios.
+    -> SI_results/fig20_cost_breakdown_sector_industry_heating.svg
+    """
+    runs = [base_run, no_flex_run, full_run]
+    labels = [r.label for r in runs]
+    costs = []
+    npc_totals, carrier_tot = [], []
+    for r in runs:
+        years = get_available_years(r.results)
+        dfac = _discount_factors(r.results, years)
+        c = pd.Series(dtype=float)
+        for y in years:
+            cy = get_capex_by_technology(r.results, y).add(get_opex_by_technology(r.results, y), fill_value=0.0)
+            c = c.add(cy * float(dfac.get(y, 0.0)), fill_value=0.0)
+        costs.append(c / 1000)  # MEUR -> bn EUR
+        npc_totals.append(float(get_annual_total_cost(r.results, years, discount=True).sum()) / 1000)
+        carrier_tot.append(float(get_annual_cost(r.results, years, "cost_carrier", discount=True).sum()) / 1000)
+
+    def grp(c: pd.Series, techs: list[str]) -> float:
+        return float(c.reindex(techs).fillna(0.0).sum())
+
+    industry_techs = [t for ts in _FIG20_INDUSTRY_GROUPS.values() for t in ts]
+    sector_df = pd.DataFrame({
+        lab: {**{s: grp(c, ts) for s, ts in _FIG20_SECTOR_TECHS.items()},
+              "Industries": grp(c, industry_techs)}
+        for lab, c in zip(labels, costs)})
+    sector_df.loc["Others"] = [float(c.sum()) for c in costs] - sector_df.sum()
+    sector_df.loc["Imported carriers"] = carrier_tot
+    sector_df = sector_df.loc[list(_FIG20_SECTOR_COLORS)]
+    ind_df = pd.DataFrame({lab: {g: grp(c, ts) for g, ts in _FIG20_INDUSTRY_GROUPS.items()}
+                           for lab, c in zip(labels, costs)})
+    heat_techs = [t for t in HEAT_SUPPLY_STACK_ORDER if any(t in c.index for c in costs)] \
+        + [t for t in INDUSTRY_TES_TECHS if any(t in c.index for c in costs)]
+    heat_df = pd.DataFrame({lab: {t: float(c.get(t, 0.0)) for t in heat_techs}
+                            for lab, c in zip(labels, costs)})
+    # Collapse TES (all ~0) into one row so the legend stays short.
+    tes_rows = [t for t in heat_df.index if t in INDUSTRY_TES_TECHS]
+    if tes_rows:
+        heat_df.loc["industry_TES"] = heat_df.loc[tes_rows].sum()
+        heat_df = heat_df.drop(index=tes_rows)
+    heat_df = heat_df[heat_df.abs().sum(axis=1) > 1e-6]
+    heat_colors = {**HEAT_SUPPLY_COLOR_MAP, "industry_TES": _eth_tint(_ETH_BRONZE, 0.3)}
+
+    from matplotlib.patches import Patch
+    heat_pretty = lambda t: (t.replace("heat_pump_industry_", "HP ").replace("_boiler_industry", " boiler")
+                              .replace("_waste_heat", " waste heat").replace("_water", " water")
+                              .replace("_", "-").replace("industry-TES", "TES"))
+
+    _bn = lambda v: f"{v:,.0f} bn" if abs(v) >= 10 else f"{v:,.1f} bn" if abs(v) >= 0.1 else f"{v:.2f} bn"
+
+    x_max = max(npc_totals) * 1.13  # one shared bn-EUR scale for every bar
+
+    def draw_row(ax, y, df_col, colors, names, hatch_map=None, min_label=0.05, f=1.0):
+        """One bar; lengths are value * f (f = zoom factor of this row type, same for
+        all scenarios). Returns {name: (left, right)} in axis units.
+        Labels: share of THIS bar + absolute value; bar total written behind the bar."""
+        tot = df_col.sum()
+        pos, left = {}, 0.0
+        for n in df_col.index:
+            v = float(df_col[n])
+            if v <= 0:
+                continue
+            w = 100 * v / tot
+            ax.barh(y, v * f, left=left, height=0.56, color=colors[n], edgecolor="white", linewidth=0.8,
+                    hatch=(hatch_map or {}).get(n))
+            if v * f / x_max >= min_label:
+                ax.text(left + v * f / 2, y, f"{names(n)}\n{w:.1f}%\n{_bn(v)}", ha="center", va="center",
+                        fontsize=8, color=_text_color_for_bg(colors[n]), fontweight="bold",
+                        bbox=dict(fc=colors[n], ec="none", pad=1.5) if (hatch_map or {}).get(n) else None)
+            else:
+                pass  # too narrow for an in-bar label; identified via the legend
+            pos[n] = (left, left + v * f)
+            left += v * f
+        x_txt = left + 0.006 * x_max
+        ax.text(x_txt, y + (0.14 if f != 1.0 else 0), _bn(tot), ha="left", va="center", fontsize=9, fontweight="bold")
+        return pos
+
+    def connector(ax, y_top, y_bot, seg, tot_bot):
+        for xa, xb in zip(seg, (0, tot_bot)):
+            ax.plot([xa, xb], [y_top - 0.25, y_bot + 0.25], color="#555555", linestyle="--", linewidth=0.8)
+
+    # Lower rows are "zoomed in": one factor per row type, identical across scenarios,
+    # chosen so the largest bar of that type spans ~82% of the axis.
+    f_ind = 0.82 * x_max / max(float(ind_df[lab].sum()) for lab in labels)
+    f_heat = 0.82 * x_max / max(float(heat_df[lab].sum()) for lab in labels)
+
+    def magnifier(ax, y, f, x0):
+        """Magnifier icon + zoom factor + scale bar, tucked under the row's total label (at x0)."""
+        ax.plot([x0 + 0.008 * x_max], [y - 0.06], marker="o", markersize=10, mfc="none", mec="#333333",
+                mew=1.6, clip_on=False)
+        ax.plot([x0 + 0.014 * x_max, x0 + 0.022 * x_max], [y - 0.11, y - 0.19], color="#333333", lw=2.2,
+                solid_capstyle="round")
+        ax.text(x0 + 0.03 * x_max, y - 0.06, f"zoom ×{f:.0f}", fontsize=8, va="center", ha="left")
+        L = min([1, 2, 5, 10, 20, 50, 100, 200], key=lambda b: abs(b * f - 0.08 * x_max))
+        ax.plot([x0, x0 + L * f], [y - 0.28, y - 0.28], color="#333333", lw=2)
+        ax.text(x0 + L * f + 0.005 * x_max, y - 0.28, f"{L} bn", fontsize=7.5, va="center")
+
+    # Panels without a heating row (e.g. base run) are cropped and given less height
+    y_lo = [-0.45 if float(heat_df[lab].sum()) > 1e-6 else 0.55 for lab in labels]
+    fig, axes = plt.subplots(3, 1, figsize=(15, 13.5),
+                             gridspec_kw={"height_ratios": [3.1 - lo for lo in y_lo]})
+    for k, (ax, lab) in enumerate(zip(axes, labels)):
+        tot_k = float(sector_df[lab].sum())
+        heat_k = float(heat_df[lab].sum())
+        ax.text(0, 2.62, lab, fontsize=11.5,
+                fontweight="bold", va="bottom")
+        pos1 = draw_row(ax, 2, sector_df[lab], _FIG20_SECTOR_COLORS, lambda n: n)
+        ind_tot = float(ind_df[lab].sum())
+        connector(ax, 2, 1, pos1["Industries"], ind_tot * f_ind)
+        pos2 = draw_row(ax, 1, ind_df[lab], _FIG20_INDUSTRY_COLORS,
+                        lambda n: n.replace(" (incl. TES)", "").replace(" (all products)", "").replace("Glass & ceramics", "Glass &\nceramics"),
+                        f=f_ind, min_label=0.035)
+        magnifier(ax, 1, f_ind, ind_tot * f_ind + 0.006 * x_max)
+        if heat_k > 1e-6:
+            connector(ax, 1, 0, pos2["Low-T heating (incl. TES)"], heat_k * f_heat)
+            draw_row(ax, 0, heat_df[lab], heat_colors,
+                     lambda t: heat_pretty(t).replace(" waste heat", "\nwaste heat").replace(" water", "\nwater"),
+                     hatch_map=HEAT_SUPPLY_HATCH_MAP, min_label=0.06, f=f_heat)
+            magnifier(ax, 0, f_heat, heat_k * f_heat + 0.006 * x_max)
+        ax.set_xlim(0, x_max); ax.set_ylim(y_lo[k], 3.1)
+        ax.set_yticks([])
+        ax.spines[["left", "right", "top"]].set_visible(False)
+        if k < len(labels) - 1:
+            ax.spines["bottom"].set_visible(False)
+            ax.set_xticks([])
+        else:
+            ax.set_xlabel("Cumulative discounted cost [bn EUR] — axis valid for the top bars only; industry and heating rows are zoomed (see scale bars)", fontsize=9)
+            ax.tick_params(labelsize=8)
+    handles = ([Patch(color=c, label=n) for n, c in _FIG20_SECTOR_COLORS.items()]
+               + [Patch(color=c, label=f"(industries) {n}") for n, c in _FIG20_INDUSTRY_COLORS.items()]
+               + [Patch(facecolor=heat_colors[n], hatch=HEAT_SUPPLY_HATCH_MAP.get(n), edgecolor="white",
+                        label=f"(heating) {heat_pretty(n)}") for n in heat_df.index])
+    fig.legend(handles=handles, loc="upper center", bbox_to_anchor=(0.5, 0.955), ncol=5, fontsize=7.5, frameon=False)
+    fig.suptitle("Total system cost, cumulative (discounted): system → industries → low-T heating",
+                 fontsize=13, fontweight="bold")
+    fig.tight_layout(rect=[0, 0, 1, 0.9])
+    savefig(fig, "fig20_cost_breakdown_sector_industry_heating")
+
+
 # ── Main ──────────────────────────────────────────────────────────────────
 
 def main() -> None:
@@ -4889,6 +5106,7 @@ def main() -> None:
                 fig0b_emissions_source_comparison(base_run, no_flex_run, full_run)
                 fig1b_cost_and_emissions_totals(base_run, no_flex_run, full_run)
                 fig11_power_and_storage_impact_with_dsm(base_run, no_flex_run, full_run)
+                fig20_cost_breakdown_sector_industry_heating(base_run, no_flex_run, full_run)
             else:
                 print("  skipping fig0b_emissions_source_comparison/fig1b_cost_and_emissions_totals/"
                       "fig11_power_and_storage_impact_with_dsm: 'Full flexibility' scenario not loaded")
