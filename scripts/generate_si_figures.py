@@ -5120,6 +5120,62 @@ def fig20_cost_breakdown_sector_industry_heating(base_run: Run, no_flex_run: Run
     savefig(fig, "fig20_cost_breakdown_sector_industry_heating")
 
 
+# ── 9debug: fig9 layout for the v11 debug run (per-sector heat techs) ──────
+# v11 splits every industry heat tech into one copy per sector (paper, glass,
+# ceramic, food), e.g. heat_pump_industry_0_100_water_paper. This sums the 4
+# sector copies back into the single tech name fig9/9b/9c use, so the stack,
+# colors and hatches match those figures and the run is directly comparable.
+DEBUG_ROOT = REPO_ROOT / "data" / "outputs" / "euler_outputs" / "debug"
+DEBUG_RUN = "Crystal_Ball_ind_heat_v11_0_no_flexibility_2020_4a_10a_interval_7ts"
+HEAT_SECTORS = ("paper", "glass", "ceramic", "food")
+
+
+def _group_sectors(df: pd.DataFrame) -> pd.DataFrame:
+    """Sum the per-sector rows of `df` (index = technology) into their
+    sector-less tech name; rows without a sector suffix pass through."""
+    if df.empty:
+        return df
+    base = [next((t[:-len(f"_{sec}")] for sec in HEAT_SECTORS if t.endswith(f"_{sec}")), t)
+            for t in df.index]
+    return df.groupby(base, sort=False).sum()
+
+
+def fig9debug_heat_supply_grouped() -> None:
+    results = load_results(DEBUG_ROOT, DEBUG_RUN)
+    run = Run(name=DEBUG_RUN, label="v11 debug", mode="euler", results=results,
+              color=SCENARIO_PALETTE[0])
+    r = run.results
+    years = get_available_years(r)
+    techs = [f"{t}_{sec}" for t in HEAT_SUPPLY_STACK_ORDER for sec in HEAT_SECTORS]
+
+    def _ordered(df: pd.DataFrame) -> pd.DataFrame:
+        df = _group_sectors(df)
+        df = df.reindex(
+            [t for t in HEAT_SUPPLY_STACK_ORDER if t in df.index]
+            + [t for t in df.index if t not in HEAT_SUPPLY_STACK_ORDER])
+        return df[[y for y in years if y in df.columns]]
+
+    heat_df = _ordered(get_capacity(r, techs, "power"))
+    add_df = _ordered(get_capacity_addition(r, techs, "power"))
+    output_df = _ordered(_output_annual_twh(run, techs))
+
+    fig, axes = plt.subplots(1, 3, figsize=(3 * (0.8 * len(heat_df.columns) + 3) + 4, 6))
+    with plt.rc_context({"hatch.linewidth": 0.5}):
+        plot_stacked_bars(output_df, "Industry heat supply (TWh) - v11 debug, sectors summed",
+                          "TWh supplied", axes[0], show_segment_labels=False, show_legend=False,
+                          color_map=HEAT_SUPPLY_COLOR_MAP, hatch_map=HEAT_SUPPLY_HATCH_MAP)
+        plot_stacked_bars(heat_df, "Industry Heat Supply Capacity (stock) - v11 debug",
+                          "GW", axes[1], show_segment_labels=False, show_legend=False,
+                          color_map=HEAT_SUPPLY_COLOR_MAP, hatch_map=HEAT_SUPPLY_HATCH_MAP)
+        plot_stacked_bars(add_df, "Industry Heat Supply Capacity Additions (new builds/period) - v11 debug",
+                          "GW added", axes[2], show_segment_labels=False, show_legend=True,
+                          color_map=HEAT_SUPPLY_COLOR_MAP, hatch_map=HEAT_SUPPLY_HATCH_MAP)
+    for ax in axes:
+        plt.setp(ax.get_xticklabels(), rotation=0)
+    fig.tight_layout()
+    savefig(fig, "fig9debug_heat_supply_trajectory")
+
+
 # ── Main ──────────────────────────────────────────────────────────────────
 
 def main() -> None:
@@ -5217,4 +5273,8 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    import sys
+    if "--fig9debug" in sys.argv:
+        fig9debug_heat_supply_grouped()
+    else:
+        main()
