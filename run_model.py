@@ -76,6 +76,7 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+import yaml
 from zen_garden import run, Results  # noqa: F401  (Results kept for post-processing)
 
 # --- Fixed locations (same layout as your original script) ----------------------
@@ -95,7 +96,7 @@ DATASET_SEARCH_DIRS = [
 META_COLUMNS = {
     "my_dataset", "my_comment", "config", "normalisation", "batch_size",
     "n_workers", "axes_config", "tolerance_explore", "seed_rng",
-    "solver_threads", "epsilon",
+    "solver_threads", "epsilon", "numeric_focus",
 }
 
 # Fallback system.json overrides, used for any of these keys a CSV row
@@ -239,6 +240,24 @@ def apply_solver_threads_override(config_json: dict, config_name: str, solver_th
     solver_options["Threads"] = solver_threads
 
 
+def apply_numeric_focus_override(config_json: dict, config_name: str, numeric_focus) -> None:
+    """Overwrite solver.solver_options.NumericFocus in-place with the CSV row's value.
+
+    Same private-staged-copy pattern as the other overrides. Lets badly scaled
+    datasets (e.g. zen_europe, whose barrier path fails at NumericFocus 0) use
+    NumericFocus 2 without slowing down every other row sharing config.json.
+    """
+    if numeric_focus is None:
+        return
+    solver_options = config_json.get("solver", {}).get("solver_options")
+    if solver_options is None:
+        raise SystemExit(
+            f"[run_model] row sets numeric_focus but {config_name} has no "
+            f"solver.solver_options block to apply it to."
+        )
+    solver_options["NumericFocus"] = numeric_focus
+
+
 def validate_plugin_config(config_json: dict, config_name: str) -> None:
     """Fail fast on an invalid plugins.mga block, before staging/running.
 
@@ -342,6 +361,9 @@ def main() -> None:
     solver_threads = None
     if "solver_threads" in table.columns and pd.notna(row["solver_threads"]) and str(row["solver_threads"]).strip():
         solver_threads = to_native(row["solver_threads"])
+    numeric_focus = None
+    if "numeric_focus" in table.columns and pd.notna(row["numeric_focus"]) and str(row["numeric_focus"]).strip():
+        numeric_focus = to_native(row["numeric_focus"])
     epsilon = None
     if "epsilon" in table.columns and pd.notna(row["epsilon"]) and str(row["epsilon"]).strip():
         epsilon = to_native(row["epsilon"])
@@ -353,7 +375,8 @@ def main() -> None:
     print(f"[run_model] task_id={args.task_id}  dataset={my_dataset}  comment={my_comment}")
     print(f"[run_model] config={config_name}  axes_config={axes_config_path.name}  normalisation={normalisation}")
     print(f"[run_model] batch_size={batch_size}  n_workers={n_workers}  tolerance_explore={tolerance_explore}  "
-          f"seed_rng={seed_rng}  solver_threads={solver_threads}  epsilon={epsilon}")
+          f"seed_rng={seed_rng}  solver_threads={solver_threads}  epsilon={epsilon}  "
+          f"numeric_focus={numeric_focus}")
     print(f"[run_model] system_overrides={system_overrides}")
 
     with open(DATA_DIR_CONFIG / config_name) as f:
@@ -363,6 +386,7 @@ def main() -> None:
         apply_normalisation_override(config_json, config_name, normalisation)
     apply_batch_overrides(config_json, config_name, batch_size, n_workers, tolerance_explore, seed_rng)
     apply_solver_threads_override(config_json, config_name, solver_threads)
+    apply_numeric_focus_override(config_json, config_name, numeric_focus)
     if epsilon is not None:
         apply_epsilon_override(config_json, config_name, epsilon)
     validate_plugin_config(config_json, config_name)
@@ -383,12 +407,20 @@ def main() -> None:
         json.dump(config_json, f, indent=2)
 
     # --- 3. Apply the system.json overrides to the COPY --------------------------
-    system_json_path = staged_dataset / "system.json"
-    with open(system_json_path) as f:
-        system = json.load(f)
+    # ZEN-creator's newer datasets ship system.yaml instead of system.json.
+    system_path = next(
+        (staged_dataset / n for n in ("system.json", "system.yaml", "system.yml")
+         if (staged_dataset / n).exists()),
+        staged_dataset / "system.json",
+    )
+    with open(system_path) as f:
+        system = json.load(f) if system_path.suffix == ".json" else yaml.safe_load(f)
     system.update(system_overrides)
-    with open(system_json_path, "w") as f:
-        json.dump(system, f, indent=2)
+    with open(system_path, "w") as f:
+        if system_path.suffix == ".json":
+            json.dump(system, f, indent=2)
+        else:
+            yaml.safe_dump(system, f, sort_keys=False)
 
     # --- 4. Decide the output folder (scratch on Euler) --------------------------
     if args.run_on == "euler":

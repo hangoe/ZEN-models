@@ -26,7 +26,7 @@ source .venv/bin/activate
 python -m pip install --upgrade pip
 
 # --- Install run_model.py's direct dependencies ---
-python -m pip install pandas numpy
+python -m pip install pandas numpy pyyaml
 
 # --- Install zen_garden --  CHOOSE ONE OPTION and uncomment it ------------------
 # Your script does `from zen_garden import run, Results`, so zen_garden must be

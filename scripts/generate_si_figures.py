@@ -70,6 +70,10 @@ SI_results/ (results, renumbered fig1-fig10):
                                           flexibility's own totals in grey vs. its single-temp
                                           counterpart's difference, and (separately) Full flexibility's
                                           own totals in grey vs. its single-temp counterpart's difference
+  fig30_matrix                         — fig14b's 4 runs as a 2x2 matrix (flexibility x temperature
+                                          resolution), cells shaded by total cost, with arrows from the
+                                          cheapest cell (Full flexibility, 3 temp levels) giving each
+                                          other cell's extra cost in % and bn EUR
 
 SI_results/method/ (no results — methodological/context only, fig1-fig9):
   fig1_heat_demand_by_sector (was fig4a) — low-temp input heat demand by sector/band, +high-temp fuel by carrier (2023):
@@ -274,8 +278,9 @@ REPO_ROOT = Path(__file__).parent.parent
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from matplotlib.colors import LinearSegmentedColormap
-from matplotlib.patches import FancyBboxPatch, Patch, Polygon, Rectangle, Wedge
+from matplotlib.cm import ScalarMappable
+from matplotlib.colors import LinearSegmentedColormap, Normalize
+from matplotlib.patches import FancyArrow, FancyBboxPatch, Patch, Polygon, Rectangle, Wedge
 from matplotlib.path import Path as MplPath
 from matplotlib.lines import Line2D
 
@@ -2947,6 +2952,209 @@ def fig14b_cost_and_emissions_totals_singletemp_vs_full(no_flex_run: Run, no_fle
                                cost_only=True)
 
 
+def _discounted_total_cost_bn(run: Run) -> float:
+    """Horizon-total discounted system cost in bn EUR (MEUR / 1000) — the
+    same number fig1b/fig14b/fig30 plot."""
+    years = get_available_years(run.results)
+    return float(get_annual_total_cost(run.results, years, discount=True).sum()) / 1000
+
+
+FIG30_YEAR = 2050  # snapshot year for fig30's capacity/storage panels (cost is horizon-cumulative)
+FIG30_SHOW_ARROWS = False  # arrows off for a look without them (user request); True restores them
+FIG30_VRE_TECHS = ["photovoltaics", "wind_onshore", "wind_offshore",
+                   "reservoir_hydro", "run-of-river_hydro"]
+
+
+def _fig30_matrix_panel(fig: plt.Figure, ax: plt.Axes, values: dict[tuple[int, int], float],
+                        title: str, unit: str, cbar_label: str, row_labels: bool = True,
+                        value_fmt: str = "{:,.0f}", delta_fmt: str = "{:,.1f}",
+                        delta_unit: str | None = None):
+    """One 2x2 flexibility x temperature-resolution matrix of fig30: `values`
+    keyed by (row, col) — row 0 = 3 temp levels (top), col 1 = Full
+    flexibility (right). Cells shaded by value (light -> dark blue,
+    normalised min..max, own colourbar), unlabelled arrows from the baseline
+    cell (Full flexibility, 3 temp levels) to the other 3; each target cell
+    carries its own absolute and relative difference to the baseline in
+    `unit` under its value (signed — the baseline need not be the smallest
+    value outside the cost panel). `delta_unit` overrides `unit` for the
+    absolute difference only (e.g. "pp" for a share given in "%"). Returns
+    the colourbar so the caller can
+    centre `title` over cells + colourbar once the layout is final — the
+    title itself is NOT drawn here."""
+    base_rc = (0, 1)
+    base = values[base_rc]
+
+    size, gap = 1.0, 0.12
+    def corner(rc):  # lower-left corner of a cell, row 0 on top
+        row, col = rc
+        return col * (size + gap), (1 - row) * (size + gap)
+    def center(rc):
+        x0, y0 = corner(rc)
+        return x0 + size / 2, y0 + size / 2
+
+    # Cost -> continuous colour fade, normalised between the cheapest (light
+    # ETH blue) and most expensive (dark ETH blue) cell; a colourbar documents it.
+    cmap = LinearSegmentedColormap.from_list(
+        "fig30_cost", [_eth_tint(_ETH_BLUE, 0.85), _ETH_BLUE, "#0F2A52"])
+    norm = Normalize(vmin=min(values.values()), vmax=max(values.values()))
+
+    for rc, c in values.items():
+        x0, y0 = corner(rc)
+        t = norm(c)
+        ax.add_patch(Rectangle((x0, y0), size, size, facecolor=cmap(t), edgecolor="#1F2A3A",
+                               linewidth=1.2, zorder=1))
+        cx, cy = center(rc)
+        # Value + its change vs. the baseline sit at each cell's outer
+        # (top/bottom) edge, leaving the middle for the arrows.
+        ty = y0 + (0.82 if rc[0] == 0 else 0.3) * size
+        text_color = "white" if t > 0.6 else "black"
+        ax.text(cx, ty, f"{value_fmt.format(c)} {unit}", ha="center", va="center", fontsize=12.5,
+                fontweight="bold", color=text_color, zorder=4)
+        if rc == base_rc:
+            sub = "baseline"
+        else:
+            delta = c - base
+            sign = "+" if delta >= 0 else "−"
+            sub = (f"{sign}{delta_fmt.format(abs(delta))} {delta_unit or unit}  "
+                   f"({sign}{abs(delta) / base * 100:.2f} %)")
+        ax.text(cx, ty - 0.12, sub, ha="center", va="center", fontsize=9.5,
+                style="italic" if rc == base_rc else "normal", color=text_color, zorder=4)
+
+    # ETH bronze: warm complement to the blue cell ramp, so the arrows stand
+    # out equally on the lightest and darkest cells.
+    arrow_color = _ETH_BRONZE
+    bx0, by0 = corner(base_rc)
+    # Each arrow gets its own start/end (fractions of a cell, relative to the
+    # baseline cell's lower-left corner) so the 3 don't pile up on one point:
+    # horizontal from the lower-middle-left, vertical from the right, diagonal
+    # from the inner corner.
+    arrows = {(0, 0): ((0.3, 0.42), (-0.4, 0.42)),
+              (1, 1): ((0.72, 0.3), (0.72, -0.4)),
+              (1, 0): ((0.1, 0.1), (-0.42, -0.42))}
+    head_len = 0.13
+    # Arrow width encodes |delta| within this panel: proportional to the
+    # panel's largest |delta| (NOT min-max — that would always draw the
+    # smallest change as the thinnest arrow even when all 3 are near-equal),
+    # with a floor so a tiny change still reads as an arrow. Length can't
+    # carry magnitude: each arrow has to reach its own target cell.
+    max_abs = max(abs(values[rc] - base) for rc in arrows) or 1.0
+    w_min, w_max = 0.04, 0.28
+    for rc, ((fx0, fy0), (fx1, fy1)) in (arrows.items() if FIG30_SHOW_ARROWS else []):
+        sx, sy = bx0 + fx0 * size, by0 + fy0 * size
+        ex, ey = bx0 + fx1 * size, by0 + fy1 * size
+        dx, dy = ex - sx, ey - sy
+        delta = values[rc] - base
+        width = max(w_min, w_max * abs(delta) / max_abs)
+        ax.add_patch(FancyArrow(sx, sy, dx, dy, width=width, head_width=width + 0.12,
+                                head_length=head_len, length_includes_head=True,
+                                facecolor=arrow_color, edgecolor="white", linewidth=1.2, zorder=3))
+
+    top_y = 2 * size + gap
+    for col, label in enumerate(["No flexibility", "Full flexibility"]):
+        ax.text(col * (size + gap) + size / 2, top_y + 0.06, label, ha="center", va="bottom",
+                fontsize=11, color="black")
+    for row, label in enumerate(["3 temp. levels", "Single temp. level"] if row_labels else []):
+        ax.text(-0.06, (1 - row) * (size + gap) + size / 2, label, ha="right", va="center",
+                rotation=90, fontsize=11, color="black")
+
+    ax.set_xlim(-0.2, 2 * size + gap + 0.02)
+    ax.set_ylim(-0.02, top_y + 0.2)
+    ax.set_aspect("equal")
+    ax.axis("off")
+    cbar = fig.colorbar(ScalarMappable(norm=norm, cmap=cmap), ax=ax, fraction=0.04, pad=0.03,
+                        shrink=0.8)
+    cbar.set_label(cbar_label, fontsize=10)
+    cbar.ax.tick_params(labelsize=9)
+    cbar.ax.yaxis.set_major_formatter(plt.FuncFormatter(lambda v, _: f"{v:,.0f}"))
+    return cbar
+
+
+def fig30_matrix(no_flex_run: Run, no_flex_single_run: Run, full_run: Run,
+                 single_temp_run: Run) -> None:
+    """fig14b's 4 runs laid out as 2x2 matrices — columns No flexibility /
+    Full flexibility, rows 3 temperature levels / single level — per user
+    sketch, 3 panels side by side (see _fig30_matrix_panel). Each cell is
+    shaded by its value, and arrows from the cheapest cell, Full flexibility
+    with 3 temp levels, point to each of the other 3 cells labelled with the
+    difference relative to that baseline in % and absolute terms. Unlike
+    fig14b, No flexibility is compared against Full flexibility here too
+    (the diagonal + horizontal arrows) — the whole point of the matrix is a
+    single shared baseline.
+
+    Panels (2x2, row-major): (1) discounted total system cost [bn EUR];
+    (1b) 2050 total heat-pump share of industry heat output [%] — same
+    _electrification_stack data as fig14a, change shown in pp; (2) 2050 variable
+    renewable power capacity [GW] — solar + wind (on/offshore) + hydro
+    (reservoir, run-of-river), summed; (3) 2050 annual storage discharge
+    [TWh/yr] over BULK_STORAGE_TECHS plus the industry DSM energy
+    equivalent (get_dsm_energy_equivalent), i.e. the same total fig12a
+    stacks — without DSM, Full flexibility's bulk discharge is ~91 TWh
+    BELOW No flexibility's (DSM displaces battery/gas-storage cycling),
+    with it slightly above. Discharge rather than storage ENERGY capacity per user choice:
+    energy capacity is ~98% natural_gas_storage (~1,015 TWh, essentially
+    all existing stock and identical across scenarios), whereas discharge
+    is what fig11/fig12 already show (battery-dominated).
+    -> SI_results/fig30_matrix.svg
+    """
+    cells = {(0, 0): no_flex_run, (0, 1): full_run,
+             (1, 0): no_flex_single_run, (1, 1): single_temp_run}
+    cost = {rc: _discounted_total_cost_bn(r) for rc, r in cells.items()}
+    vre = {rc: float(get_capacity(r.results, FIG30_VRE_TECHS, "power")
+                     .get(FIG30_YEAR, pd.Series(dtype=float)).sum())
+           for rc, r in cells.items()}
+    # Bulk storage discharge + industry DSM energy equivalent, both GWh ->
+    # TWh — same two components fig12a stacks (DSM is 0 in No flexibility).
+    storage = {}
+    for rc, r in cells.items():
+        bulk = get_storage_flows(r.results, BULK_STORAGE_TECHS, "flow_storage_discharge") \
+            .get(FIG30_YEAR, pd.Series(dtype=float)).sum()
+        dsm = get_dsm_energy_equivalent(r.results, DSM_ENERGY_STACK_ORDER, [FIG30_YEAR]).sum() \
+            .get(FIG30_YEAR, 0.0)
+        storage[rc] = float(bulk + dsm) / 1000.0
+
+    # Total heat-pump share of industry heat output (all temperature bands
+    # and sources), same _electrification_stack data as fig14a.
+    hp_share = {}
+    for rc, r in cells.items():
+        stack = _electrification_stack(r)
+        hp_cols = [c for c in stack.columns if c.startswith("heat_pump")]
+        hp_share[rc] = float(stack.loc[FIG30_YEAR, hp_cols].sum())
+
+    # 2x2 grid of panels: top row cost | HP share, bottom row VRE | storage.
+    fig, axes = plt.subplots(2, 2, figsize=(15, 14))
+    panels = [(cost, "Total cumulative costs in bn €", "bn €",
+               "Discounted total system cost [bn EUR]", {}),
+              (hp_share, f"Heat-pump share of industrial heat {FIG30_YEAR} in %", "%",
+               f"Heat-pump share of industry heat output {FIG30_YEAR} [%]",
+               dict(value_fmt="{:.1f}", delta_unit="pp")),
+              (vre, f"Variable renewable capacity {FIG30_YEAR} in GW", "GW",
+               f"Solar + wind + hydro capacity {FIG30_YEAR} [GW]", {}),
+              (storage, f"Storage discharge incl. DSM {FIG30_YEAR} in TWh", "TWh",
+               f"Annual storage + DSM discharge {FIG30_YEAR} [TWh]", {})]
+    cbars = [_fig30_matrix_panel(fig, ax, vals, title, unit, cbar_label, row_labels=(i % 2 == 0),
+                                 **kw)
+             for i, (ax, (vals, title, unit, cbar_label, kw)) in enumerate(zip(axes.flat, panels))]
+    fig.subplots_adjust(hspace=0.1, wspace=0.12)
+    # Centre each title over its cells + colourbar (incl. its label) — only
+    # possible after a draw, since set_aspect("equal") shrinks each axes and
+    # the colourbar label's extent is only known once rendered.
+    fig.canvas.draw()
+    renderer = fig.canvas.get_renderer()
+    to_fig = fig.transFigure.inverted()
+    for ax, cbar, (_, title, *_rest) in zip(axes.flat, cbars, panels):
+        left = ax.transData.transform((0, 0))[0]  # left edge of the cells
+        right = cbar.ax.get_tightbbox(renderer).x1
+        top = ax.get_window_extent(renderer).y1
+        x, y = to_fig.transform(((left + right) / 2, top))
+        fig.text(x, y + 0.003, title, ha="center", va="bottom", fontsize=12.5, fontweight="bold")
+    bottom = to_fig.transform((0, axes[1, 0].get_window_extent(renderer).y0))[1]
+    if FIG30_SHOW_ARROWS:
+        fig.text(0.5, bottom - 0.012, "Arrow width is proportional to the size of the change relative to "
+                 "the largest change within each panel.", ha="center", va="top", fontsize=10,
+                 style="italic", color="black")
+    savefig(fig, "fig30_matrix")
+
+
 def _cost_and_emissions_totals(runs: list[Run], base_for: dict[str, str], delta_color: dict[str, str],
                                 fig_name: str, top: float | None = None,
                                 bottom: float | None = None,
@@ -2963,10 +3171,7 @@ def _cost_and_emissions_totals(runs: list[Run], base_for: dict[str, str], delta_
     # bn EUR (billion EUR) rather than MEUR per user request — MEUR values
     # here run ~2.3e7 (i.e. ~23 trillion EUR); dividing by 1000 gives a
     # legible ~23,000 bn EUR without scientific-notation axis ticks.
-    cost = {}
-    for r in runs:
-        years = get_available_years(r.results)
-        cost[r.label] = float(get_annual_total_cost(r.results, years, discount=True).sum()) / 1000
+    cost = {r.label: _discounted_total_cost_bn(r) for r in runs}
 
     labels = [r.label for r in runs]
 
@@ -5237,8 +5442,9 @@ def main() -> None:
                                                                    full_flex_run, single_temp_run)
             fig14b_cost_and_emissions_totals_singletemp_vs_full(no_flex_run, no_flex_single_run,
                                                                 full_flex_run, single_temp_run)
+            fig30_matrix(no_flex_run, no_flex_single_run, full_flex_run, single_temp_run)
         else:
-            print(f"  skipping fig14a/fig14b: requires 'No flexibility', 'Full flexibility', and "
+            print(f"  skipping fig14a/fig14b/fig30: requires 'No flexibility', 'Full flexibility', and "
                   f"{NO_FLEX_SINGLE_TEMP_SCENARIO[1]!r} all loaded")
     else:
         print("  skipping fig3b_heat_pathway/fig14a/fig14b: "

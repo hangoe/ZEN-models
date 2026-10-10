@@ -12,6 +12,8 @@
 #   sbatch --array=10-13    submit_euler.sh     # no_flexibility_nodiffusion ts sweep (1/3/10/20 ts)
 #   sbatch --array=20,21,27 submit_euler.sh     # v10_0 (annual, 2020-2050): full flex, no flex, Crystal_Ball base
 #   sbatch --array=20-29    submit_euler.sh     # all v10_0 rows (31 annual periods: may need more --time/--mem than below)
+#   sbatch --array=49       submit_euler.sh     # zen_europe v1 mid-size test (ref 2022, 3 yrs, 7 ts, NumericFocus 2) -- run first
+#   sbatch --array=47,48    submit_euler.sh     # zen_europe v1 full horizon 2022-2050 (diffusion / nodiffusion)
 #
 # The --array range must match the task_id values in parameters.csv.
 ###############################################################################
