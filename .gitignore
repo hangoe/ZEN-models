@@ -3,6 +3,8 @@
 *.lp
 data/outputs/**/*.h5
 /data/naturalearth/
-/.venv/__pycache__/
+/.venv/
+zen_run_*.out
+zen_run_*.err
 *.pyc
 .DS_Store
