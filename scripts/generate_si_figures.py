@@ -26,46 +26,31 @@ model results, either hand-typeset/illustrative or plotting input
 assumptions/context data rather than model output — is written into
 SI_results/method/ instead, renumbered fig1..fig7 within that subfolder.
 Function names below keep their OLD fig-N labels (fig11_mga_method,
-fig4a_heat_demand_by_sector, etc.) purely as stable internal identifiers
+fig4b_industry_fuel_demand_comparison, etc.) purely as stable internal identifiers
 for cross-referencing in comments throughout this file; only the actual
 output filename/folder (the savefig() call at the end of each function)
 uses the new per-folder numbering — see each entry's "-> " below for where
 it actually lands on disk.
 
-SI_results/ (results, renumbered fig1-fig10):
+SI_results/ (results; removed/superseded figures are kept in SI_results/archive/,
+the zen-europe versions of removed ones in archive/zen_europe/):
   fig1_cost_composition (was fig0a)            — CAPEX/OPEX/carrier/carbon-cost breakdown of each v7_0
                                           scenario's cost increase vs Crystal Ball base
   fig2_emissions_source_comparison (was fig0b) — Full flex vs Crystal Ball base, year 2025: where the
                                           emissions increase comes from vs. only a modest cost delta
-  fig3_cost_delta (was fig1a)          — discounted system cost delta vs Full flexibility
-  fig4_industry_capacity (was fig1b)   — industry heat-supply & production capacity, 2050
-  fig5_dsm_cycles_by_product (was fig2) — DSM utilization (cycles/yr) by product: optimistic vs pessimistic
+  fig5b_dsm_discharge_by_product        — annual DSM throughput per product: optimistic vs pessimistic
   fig6_heat_pathway (was fig3b)        — direct vs temp-conversion heat production, 2050
   fig7_retrofit_ccs_comparison (was fig5) — CO2 captured by retrofit-CCS technology, No flexibility vs Crystal Ball base
-  fig8_diffusion_mechanisms (was fig6) — ZEN-garden technology-diffusion/learning mechanisms compared
-  fig9_heat_supply_trajectory_no_flexibility (was fig7) — No flexibility heat-supply capacity, every modeled year 2020-2050
-  fig9b_heat_supply_trajectory_full_flexibility — same layout as fig9, for the Full flexibility scenario
-  fig15a_heat_supply_output_no_flexibility_twh (new, fig9c) — standalone copy of fig9's top
-                                          ("Industry heat supply") panel only, in TWh instead of GW —
-                                          per user request, for use on its own without the capacity-
-                                          stock/additions panels below it
-  fig15b_heat_supply_output_full_flexibility_twh (new, fig9c) — same as fig15a, for the Full
-                                          flexibility scenario (was the sole fig15 before fig15a was added)
-  fig11_power_and_storage_impact_with_dsm — power generation capacity (top) & storage annual energy
-                                          discharged (bottom), each a single plot with Crystal Ball base / No
-                                          flexibility / Full flexibility as 3 adjacent bars per year, 3
-                                          snapshot years (2030/2040/2050) — generation fleet SCALES UP with mix
-                                          barely shifting; storage capacity stays near-identical across
-                                          scenarios but discharge (utilization) doesn't. Full flexibility's
-                                          storage bars also stack its DSM discharge (all 10 products;
-                                          ammonia/methanol natively GWh, the other 8 mass-carrier products
-                                          converted via their own system-wide production energy intensity
-                                          that year) on top of the same 5 power-sector storage techs — see
-                                          fig11's own section comment for the per-product methodology
-  fig12_capacity_and_storage_base_and_delta — same 2 quantities as fig11, but as Crystal Ball base
-                                          (absolute stack) + a floating Δ No flexibility bar per year
-  fig13_regional_capacity_delta_map      — that same Δ No flexibility, per node, as area-scaled pie
-                                          glyphs on a map of the modeled European regions
+  fig8a_diffusion_mechanisms_heat_pumps — technology-diffusion limit decomposition for the industry heat pumps
+  fig9_heat_supply_trajectory_noflex_vs_fullflex — industry heat output / capacity stock / capacity
+                                          additions over every modeled year, No flexibility (left) next
+                                          to Full flexibility (right); replaces the former fig9 + fig9b
+  fig15a_heat_supply_output_no_flexibility_twh — standalone copy of fig9's top ("Industry heat
+                                          supply") panel only, in TWh
+  fig15b_heat_supply_output_full_flexibility_twh — same as fig15a, for the Full flexibility scenario
+  fig12_capacity_and_storage_base_and_delta — power generation capacity & storage annual energy
+                                          discharged at 2030/2040/2050, as Crystal Ball base (absolute
+                                          stack) + a floating Δ No flexibility bar per year
   fig14a_heat_supply_electrification_singletemp_vs_full — "electrified" industry heat share (heat
                                           pump + electrode boiler, stacked) at 2030/2040/2050, as 2
                                           grouped-bar panels — one per model option (No flexibility /
@@ -74,8 +59,8 @@ SI_results/ (results, renumbered fig1-fig10):
                                           combined total barely moves, but the HP/electrode-boiler split
                                           within it shifts sharply; only singletemp-vs-not is ever
                                           compared, never the 2 model options against each other
-  fig14b_cost_emissions_totals_singletemp_vs_full — fig1b's (fig1b_cost_emissions_totals) template
-                                          applied to 2 independent baselines side by side: No
+  fig14b_cost_emissions_totals_singletemp_vs_full — cost & emissions totals (_cost_and_emissions_totals)
+                                          for 2 independent baselines side by side: No
                                           flexibility's own totals in grey vs. its single-temp
                                           counterpart's difference, and (separately) Full flexibility's
                                           own totals in grey vs. its single-temp counterpart's difference
@@ -83,10 +68,10 @@ SI_results/ (results, renumbered fig1-fig10):
                                           resolution), cells shaded by total cost, with arrows from the
                                           cheapest cell (Full flexibility, 3 temp levels) giving each
                                           other cell's extra cost in % and bn EUR
+  fig20_cost_breakdown_sector_industry_heating — total system cost drilled down sector ->
+                                          industries -> low-temperature heat
 
-SI_results/method/ (no results — methodological/context only, fig1-fig9):
-  fig1_heat_demand_by_sector (was fig4a) — low-temp input heat demand by sector/band, +high-temp fuel by carrier (2023):
-                                          an exogenous INPUT ASSUMPTION, not a solved-model result (see below)
+SI_results/method/ (no results — methodological/context only; removed ones in archive/method/):
   fig2_industry_fuel_demand_comparison (was fig4b) — new-sector heat/fuel demand vs. pre-existing cement/steel fuel mix
   fig3_industry_sector_emissions_context (was fig8) — European industry CO2 emissions by
                                           subsector (JRC-IDEES-2023), colored by Crystal Ball scope
@@ -105,11 +90,6 @@ SI_results/method/ (no results — methodological/context only, fig1-fig9):
                                           directional solves — a mid-exploration SNAPSHOT (solve order
                                           starts with the farthest/most-prominent corner); see fig8 for
                                           the same toy geometry run to full completion
-  fig6_lp_formulation (was fig12)       — energy system optimization as an LP: the general cost-min
-                                          capacity-expansion formulation (left) next to this work's
-                                          actual "No flexibility" model's size and ZEN-garden-specific
-                                          formulation details (right), read from that run's
-                                          benchmarking.json/system.json/solver.json
   fig7_mga_axis_construction (was fig13) — conceptual, non-data schematic of how the NUMBER of
                                           candidate MGA axes grows as dimensions are crossed, left to
                                           right: (1) 3 technology-group axes alone; (2) x 4 regions
@@ -127,14 +107,12 @@ SI_results/method/ (no results — methodological/context only, fig1-fig9):
                                           already-found vertex is extremal toward the new direction -
                                           only solve 1 starts at z* itself
 
-fig4a/fig4b (now method/fig1, method/fig2), fig8/fig9 (now method/fig3,
-method/fig4) moved into method/ because none of them plot a SOLVED MODEL
-RESULT: fig4a is the exogenous heat-demand ASSUMPTION fed into the model
-(see its own docstring below), fig4b is largely the same kind of
+fig4b (now method/fig2) and fig8/fig9 (now method/fig3, method/fig4) live
+in method/ because none of them plot a SOLVED MODEL RESULT: fig4b is an
 input-vs-context comparison, and fig8/fig9 plot external JRC-IDEES-2023/
-UNFCCC input data establishing Crystal Ball's scope — none of the 4 touch
-EULER_ROOT run output. fig11/fig12/fig13 (now method/fig5-7) were already
-method figures by construction (see below).
+UNFCCC input data establishing Crystal Ball's scope. fig11/fig13/fig14
+(now method/fig5, fig7, fig8) are method figures by construction (see
+below).
 
 fig11 (method/fig5) is a pure method illustration: hand-picked, unitless 2D
 geometry (no model run, no external data at all), generated unconditionally
@@ -143,16 +121,6 @@ the model's actual 6-D MGA exploration space plotted in
 data/outputs/figures/mga_tests/) so both axes can be labeled generically
 ("Variable A/B") for a textbook-style explainer, independent of which
 specific technologies the real MGA runs explored.
-
-fig12's (method/fig6) left side (the general LP formulation) is likewise
-hand-typeset, not derived from anything solvable. Its right side, unlike
-fig11, IS real: the variable/constraint counts and solver stats are read
-directly from the "No flexibility" scenario's own
-benchmarking.json/system.json/solver.json (found via _search_var_dict under
-SCENARIOS[0], the same lookup load_results() uses) rather than hardcoded,
-so they can't silently drift from that run. Generated unconditionally in
-main(); skipped gracefully (like fig11) if that scenario isn't under
-EULER_ROOT yet.
 
 fig13 (method/fig7), like fig11, is a pure method illustration with no
 solved points — but deliberately does NOT use 2D coordinate frames (an
@@ -168,14 +136,14 @@ always a pictogram (lightning = power, "H2" = hydrogen, "C" = carbon) —
 consistent across all 3 panels. Every count is read directly off this
 repo's real MGA axis configs rather than invented — see the constant block
 above fig13_mga_axis_construction() for exactly which config_mga_axes_*.json
-file each panel's number comes from. Unlike fig11/fig12, fig13's map DOES
+file each panel's number comes from. Unlike fig11, fig13's map DOES
 pull in a new dependency (geopandas + the cached Natural Earth shapefile in
 data/naturalearth/) per user request for the real geography instead of an
 abstract icon — it falls back to a hand-drawn 4-wedge compass if geopandas
 or the shapefile aren't available, so it still generates unconditionally in
 main() either way.
 
-fig8 and fig9, like fig4a, plot real-world INPUT data (JRC-IDEES-2023 subsector
+fig8 and fig9 plot real-world INPUT data (JRC-IDEES-2023 subsector
 emissions; Mannhardt's documented 90.0% sector-coverage figure plus UNFCCC CRF
 data via sector_emissions_2022.csv), not solved-model results — generated
 unconditionally in main(), independent of which Euler runs are loaded. fig8's
@@ -183,47 +151,6 @@ JSON is produced by extract_industry_sector_emissions.py (run under
 zen-creator-env, same env-split reason as extract_heat_demand_by_sector.py);
 fig9 reads sector_emissions_2022.csv directly (a plain CSV, no openpyxl
 needed) from the sibling ZEN-creator repo.
-
-fig4a is the odd one out: unlike every other figure here, it does NOT come from
-a solved model run. It plots the exogenous low-temperature heat-demand
-ASSUMPTION that ZEN-creator computes for glass/ceramic/paper/food
-(ProcessParametrizationDataset._heat_cfs × each sector's own demand volume,
-FEC_YEAR=2023) — i.e. what goes INTO the model as `demand` on
-heat_industry_0_100/100_150/150_200, not what the solved model does with it
-(that's fig3b's territory) — plus, stacked on top in grey and split by
-carrier (including "oil" for ceramic as of ZEN-creator commit 1f3f708), each
-sector's high-temperature (>200°C) fuel demand (direct combustion, no
-heat_industry_* carrier involved — a different supply pathway, shown only for
-scale against the colored low-temperature bands), plus a final green
-electricity segment (not temperature-banded, not part of the fuel mix — a
-separate fixed input every production tech has). Values are aggregated across
-all MODEL_NODES (EU27+CH+NO+UK), not per-country. Since
-ZEN-creator needs openpyxl/xlrd (zen-creator-env) and this script needs
-matplotlib (zen-garden-env) — the two conda envs are disjoint — the
-extraction is a separate script (scripts/extract_heat_demand_by_sector.py,
-run under zen-creator-env) that writes heat_demand_by_sector_input.json into
-this same FIGURES_DIR; fig4a_heat_demand_by_sector() here just reads and
-plots it, and is skipped gracefully (like fig0a/fig0b vs. Crystal Ball base)
-if that JSON hasn't been generated yet. See extract_heat_demand_by_sector.
-py's docstring for the full provenance/validation chain (Rehfeldt2017.csv ->
-compute_sector_params(), cross-checked against a materialized dataset's own
-demand.csv and attributes.json).
-
-fig2 used to be a pair (fig2a_tes_dsm_utilization, fig2b_dsm_cycles_by_product).
-fig2a summed flow_storage_charge/discharge across all INDUSTRY_DSM_TECHS, but
-those techs are NOT unit-homogeneous: ammonia_DSM/methanol_DSM are
-energy-carrier storage (GWh, confirmed via Results.get_unit()), while the
-other 8 (ceramic/clinker/food/glass/olefin/paper/primary_steel/
-secondary_steel) are mass-carrier storage (kt-of-product) — its
-"[GWh+kt]" axis label was already an admission of an invalid mixed-unit sum.
-Removed outright (per user decision) rather than fixed, since its message
-(TES negligible vs. DSM once DSM is available) is carried by prose alone in
-03_SI.tex. fig2b was renamed to fig2 (dropping the now-meaningless "b"
-suffix) and gained hatching to flag which of its bars are the 2
-energy-carrier products (ammonia, methanol) vs. the 8 mass-carrier ones —
-its "cycles/year" metric was already unit-safe (each product's discharge is
-divided by its OWN capacity in the same native unit), but had no visual cue
-for readers that the underlying carriers differ in kind.
 
 The planned "Emissions" subsection (fig3b) is intentionally NOT built as a
 standalone comparison across the 6 v7_0 scenarios: their horizon-total
@@ -234,20 +161,12 @@ comparison against Crystal Ball base instead — see
 fig0b_emissions_source_comparison's docstring — without a dedicated,
 mostly-flat fig3b-only pairing.
 
-fig3a_temp_sensitivity_summary (cost/emissions/capacity delta bars, Single
-temperature level vs Full flexibility) was deleted per user request: its cost
-and capacity bars only repeated what fig0a/fig1b already show, and the one
-new number it carried (emissions delta, ~+0.9%) is reported as prose in
-03_SI.tex instead. fig3b (heat pathway) is unchanged and keeps its original
-name/label — it was NOT renamed down to "fig3" the way fig2b was, since the
-user only asked to drop fig3a this time, not collapse the pair.
-
 "Crystal Ball (base)" only feeds fig0a/0b. `load_base_scenario()` still skips
 them gracefully (with a printed note) if Crystal_Ball_2025_10a_5a_interval_10ts/
 isn't present under EULER_ROOT, but as of v7_0 it has converged and is loaded
 normally. It's deliberately NOT a 7th entry in SCENARIOS below or
 in any other figure: it has no industry heat/DSM/TES sector at all, so
-capacity/utilization figures (1b, 2, 3b)
+capacity/utilization figures (3b, 5b)
 would show a misleading 0 for it rather than a meaningful
 absence. Cost and emissions totals, by contrast, are well-defined for any
 run regardless of sector structure, which is what makes it fig0a/0b material.
@@ -298,7 +217,6 @@ from plots.figures_by_run import (
     INDUSTRY_DSM_TECHS,
     INDUSTRY_HEAT_CARRIERS_ENERGY,
     INDUSTRY_HEAT_TECHS_BOILERS_HP,
-    INDUSTRY_HEAT_TECHS_PRODUCTION,
     INDUSTRY_HEAT_TECHS_TEMP_CONV,
     get_capacity,
     get_capacity_addition,
@@ -326,14 +244,12 @@ from plots.figure_settings import (
     SCENARIO_PALETTE,
     COLOR_MAP,
     _apply_shared_ylim,
-    _search_var_dict,
     _text_color_for_bg,
     apply_font_mode,
     eth_tint,
     get_available_years,
     load_results,
 )
-from plots.natural_earth import EUROPE_EXTENT, ISO_A2_EH_OVERRIDES, NATURALEARTH_SHP
 
 # Font family (Arial for presentations vs. cmr10/Computer Modern matching
 # MT_report_HG's LaTeX, for the report) is toggled in ONE place for every
@@ -373,7 +289,7 @@ COMPARISON_YEARS = [2030, 2040, 2050]
 # 2022-2050, time steps per system.yaml). The other entries use the folder
 # names those scenarios are expected to get and self-skip until run.
 SCENARIOS = [
-    ("zen_europe_ind_heat_v1_no_flexibility_2022_8a_4a_interval_10ts_systemyaml", "No flexibility"),
+    ("zen_europe_ind_heat_v1_no_flexibility_2022_8a_4a_interval_10ts", "No flexibility"),
     ("zen_europe_ind_heat_v1_2022_8a_4a_interval_7ts", "Full flexibility"),
     ("zen_europe_ind_heat_v1_DSM_pessimistic_2022_8a_4a_interval_7ts", "DSM pessimistic"),
     ("zen_europe_ind_heat_v1_DSM_only_2022_8a_4a_interval_7ts", "DSM only"),
@@ -471,7 +387,7 @@ def _snap_years(wanted: list[int], available: list[int]) -> list[int]:
 def snap_snapshot_years(runs: list[Run]) -> None:
     """Rebind the module-level snapshot-year constants to the loaded runs'
     modeled years (common to all of them)."""
-    global YEAR, COMPARISON_YEARS, SNAPSHOT_YEARS_POWER, FIG30_YEAR, _REGIONAL_YEAR
+    global YEAR, COMPARISON_YEARS, SNAPSHOT_YEARS_POWER, FIG30_YEAR
     if not runs:
         return
     available = sorted(set.intersection(*(set(get_available_years(r.results)) for r in runs)))
@@ -479,7 +395,6 @@ def snap_snapshot_years(runs: list[Run]) -> None:
     COMPARISON_YEARS = _snap_years(COMPARISON_YEARS, available)
     SNAPSHOT_YEARS_POWER = _snap_years(SNAPSHOT_YEARS_POWER, available)
     FIG30_YEAR = _snap_years([FIG30_YEAR], available)[0]
-    _REGIONAL_YEAR = _snap_years([_REGIONAL_YEAR], available)[0]
     print(f"  snapshot years: YEAR={YEAR}, COMPARISON_YEARS={COMPARISON_YEARS}, "
           f"SNAPSHOT_YEARS_POWER={SNAPSHOT_YEARS_POWER}")
 
@@ -642,31 +557,7 @@ def fig0a_cost_composition(components_with_base: pd.DataFrame) -> None:
     savefig(fig, "fig1_cost_composition")
 
 
-# ── 1a: Cost delta vs Full flexibility ─────────────────────────────────────
-
-def fig1a_cost_delta(metrics: pd.DataFrame) -> None:
-    baseline = metrics.loc["Full flexibility", "npc_total_meur"]
-    others = metrics.drop("Full flexibility")
-    delta = others["npc_total_meur"] - baseline
-    pct = delta / baseline * 100
-
-    fig, ax = plt.subplots(figsize=(7, 5))
-    colors = [SCENARIO_PALETTE[list(metrics.index).index(lbl) % len(SCENARIO_PALETTE)]
-              for lbl in others.index]
-    bars = ax.bar(others.index, delta.values, color=colors, edgecolor="white")
-    for bar, p in zip(bars, pct.values):
-        ax.text(bar.get_x() + bar.get_width() / 2, bar.get_height(),
-                f"+{p:.2f}%", ha="center", va="bottom", fontsize=9, fontweight="bold")
-    ax.axhline(0, color="black", linewidth=0.8)
-    ax.set_ylabel(r"$\Delta$ discounted system cost vs Full flexibility [MEUR]")
-    ax.set_title("System Cost Delta vs Full Flexibility\n(discounted, full horizon)",
-                  fontsize=12, fontweight="bold")
-    plt.setp(ax.get_xticklabels(), rotation=20, ha="right")
-    fig.tight_layout()
-    savefig(fig, "fig3_cost_delta")
-
-
-# ── 1b: Industry capacity, 2050 ─────────────────────────────────────────────
+# ── Print palettes (heat supply / production) ───────────────────────────────
 
 _eth_tint = eth_tint  # alias -- eth_tint itself now lives in figure_settings.py
 
@@ -772,90 +663,17 @@ def _year_group_labels(ax, n_groups: int, group_labels: list[str], years: list[i
         ax.axvline(gi * n_yr - 0.5, color="#cccccc", linewidth=0.7, zorder=0)
 
 
-def fig1b_industry_capacity(runs: list[Run]) -> None:
-    """3 columns (COMPARISON_YEARS) x 2 rows (heat supply, production)
-    small-multiples grid — reverted from two earlier layouts that didn't
-    work: a 3-row/A4-portrait-tall version (shrank too small once fit to a
-    document page width) and a single-row version with all 3 years' bars
-    crammed per scenario (18 bars in one row read as chaotic). Here each
-    subplot holds just 6 scenario bars for one year, and each ROW shares one
-    y-axis scale across its 3 year-columns (_apply_shared_ylim) so capacity
-    changes over time are still directly comparable, just split across
-    panels instead of packed into one.
+# ── 9: Heat-supply trajectory, No flexibility vs Full flexibility ──────────
 
-    CAVEAT on the "Heat Supply" row's 2050 column: capacity there is
-    noticeably LOWER than at 2040 in every single scenario (e.g. "No
-    flexibility": ~94 GW at 2040 vs ~72 GW at 2050 — a ~24% drop), even
-    though the "Production Technologies" row stays essentially FLAT across
-    the whole horizon (~60 ton/h throughout, confirmed directly) — this is
-    NOT a declining-demand story. Checked directly against the solved model:
-    it's driven by boiler-fleet lifetime retirement. natural_gas/biomass/
-    electrode/coal/waste boilers all have 25-30yr lifetimes, and the model
-    built most of its boiler fleet in a large initial spike (~15 GW in 2020
-    + ~29 GW in 2022 alone, "No flexibility") which starts retiring right
-    around 2045-2047; replacement capacity_addition in 2044-2050 combined is
-    only a small fraction of what's retiring in the same window (biomass
-    boiler capacity alone falls from ~11 GW at 2040 to ~1 GW at 2050). Heat
-    pumps (20yr lifetime) show no such drop. Reads as a finite-horizon/
-    myopic-foresight under-investment artifact near the model's terminal
-    periods — the same family of terminal-year artifact fig0a/fig0b's
-    docstrings already flag for cost/budget behavior — not new information
-    about industry heat demand shrinking.
-    """
-    # temp-conversion capacity excluded here — see industry_heat_capacity() docstring;
-    # its own direct-vs-conversion pathway is the subject of fig3b instead.
-    heat_dfs, prod_dfs = [], []
-    for year in COMPARISON_YEARS:
-        heat_series = [(r.label, get_capacity(r.results, INDUSTRY_HEAT_TECHS_BOILERS_HP, "power")
-                        .get(year, pd.Series(dtype=float))) for r in runs]
-        prod_series = [(r.label, get_capacity(r.results, INDUSTRY_HEAT_TECHS_PRODUCTION, "power")
-                        .get(year, pd.Series(dtype=float))) for r in runs]
+def fig9_heat_supply_trajectory(no_flex_run: Run, full_run: Run) -> None:
+    """Industry heat supply over every modeled year, No flexibility (left
+    column) next to Full flexibility (right column), rows sharing their y
+    axis: operated output (TWh), capacity stock (GW), capacity additions
+    (GW/period). Replaces the former separate fig9 (No flexibility) and
+    fig9b (Full flexibility). The mechanism notes below were written for the
+    No flexibility case (Crystal Ball v9_0 numbers).
 
-        heat_df = build_comparison_df(heat_series)
-        # See HEAT_SUPPLY_STACK_ORDER: boilers drawn first -> bottom of the
-        # stack, below all heat pumps, which are then ordered high->low temperature.
-        heat_df = heat_df.reindex(
-            [t for t in HEAT_SUPPLY_STACK_ORDER if t in heat_df.index]
-            + [t for t in heat_df.index if t not in HEAT_SUPPLY_STACK_ORDER])
-        heat_dfs.append(heat_df)
-        prod_dfs.append(build_comparison_df(prod_series))
-
-    n_yr = len(COMPARISON_YEARS)
-    fig, axes = plt.subplots(2, n_yr, figsize=(6 * n_yr, 11))
-    fig.suptitle("Industry Technology Capacity Over Time", fontsize=14, fontweight="bold")
-    with plt.rc_context({"hatch.linewidth": 0.5}):  # subtler hatch lines than the 1.0 default
-        for col, year in enumerate(COMPARISON_YEARS):
-            plot_stacked_bars(heat_dfs[col], f"Heat Supply (boilers & heat pumps) - {year}",
-                              "GW", axes[0, col], show_segment_labels=True, show_legend=(col == n_yr - 1),
-                              color_map=HEAT_SUPPLY_COLOR_MAP, hatch_map=HEAT_SUPPLY_HATCH_MAP)
-    for col, year in enumerate(COMPARISON_YEARS):
-        plot_stacked_bars(prod_dfs[col], f"Production Technologies - {year}",
-                          "ton/h", axes[1, col], show_segment_labels=True, show_legend=(col == n_yr - 1),
-                          color_map=PRODUCTION_COLOR_MAP, hatch_map={})
-    _apply_shared_ylim(list(axes[0, :]), heat_dfs)
-    _apply_shared_ylim(list(axes[1, :]), prod_dfs)
-    for ax in axes.flat:
-        plt.setp(ax.get_xticklabels(), rotation=30, ha="right")
-    fig.text(0.5, 0.005,
-             "Heat-supply 2050 dip: boiler-fleet lifetime retirement (25-30yr) outpacing late-horizon "
-             "replacement investment - not a demand decline (Production row is flat). See docstring.",
-             ha="center", va="bottom", fontsize=8, style="italic", color="#555555")
-    fig.tight_layout(rect=[0, 0.02, 1, 0.95])
-    savefig(fig, "fig4_industry_capacity")
-
-
-# ── 7: Heat-supply capacity trajectory, No flexibility, full horizon ───────
-
-def fig7_heat_supply_trajectory(runs: list[Run]) -> None:
-    """Full-horizon version of fig1b's "Heat Supply" row (same techs, stack
-    order, color/hatch map) for the "No flexibility" scenario only, plotting
-    every modeled year (2020-2050, 2yr steps) instead of the 3-year
-    COMPARISON_YEARS snapshot — lets the buildout/retirement pattern fig1b's
-    docstring already flags (a ~24% capacity dip at 2050 from boiler-fleet
-    lifetime retirement outpacing late-horizon replacement) be read directly
-    off the trajectory rather than inferred from 3 points.
-
-    Top panel: capacity stock per period (as fig1b). Bottom panel: capacity
+    Middle row: capacity stock per period. Bottom row: capacity
     ADDITIONS per period (capacity_addition, i.e. new builds only, not net of
     retirements) — added per user request to see whether the persistently
     large natural_gas_boiler_industry stock is legacy fleet coasting on its
@@ -957,8 +775,53 @@ def fig7_heat_supply_trajectory(runs: list[Run]) -> None:
     consequence of ZEN-garden having no early-decommissioning decision,
     combined with a technology cost-crossover partway through the
     horizon."""
-    fig7_heat_supply_trajectory_for(runs, "No flexibility",
-                                     "fig9_heat_supply_trajectory_no_flexibility")
+    runs = [no_flex_run, full_run]
+    panels = []
+    for r in runs:
+        years = get_available_years(r.results)
+        panels.append([
+            _stack_ordered(_output_annual_twh(r, INDUSTRY_HEAT_TECHS_BOILERS_HP), HEAT_SUPPLY_STACK_ORDER, years),
+            _stack_ordered(get_capacity(r.results, INDUSTRY_HEAT_TECHS_BOILERS_HP, "power"),
+                           HEAT_SUPPLY_STACK_ORDER, years),
+            _stack_ordered(get_capacity_addition(r.results, INDUSTRY_HEAT_TECHS_BOILERS_HP, "power"),
+                           HEAT_SUPPLY_STACK_ORDER, years),
+        ])
+    row_specs = [("Industry heat supply", "TWh supplied"),
+                 ("Capacity (stock)", "GW"),
+                 ("Capacity additions (new builds/period)", "GW added")]
+
+    n_years = max(len(p[1].columns) for p in panels)
+    fig, axes = plt.subplots(3, 2, figsize=(2 * (0.8 * n_years + 3), 16), sharey="row")
+    with plt.rc_context({"hatch.linewidth": 0.5}):
+        for col, (r, dfs) in enumerate(zip(runs, panels)):
+            for row, (df, (title, ylabel)) in enumerate(zip(dfs, row_specs)):
+                plot_stacked_bars(df, f"{title} - {r.label}", ylabel if col == 0 else "", axes[row, col],
+                                  show_segment_labels=False, show_legend=(row == 0 and col == 1),
+                                  color_map=HEAT_SUPPLY_COLOR_MAP, hatch_map=HEAT_SUPPLY_HATCH_MAP)
+    for ax in axes.flat:
+        plt.setp(ax.get_xticklabels(), rotation=0)
+    fig.tight_layout()
+    savefig(fig, "fig9_heat_supply_trajectory_noflex_vs_fullflex")
+
+
+_TOTAL_CACHE: dict[tuple[int, str], pd.DataFrame] = {}
+
+
+def _cached_total(results, component: str) -> pd.DataFrame:
+    """results.get_total(component), memoized per Results object — several
+    figures re-read the same large flow_conversion_* frames for the same run.
+    Callers must not mutate the returned frame."""
+    key = (id(results), component)
+    if key not in _TOTAL_CACHE:
+        _TOTAL_CACHE[key] = results.get_total(component)
+    return _TOTAL_CACHE[key]
+
+
+def _stack_ordered(df: pd.DataFrame, order: list[str], years: list[int] | None = None) -> pd.DataFrame:
+    """Rows reordered bottom-to-top per `order` (techs not in it appended
+    after, so nothing is dropped); columns restricted to `years` if given."""
+    df = df.reindex([t for t in order if t in df.index] + [t for t in df.index if t not in order])
+    return df if years is None else df[[y for y in years if y in df.columns]]
 
 
 def _output_avg_gw(r: Run, techs: list[str]) -> pd.DataFrame:
@@ -967,7 +830,7 @@ def _output_avg_gw(r: Run, techs: list[str]) -> pd.DataFrame:
     nameplate capacity GW, their ratio being that tech's implied capacity
     factor. Shared by fig9's top ("Industry heat supply") panel and fig14a's
     same-quantity scenario comparison."""
-    flow_out = r.results.get_total("flow_conversion_output")
+    flow_out = _cached_total(r.results, "flow_conversion_output")
     rows = {}
     for t in techs:
         if t not in flow_out.index.get_level_values("technology"):
@@ -978,67 +841,22 @@ def _output_avg_gw(r: Run, techs: list[str]) -> pd.DataFrame:
     return pd.DataFrame(rows).T if rows else pd.DataFrame()
 
 
-def fig7_heat_supply_trajectory_for(runs: list[Run], label: str, fig_name: str) -> None:
-    """Generic engine behind fig7_heat_supply_trajectory (see its docstring
-    for the "No flexibility" mechanics). Parameterized over `label`/`fig_name`
-    so the same plot can be produced for other scenarios, e.g. fig9b for
-    "Full flexibility", added per user request to compare buildout/retirement
-    trajectories side by side with the no-flexibility case."""
-    r = by_label(runs, label)
-    years = get_available_years(r.results)
-
-    def _ordered(df: pd.DataFrame) -> pd.DataFrame:
-        df = df.reindex(
-            [t for t in HEAT_SUPPLY_STACK_ORDER if t in df.index]
-            + [t for t in df.index if t not in HEAT_SUPPLY_STACK_ORDER])
-        return df[[y for y in years if y in df.columns]]
-
-    heat_df = _ordered(get_capacity(r.results, INDUSTRY_HEAT_TECHS_BOILERS_HP, "power"))
-    add_df = _ordered(get_capacity_addition(r.results, INDUSTRY_HEAT_TECHS_BOILERS_HP, "power"))
-    output_df = _ordered(_output_annual_twh(r, INDUSTRY_HEAT_TECHS_BOILERS_HP))
-
-    fig, axes = plt.subplots(3, 1, figsize=(0.8 * len(heat_df.columns) + 3, 16))
-    with plt.rc_context({"hatch.linewidth": 0.5}):
-        plot_stacked_bars(output_df, "Industry heat supply (TWh)",
-                          "TWh supplied", axes[0], show_segment_labels=False, show_legend=True,
-                          color_map=HEAT_SUPPLY_COLOR_MAP, hatch_map=HEAT_SUPPLY_HATCH_MAP)
-        plot_stacked_bars(heat_df, f"Industry Heat Supply Capacity (stock) - {label}",
-                          "GW", axes[1], show_segment_labels=False, show_legend=False,
-                          color_map=HEAT_SUPPLY_COLOR_MAP, hatch_map=HEAT_SUPPLY_HATCH_MAP)
-        plot_stacked_bars(add_df, f"Industry Heat Supply Capacity Additions (new builds/period) - {label}",
-                          "GW added", axes[2], show_segment_labels=False, show_legend=False,
-                          color_map=HEAT_SUPPLY_COLOR_MAP, hatch_map=HEAT_SUPPLY_HATCH_MAP)
-    for ax in axes:
-        plt.setp(ax.get_xticklabels(), rotation=0)
-    fig.tight_layout()
-    savefig(fig, fig_name)
-
-
 def _output_annual_twh(r: Run, techs: list[str]) -> pd.DataFrame:
     """Same quantity as _output_avg_gw (actual OPERATED output), expressed as
     total annual energy in TWh (avg GW * HOURS_PER_YEAR / 1000) instead of an
-    averaged-power rate — used by fig9c's standalone panel, per user request
-    to move fig9b's top panel from GW to the more intuitive annual-energy
-    TWh unit."""
+    averaged-power rate — used by fig9's top row and fig15a/b."""
     return _output_avg_gw(r, techs) * HOURS_PER_YEAR / 1000
 
 
-def fig9c_heat_supply_output_twh_for(runs: list[Run], label: str, fig_name: str) -> None:
-    """Standalone version of fig9/fig9b's top ("Industry heat supply") panel
-    only — per user request, extracted out of the 3-panel fig9/fig9b figure
-    (which also has capacity-stock and capacity-addition panels below it)
-    into its own single-panel figure, with the unit changed from average GW
-    to annual TWh (see _output_annual_twh). Parameterized over `label`/
-    `fig_name` (fig9_heat_supply_trajectory_for's pattern) so the same panel
-    can be produced for both "No flexibility" (fig15a) and "Full
+def fig15_heat_supply_output_twh_for(runs: list[Run], label: str, fig_name: str) -> None:
+    """Standalone version of fig9's top ("Industry heat supply") row for a
+    single scenario, in annual TWh (see _output_annual_twh). Parameterized
+    over `label`/`fig_name` so the same panel can be produced for both "No flexibility" (fig15a) and "Full
     flexibility" (fig15b)."""
     r = by_label(runs, label)
     years = get_available_years(r.results)
-    output_df = _output_annual_twh(r, INDUSTRY_HEAT_TECHS_BOILERS_HP)
-    output_df = output_df.reindex(
-        [t for t in HEAT_SUPPLY_STACK_ORDER if t in output_df.index]
-        + [t for t in output_df.index if t not in HEAT_SUPPLY_STACK_ORDER])
-    output_df = output_df[[y for y in years if y in output_df.columns]]
+    output_df = _stack_ordered(_output_annual_twh(r, INDUSTRY_HEAT_TECHS_BOILERS_HP),
+                               HEAT_SUPPLY_STACK_ORDER, years)
 
     fig, ax = plt.subplots(1, 1, figsize=(0.8 * len(output_df.columns) + 3, 6))
     with plt.rc_context({"hatch.linewidth": 0.5}):
@@ -1048,20 +866,6 @@ def fig9c_heat_supply_output_twh_for(runs: list[Run], label: str, fig_name: str)
     plt.setp(ax.get_xticklabels(), rotation=0)
     fig.tight_layout()
     savefig(fig, fig_name)
-
-
-def _heat_supply_shares(r: Run) -> pd.DataFrame:
-    """Heat-pump share and electrode-boiler share of total industry heat
-    output (both as % of INDUSTRY_HEAT_TECHS_BOILERS_HP's total, the same
-    quantity fig9's top panel and the old fig14a's "HP: XX%" annotation
-    used), one row each, indexed by year over `r`'s full modeled horizon."""
-    df = _output_avg_gw(r, INDUSTRY_HEAT_TECHS_BOILERS_HP)
-    total = df.sum(axis=0)
-    hp_total = df.loc[[t for t in df.index if t.startswith("heat_pump")]].sum(axis=0)
-    eboiler = df.loc["electrode_boiler_industry"] if "electrode_boiler_industry" in df.index \
-        else pd.Series(0.0, index=total.index)
-    return pd.DataFrame({"Heat pump share": 100 * hp_total / total,
-                          "Electrode boiler share": 100 * eboiler / total})
 
 
 # fig14a-specific: one color per TEMPERATURE BAND, not per source — unlike
@@ -1109,8 +913,7 @@ def _electrification_stack(r: Run) -> pd.DataFrame:
     total = df.sum(axis=0)
     electrified = [t for t in df.index if t == "electrode_boiler_industry" or t.startswith("heat_pump")]
     shares = 100 * df.loc[electrified].div(total, axis=1)
-    ordered = [t for t in HEAT_SUPPLY_STACK_ORDER if t in shares.index]
-    return shares.loc[ordered].T
+    return _stack_ordered(shares, HEAT_SUPPLY_STACK_ORDER).T
 
 
 def fig14a_heat_supply_electrification_singletemp_vs_full(no_flex_run: Run, no_flex_single_run: Run,
@@ -1285,7 +1088,7 @@ def _ccs_captured_by_tech(r, year: int) -> pd.Series:
     """Actual CO2 captured that year (kt CO2eq) per retrofit tech — see the
     module-level RETROFIT_CCS_TECHS comment on why no unit conversion is
     needed here despite fig4b's flow_conversion_input caveat."""
-    flow_out = r.get_total("flow_conversion_output")
+    flow_out = _cached_total(r, "flow_conversion_output")
     if "carbon" not in flow_out.index.get_level_values("carrier"):
         return pd.Series(dtype=float)
     carbon = flow_out.xs("carbon", level="carrier")
@@ -1391,74 +1194,12 @@ def fig5_retrofit_ccs_comparison(no_flex_run: Run, base_run: Run) -> None:
     savefig(fig, "fig7_retrofit_ccs_comparison", extra_artists=[leg1, leg2])
 
 
-# ── 2: DSM cycles by product, 2050 ──────────────────────────────────────────
+# ── 5b: DSM throughput by product ─────────────────────────────────────────────
 
 # ammonia_DSM/methanol_DSM store an energy carrier (GWh); the other 8
 # INDUSTRY_DSM_TECHS store a mass carrier (kt-of-product) — confirmed via
-# Results.get_unit() against a solved run. dsm_cycles()'s discharge/capacity
-# ratio is unit-safe regardless (each tech divides by its OWN capacity in its
-# own native unit, so the resulting cycles/year is dimensionless either way),
-# but fig2_dsm_cycles_by_product hatches these two bars so a reader isn't left
-# assuming all 10 products are moving directly comparable physical quantities.
+# Results.get_unit() against a solved run.
 DSM_ENERGY_CARRIER_TECHS = {"ammonia_DSM", "methanol_DSM"}
-
-
-def dsm_cycles(r, year: int) -> pd.Series:
-    discharge = get_storage_flows(r, INDUSTRY_DSM_TECHS, "flow_storage_discharge")
-    capacity = get_capacity(r, INDUSTRY_DSM_TECHS, "energy")
-    cycles = {}
-    for tech in INDUSTRY_DSM_TECHS:
-        cap = capacity.loc[tech, year] if tech in capacity.index and year in capacity.columns else 0.0
-        dis = discharge.loc[tech, year] if tech in discharge.index and year in discharge.columns else 0.0
-        cycles[tech] = dis / cap if cap > 1e-9 else 0.0
-    return pd.Series(cycles)
-
-
-def fig2_dsm_cycles_by_product(runs: list[Run]) -> None:
-    # "Full flexibility" (opt.) vs "DSM pessimistic" (pess.) isolates the
-    # demand-shiftability-assumption effect on utilization directly, since
-    # both scenarios otherwise share the same industry heat / TES setup
-    # (Table SIScenarios, Table SIDSMCategorization) — unlike the previous
-    # comparison against "Single temperature level", which also changes the
-    # temperature-band resolution and so conflated two different effects.
-    scenarios = ["Full flexibility", "DSM pessimistic"]
-    legend_labels = {"Full flexibility": "Optimistic (Full flexibility)",
-                      "DSM pessimistic": "Pessimistic (DSM pessimistic)"}
-    df = pd.DataFrame({label: dsm_cycles(by_label(runs, label).results, YEAR) for label in scenarios})
-    is_energy_carrier = {t: t in DSM_ENERGY_CARRIER_TECHS for t in df.index}
-    df.index = [t.replace("_DSM", "").replace("_", " ") for t in df.index]
-    is_energy_carrier = {t.replace("_DSM", "").replace("_", " "): v for t, v in is_energy_carrier.items()}
-    df = df.sort_values(scenarios[0], ascending=False)
-
-    fig, ax = plt.subplots(figsize=(10, 6))
-    n = len(scenarios)
-    width = 0.8 / n
-    x = np.arange(len(df))
-    with plt.rc_context({"hatch.linewidth": 0.5}):  # subtler hatch lines than the 1.0 default
-        for i, label in enumerate(scenarios):
-            offsets = x + (i - (n - 1) / 2) * width
-            color = SCENARIO_PALETTE[[l for _, l in SCENARIOS].index(label)]
-            bars = ax.bar(offsets, df[label].values, width, label=legend_labels[label],
-                          color=color, edgecolor="white")
-            for bar, t in zip(bars, df.index):
-                if is_energy_carrier[t]:
-                    bar.set_hatch("//")
-    ax.set_xticks(x)
-    ax.set_xticklabels(df.index, rotation=30, ha="right", fontsize=9)
-    ax.set_ylabel("Discharge cycles / year")
-    ax.set_title(f"DSM Utilization by Product, {YEAR}\n"
-                 "Demand-Shiftability Assumption (DSM Categories)", fontsize=12, fontweight="bold")
-    scenario_handles, scenario_labels = ax.get_legend_handles_labels()
-    energy_handle = Patch(facecolor="white", edgecolor="black", hatch="//",
-                          label="Energy carrier (GWh): ammonia, methanol")
-    mass_handle = Patch(facecolor="white", edgecolor="black",
-                        label="Mass carrier (kt): others")
-    ax.legend(scenario_handles + [energy_handle, mass_handle],
-             scenario_labels + [energy_handle.get_label(), mass_handle.get_label()],
-             fontsize=9, frameon=False)
-    ax.grid(axis="y", alpha=0.3)
-    fig.tight_layout()
-    savefig(fig, "fig5_dsm_cycles_by_product")
 
 
 # Literature lower heating values used to express the two energy-carrier DSM
@@ -1706,125 +1447,6 @@ _ELECTRICITY_COLOR = _ETH_BLUE
 _ELECTRICITY_LABEL = "Electricity"
 
 
-def fig4a_heat_demand_by_sector() -> None:
-    """Low-temperature industry heat-demand assumption by sector and temperature
-    band (FEC_YEAR=2023), i.e. the `demand` ZEN-creator writes onto
-    heat_industry_0_100/100_150/150_200 for glass/ceramic/paper/food — NOT a
-    solved-model result (contrast fig3b, which shows how the model then meets
-    this demand). Grey segments on top add each sector's high-temperature
-    (>200°C) fuel demand, split by carrier, for scale: that demand is met by
-    DIRECT FUEL COMBUSTION, not any heat_industry_* carrier, so it is a
-    different supply pathway rather than a 4th heat-demand band — shown here
-    only so the colored low-temperature bands can be read against each
-    sector's full process-energy intensity, not in isolation. Ceramic's fuel
-    mix includes "oil" (JRC-IDEES "Other liquids", 15.2% of its 2023 thermal
-    FEC) since ZEN-creator commit 1f3f708 added the MODEL_CARRIER_MAP entry —
-    previously that share was dropped entirely rather than shown. Glass/
-    ceramic's fuel mix also includes "Fuel to process" (ZEN-creator commit
-    1687533's fuel_to_kiln carrier, consolidated here via
-    _consolidate_blended_fuel — see _BLENDED_FUEL_CARRIERS' docstring for
-    why this is shown as one flat grey segment rather than split by the
-    fuel_to_kiln-switching techs' own raw carriers). A final green segment
-    adds each sector's electricity demand (not temperature-banded, not part
-    of the fuel mix — a separate, fixed input every X_production tech has
-    alongside both).
-
-    All three pieces are demand_volume[sector].sum() (tonproduct/hour) times a
-    GW/(tonproduct/hour) conversion factor, from ProcessParametrizationDataset
-    itself (self._heat_cfs, self._sector_params[s].cf_fuel/cf_elec,
-    self._fuel_shares) — the exact same object/attributes that build each
-    production tech's real conversion_factor, not a re-derivation. See
-    extract_heat_demand_by_sector.py's docstring for the full provenance chain
-    (Rehfeldt2017.csv per-sub-process temperature distributions ->
-    compute_sector_params(), JRC-IDEES thermal FEC -> fuel_shares) and for the
-    cross-check against a materialized dataset (Crystal_Ball_ind_heat_v7_3):
-    this script's numbers match that dataset's demand.csv sums and
-    glass_production's attributes.json conversion factors exactly.
-
-    Values are AGGREGATED (summed) ACROSS ALL MODEL_NODES — EU27 (minus MT,
-    CY) + CH + NO + UK — not a per-country breakdown. In GW, the same unit as
-    each heat_industry_* carrier's own `demand` attribute (energy carrier,
-    unit "GW"), so bar heights are directly comparable to fig1b's
-    heat-supply-capacity panel.
-    """
-    if not HEAT_DEMAND_INPUT_JSON.exists():
-        print(f"  skipping fig4a_heat_demand_by_sector: {HEAT_DEMAND_INPUT_JSON.relative_to(REPO_ROOT)} "
-              "not found — run scripts/extract_heat_demand_by_sector.py under zen-creator-env first")
-        return
-    import json
-    data = json.loads(HEAT_DEMAND_INPUT_JSON.read_text())
-    sectors = list(HEAT_DEMAND_SECTOR_LABELS)
-    for s in sectors:
-        data[s]["fuel_by_carrier"] = _consolidate_blended_fuel(data[s]["fuel_by_carrier"])
-    bands = list(HEAT_DEMAND_BAND_TINTS)
-    fuel_carriers = [c for c in FUEL_CARRIER_HATCHES if any(c in data[s]["fuel_by_carrier"] for s in sectors)]
-
-    fig, ax = plt.subplots(figsize=(12, 7))
-    x = np.arange(len(sectors))
-    heat_vals = {band: np.array([data[s]["heat"][band] for s in sectors]) for band in bands}
-    fuel_vals = {c: np.array([data[s]["fuel_by_carrier"].get(c, 0.0) for s in sectors]) for c in fuel_carriers}
-    electricity_vals = np.array([data[s]["electricity"] for s in sectors])
-    totals = sum(heat_vals.values()) + sum(fuel_vals.values()) + electricity_vals
-    label_threshold = 0.025 * totals.max()  # segments smaller than this would overlap their own text
-
-    bottom = np.zeros(len(sectors))
-    for band in bands:
-        vals = heat_vals[band]
-        colors = [_eth_tint(PRODUCTION_COLOR_MAP[f"{s}_production"], HEAT_DEMAND_BAND_TINTS[band]) for s in sectors]
-        for xi, bi, vi, ci in zip(x, bottom, vals, colors):
-            ax.bar(xi, vi, 0.6, bottom=bi, color=ci, edgecolor="white", linewidth=0.5)
-            if vi > label_threshold:
-                ax.text(xi, bi + vi / 2, f"{vi:.2f}", ha="center", va="center", fontsize=8,
-                        color=_text_color_for_bg(ci))
-        bottom += vals
-    heat_top = bottom.copy()
-    with plt.rc_context({"hatch.linewidth": 0.5}):
-        for carrier in fuel_carriers:
-            vals = fuel_vals[carrier]
-            hatch = FUEL_CARRIER_HATCHES[carrier]
-            for xi, bi, vi in zip(x, bottom, vals):
-                ax.bar(xi, vi, 0.6, bottom=bi, color=_ETH_GREY, edgecolor="white", linewidth=0.5, hatch=hatch)
-                if vi > label_threshold:
-                    ax.text(xi, bi + vi / 2, f"{vi:.2f}", ha="center", va="center", fontsize=8,
-                            color="black", bbox=_FUEL_LABEL_BBOX)
-            bottom += vals
-    fuel_top = bottom.copy()
-    for xi, bi, vi in zip(x, bottom, electricity_vals):
-        ax.bar(xi, vi, 0.6, bottom=bi, color=_ELECTRICITY_COLOR, edgecolor="white", linewidth=0.5)
-        if vi > label_threshold:
-            ax.text(xi, bi + vi / 2, f"{vi:.2f}", ha="center", va="center", fontsize=8,
-                    color=_text_color_for_bg(_ELECTRICITY_COLOR))
-    bottom += electricity_vals
-    for xi, hi in zip(x, heat_top):
-        if hi > 0:
-            ax.plot([xi - 0.3, xi + 0.3], [hi, hi], color="black", linewidth=1.0, linestyle=":")
-    for xi, fi in zip(x, fuel_top):
-        if fi > 0:
-            ax.plot([xi - 0.3, xi + 0.3], [fi, fi], color="black", linewidth=1.0, linestyle=":")
-    for xi, total in zip(x, bottom):
-        ax.text(xi, total, f"{total:.2f}", ha="center", va="bottom", fontsize=9, fontweight="bold")
-
-    ax.set_xticks(x)
-    ax.set_xticklabels([HEAT_DEMAND_SECTOR_LABELS[s] for s in sectors], fontsize=10)
-    ax.set_ylabel("Heat / fuel demand [GW]")
-    ax.set_title("Low-Temperature Industry Heat Demand by Sector and Temperature Band\n"
-                  "(input assumption, ZEN-creator base year 2023, aggregated across all nodes)",
-                  fontsize=12, fontweight="bold")
-    band_handles = [Patch(facecolor=_eth_tint(_ETH_GREY, HEAT_DEMAND_BAND_TINTS[b]),
-                           edgecolor="white", label=f"Heat carrier: {HEAT_DEMAND_BAND_LABELS[b]}") for b in bands]
-    fuel_handles = [Patch(facecolor=_ETH_GREY, edgecolor="white", linewidth=0.4,
-                           hatch=FUEL_CARRIER_LEGEND_HATCHES[c],
-                           label=_fuel_legend_label(c)) for c in fuel_carriers]
-    electricity_handle = [Patch(facecolor=_ELECTRICITY_COLOR, edgecolor="white", label=_ELECTRICITY_LABEL)]
-    with plt.rc_context({"hatch.linewidth": 1.3}):
-        ax.legend(handles=band_handles + fuel_handles + electricity_handle, fontsize=8.5, frameon=True,
-                  facecolor="white", framealpha=0.9, edgecolor="none", loc="upper left", ncol=2,
-                  handlelength=3.0, handleheight=1.8, columnspacing=1.2)
-    ax.grid(axis="y", alpha=0.3)
-    fig.tight_layout()
-    savefig(fig, "fig1_heat_demand_by_sector", subdir="method")
-
-
 # ── 4b: New-sector heat demand vs. pre-existing cement/steel fuel mix ──────
 
 # Reconstruction: this figure (and fig6, originally numbered "fig99") originally existed only as a
@@ -1890,7 +1512,7 @@ def _tech_fuel_by_carrier(r, techs: list[str], year: int) -> pd.Series:
     project memory on get_unit()/convert_to_yearly_unit) down to an average-
     GW figure, so it's directly comparable to fig4a's heat-demand bars (a true
     GW capacity-equivalent figure, not an annual energy total)."""
-    flow_in = r.get_total("flow_conversion_input")
+    flow_in = _cached_total(r, "flow_conversion_input")
     out: dict[str, float] = {}
     for tech in techs:
         if tech not in flow_in.index.get_level_values("technology"):
@@ -1942,7 +1564,6 @@ def fig4b_industry_fuel_demand_comparison(runs: list[Run]) -> None:
         print(f"  skipping fig4b_industry_fuel_demand_comparison: {HEAT_DEMAND_INPUT_JSON.relative_to(REPO_ROOT)} "
               "not found — run scripts/extract_heat_demand_by_sector.py under zen-creator-env first")
         return
-    import json
     data = json.loads(HEAT_DEMAND_INPUT_JSON.read_text())
     new_sectors = list(HEAT_DEMAND_SECTOR_LABELS)
     for s in new_sectors:
@@ -2191,138 +1812,6 @@ def _knowledge_history_term(r, tech: str, years: list[int]) -> pd.Series:
         total = sum(v * (1 - kdr) ** (y - py - dy) for py, v in vintages.items() if py < y)
         out[y] = tdr * total
     return pd.Series(out)
-
-
-def _market_share_term(r, tech: str, years: list[int]) -> pd.Series:
-    """Reconstructs term (b): market_share_unbounded * sum(capacity_previous
-    of every OTHER technology sharing `tech`'s reference carrier), exactly
-    (no approximation) - reference-carrier peers come straight from
-    Results.get_df("set_reference_carriers"), the same lookup ZEN-garden's
-    own postprocessing uses (Results.extract_carrier)."""
-    msu = float(r.get_total("market_share_unbounded").iloc[0])
-    ref_carriers = r.get_df("set_reference_carriers")
-    ref = ref_carriers.get(tech)
-    peers = [t for t, c in ref_carriers.items() if c == ref and t != tech]
-    total = pd.Series(0.0, index=years)
-    for peer in peers:
-        s = _series_by_tech(r, "capacity_previous", peer)
-        if s.empty:
-            continue
-        total = total.add(s.reindex(years).fillna(0.0), fill_value=0.0)
-    return total * msu
-
-
-def _unbounded_floor_term(r, tech: str) -> float:
-    """Term (c): capacity_addition_unbounded (a per-node rate) times the
-    number of nodes where `tech` can be built at all (approximated as the
-    number of distinct locations in its own capacity_addition index - the
-    technology's full modeled footprint, whether or not it ends up used at
-    every one)."""
-    cau_series = r.get_total("capacity_addition_unbounded")
-    if tech not in cau_series.index:
-        return 0.0
-    cau = float(cau_series.loc[tech])
-    ca = r.get_total("capacity_addition")
-    ca = ca[ca.index.get_level_values("capacity_type") == "power"]
-    if tech not in ca.index.get_level_values("technology"):
-        return cau
-    n_nodes = len(ca.xs(tech, level="technology").index.get_level_values("location").unique())
-    return cau * n_nodes
-
-
-def fig6_diffusion_mechanisms(runs: list[Run]) -> None:
-    """Row 1: installed capacity vs. site potential (capacity_limit) per
-    technology, "No flexibility" scenario, every modeled year - mechanism 5
-    above. SMR_CCS has no site-potential bar (capacity_limit=inf).
-
-    Row 2: actual capacity ADDED per period vs. a reconstruction of the
-    3-term diffusion-limit ceiling, STACKED so all 3 active terms of
-    mechanism 1 are visible at once (knowledge/history, market-share,
-    unbounded-addition floor) - see _knowledge_history_term/
-    _market_share_term/_unbounded_floor_term for each term's reconstruction.
-    This is an approximate reconstruction, not an exact replication of the
-    solver's own per-location/per-vintage constraint (see
-    _knowledge_history_term's docstring for the one known gap and its
-    largest observed size) - read the stacked bars as showing the relative
-    SHAPE and ORDER OF MAGNITUDE of each mechanism's contribution, not a
-    literal, always-binding ceiling; the black line occasionally poking
-    above the stack in early periods is that approximation's known
-    limitation, not a sign the underlying model is inconsistent.
-    wind_onshore/offshore/PV show the "large existing base + market-share
-    headroom" regime (floor term ~0, invisible); SMR_CCS shows the opposite
-    "cold-start" regime (knowledge/market terms start near 0, floor term is
-    what lets it grow at all) - the same mechanism that inflates ALL 8 CCS
-    retrofit techs' capacity roughly equally, per fig5's docstring.
-
-    The 2 confirmed-INACTIVE cost/growth mechanisms (learning curve / "
-    negative learning", PWA nonlinear capex) and the 1 confirmed-inactive
-    per-period bound (capacity_addition_min/max) are deliberately not given
-    plot space - see the module-level comment above this function for why,
-    and to keep this an explicit, checked negative result rather than a
-    silent omission.
-
-    "No flexibility" is used (matching the original figure) since these are
-    exogenous/structural mechanisms, not meaningfully scenario-dependent for
-    the industry-heat-flexibility axis this SI section otherwise studies.
-    """
-    run = by_label(runs, "No flexibility")
-    r = run.results
-    years = get_available_years(r)
-
-    fig, axes = plt.subplots(2, 4, figsize=(19, 9))
-    for col, (tech, label, color) in enumerate(DIFFUSION_EXAMPLE_TECHS):
-        potential = _site_potential(r, tech)
-        installed = _series_by_tech(r, "capacity", tech).reindex(years).fillna(0.0)
-        addition = _series_by_tech(r, "capacity_addition", tech).reindex(years).fillna(0.0)
-
-        ax1 = axes[0, col]
-        ax1.bar(years, installed, width=1.6, color=color, label="Installed capacity" if col == 0 else None)
-        if np.isfinite(potential):
-            ax1.bar(years, potential - installed, width=1.6, bottom=installed,
-                    color=_eth_tint(color, 0.75), label="Unused site potential" if col == 0 else None)
-            ax1.axhline(potential, color=color, linestyle="--", linewidth=1.2)
-            pct_used = installed.iloc[-1] / potential * 100 if potential > 0 else 0.0
-            ax1.text(0.97, 0.55, f"{pct_used:.0f}% of potential\nused by {years[-1]}",
-                     transform=ax1.transAxes, ha="right", va="top", fontsize=8.5, color=color)
-            ax1.set_title(f"{label}\n(site potential: {potential:,.0f} GW)", fontsize=10)
-        else:
-            ax1.set_title(f"{label}\n(capacity_limit = inf: no site-potential cap)", fontsize=10)
-        if col == 0:
-            ax1.set_ylabel("Installed capacity [GW]")
-            ax1.legend(fontsize=8, frameon=True, facecolor="white", framealpha=0.9,
-                       edgecolor="none", loc="upper left")
-
-        ax2 = axes[1, col]
-        knowledge = _knowledge_history_term(r, tech, years)
-        market = _market_share_term(r, tech, years)
-        floor = np.full(len(years), _unbounded_floor_term(r, tech))
-        bottom = np.zeros(len(years))
-        for vals, comp_label, comp_color in [
-            (knowledge.to_numpy(), "Knowledge/history term", _eth_tint(color, 0.05)),
-            (market.reindex(years).fillna(0.0).to_numpy(), "Market-share term", _eth_tint(color, 0.4)),
-            (floor, "Unbounded-addition floor", _eth_tint(color, 0.72)),
-        ]:
-            ax2.bar(years, vals, width=1.6, bottom=bottom, color=comp_color,
-                    edgecolor="white", linewidth=0.4, label=comp_label if col == 0 else None)
-            bottom += vals
-        ax2.plot(years, addition.to_numpy(), color="black", marker="o", markersize=3.5,
-                 linewidth=1.2, label="Actual capacity addition" if col == 0 else None)
-        if col == 0:
-            ax2.set_ylabel("Capacity added per period [GW]")
-            ax2.legend(fontsize=7, frameon=True, facecolor="white", framealpha=0.9,
-                       edgecolor="none", loc="upper left")
-        ax2.set_xlabel("Year")
-        ax2.grid(axis="y", alpha=0.25)
-
-    fig.suptitle("Technology-Diffusion / Capacity-Growth Mechanisms\n"
-                 f"No flexibility, {years[0]}-{years[-1]} (Crystal Ball ind heat v8 0) - row 2 stacks show "
-                 "all 3 active diffusion-limit terms", fontsize=12.5)
-    fig.text(0.5, 0.005,
-             "Row 2 stacks are an approximate reconstruction of the solver's own constraint (order of "
-             "magnitude, not an exact/always-binding ceiling) - see _knowledge_history_term's docstring.",
-             ha="center", va="bottom", fontsize=8, style="italic", color="#555555")
-    fig.tight_layout(rect=[0, 0.02, 1, 0.93])
-    savefig(fig, "fig8_diffusion_mechanisms")
 
 
 # ── 8a: Same diffusion-limit decomposition, for the 6 industry heat pumps ──
@@ -2922,34 +2411,6 @@ def _grey_delta_bar(ax, labels: list[str], values: dict[str, float], base_for: d
     ax.tick_params(axis="x", length=0)
 
 
-def fig1b_cost_and_emissions_totals(base_run: Run, no_flex_run: Run, full_run: Run) -> None:
-    """Companion to fig0a/fig0b, requested as a single at-a-glance pair: for
-    all 3 scenarios (base / no flexibility / full flexibility), show the
-    TOTAL (not just the delta) discounted system cost (left) and TOTAL true
-    cumulative emissions (right) — but with "Crystal Ball (base)"'s own
-    value rendered as the shared grey base of every bar, and only each other
-    scenario's difference from that base value drawn in color, so the
-    figure reads as fig0a/fig0b's deltas without hiding how small they are
-    relative to the totals they sit on top of.
-
-    Cost uses the same horizon-total discounted `get_annual_total_cost` as
-    compute_headline_metrics's npc_total_meur. Emissions deliberately do
-    NOT use compute_headline_metrics's emissions_total_mton — that's a naive
-    per-year sum which badly understates true cumulative emissions (see
-    fig0b's docstring) — instead using the same
-    `carbon_emissions_cumulative` value (at the final modeled year) that
-    fig0b's Panel B plots, for consistency with that figure's numbers.
-    """
-    base_for = {r.label: base_run.label for r in [base_run, no_flex_run, full_run]}
-    delta_color = {base_run.label: _ETH_GREY, no_flex_run.label: _ETH_BLUE,
-                   full_run.label: _ETH_PURPLE}
-    # Capped at 26,000 on both panels (vs. the auto ~1.12x headroom, which
-    # reached ~27,000 / ~27,500) per user request — still enough headroom
-    # above the ~24,400 max bar for its value label.
-    _cost_and_emissions_totals([base_run, no_flex_run, full_run], base_for, delta_color,
-                               "fig1b_cost_emissions_totals", top=26000)
-
-
 def fig14b_cost_and_emissions_totals_singletemp_vs_full(no_flex_run: Run, no_flex_single_run: Run,
                                                          full_run: Run, single_temp_run: Run) -> None:
     """Fig1b's template applied to 2 INDEPENDENT baselines side by side, per
@@ -3126,13 +2587,13 @@ def fig30_matrix(no_flex_run: Run, no_flex_single_run: Run, full_run: Run,
     renewable power capacity [GW] — solar + wind (on/offshore) + hydro
     (reservoir, run-of-river), summed; (3) 2050 annual storage discharge
     [TWh/yr] over BULK_STORAGE_TECHS plus the industry DSM energy
-    equivalent (get_dsm_energy_equivalent), i.e. the same total fig12a
-    stacks — without DSM, Full flexibility's bulk discharge is ~91 TWh
+    equivalent (get_dsm_energy_equivalent), i.e. bulk discharge + DSM
+    combined — without DSM, Full flexibility's bulk discharge is ~91 TWh
     BELOW No flexibility's (DSM displaces battery/gas-storage cycling),
     with it slightly above. Discharge rather than storage ENERGY capacity per user choice:
     energy capacity is ~98% natural_gas_storage (~1,015 TWh, essentially
     all existing stock and identical across scenarios), whereas discharge
-    is what fig11/fig12 already show (battery-dominated).
+    is what fig12 already shows (battery-dominated).
     -> SI_results/fig30_matrix.svg
     """
     cells = {(0, 0): no_flex_run, (0, 1): full_run,
@@ -3142,7 +2603,7 @@ def fig30_matrix(no_flex_run: Run, no_flex_single_run: Run, full_run: Run,
                      .get(FIG30_YEAR, pd.Series(dtype=float)).sum())
            for rc, r in cells.items()}
     # Bulk storage discharge + industry DSM energy equivalent, both GWh ->
-    # TWh — same two components fig12a stacks (DSM is 0 in No flexibility).
+    # TWh (DSM is 0 in No flexibility).
     storage = {}
     for rc, r in cells.items():
         bulk = get_storage_flows(r.results, BULK_STORAGE_TECHS, "flow_storage_discharge") \
@@ -3200,13 +2661,13 @@ def _cost_and_emissions_totals(runs: list[Run], base_for: dict[str, str], delta_
                                 delta_fmt: str | None = None, x: np.ndarray | None = None,
                                 figsize: tuple[float, float] = (11, 4.6),
                                 cost_only: bool = False) -> None:
-    """Shared body of fig1b/fig14b — `base_for` maps each run's label to the
+    """Body of fig14b — `base_for` maps each run's label to the
     label supplying ITS grey baseline (see _grey_delta_bar), `runs` the bars
     themselves, in order. `top`/`bottom`/`delta_fmt`/`x` pass straight
     through to _grey_delta_bar (same limits/positions on both panels).
     `cost_only=True` (fig14b, per user request) drops the emissions panel
     entirely and renders a single-axes figure instead of the 2-panel
-    cost+emissions layout fig1b still uses."""
+    cost+emissions layout."""
     # bn EUR (billion EUR) rather than MEUR per user request — MEUR values
     # here run ~2.3e7 (i.e. ~23 trillion EUR); dividing by 1000 gives a
     # legible ~23,000 bn EUR without scientific-notation axis ticks.
@@ -3293,7 +2754,6 @@ def fig8_industry_sector_emissions_context() -> None:
               f"{INDUSTRY_SECTOR_EMISSIONS_JSON.relative_to(REPO_ROOT)} not found — "
               "run scripts/extract_industry_sector_emissions.py under zen-creator-env first")
         return
-    import json
     data = json.loads(INDUSTRY_SECTOR_EMISSIONS_JSON.read_text())
     sectors = data["sectors"]
 
@@ -3665,149 +3125,11 @@ STORAGE_COLOR_MAP = {
 STORAGE_STACK_ORDER = ["battery", "pumped_hydro", "natural_gas_storage", "oil_storage", "salt_cavern_storage"]
 
 
-def _plot_grouped_stacked_bars(
-    dfs_by_year: dict[int, pd.DataFrame],
-    title: str,
-    unit: str,
-    ax: plt.Axes,
-    color_map: dict,
-    hatch_map: dict,
-    show_segment_labels: bool = False,
-    show_legend: bool = True,
-) -> None:
-    """Like plot_stacked_bars, but draws one cluster of adjacent bars per
-    year (dfs_by_year keys), all on a single axis, so scenarios (df columns —
-    same columns/order in every year) can be compared side by side within
-    each year AND across years in one glance. A 1-bar-width gap separates
-    each year's cluster from the next; scenario labels sit on the bar ticks,
-    year labels are annotated centered below each cluster. Unlike
-    plot_stacked_bars, color_map/hatch_map are required (every caller here
-    already passes a print-figure-specific palette)."""
-    years = sorted(dfs_by_year)
-    scenarios = dfs_by_year[years[0]].columns.tolist()
-    n_scen = len(scenarios)
-    bar_width = 0.8
-    labeled: set[str] = set()
-    positions_all: list[float] = []
-    tick_labels_all: list[str] = []
-    year_centers: list[float] = []
-
-    for yi, year in enumerate(years):
-        df = dfs_by_year[year]
-        base = yi * (n_scen + 1)
-        positions = [base + i for i in range(n_scen)]
-        positions_all.extend(positions)
-        tick_labels_all.extend(scenarios)
-        year_centers.append((positions[0] + positions[-1]) / 2)
-        positive_df = df.clip(lower=0)
-        negative_df = df.clip(upper=0)
-        for scen, pos in zip(scenarios, positions):
-            bottom_pos = 0.0
-            bottom_neg = 0.0
-            for cat_idx, category in enumerate(df.index):
-                val_pos = positive_df.loc[category, scen]
-                val_neg = negative_df.loc[category, scen]
-                color = color_map[category]
-                hatch = hatch_map.get(category, "")
-                add_label = category not in labeled
-                if val_pos > 0:
-                    ax.bar(pos, val_pos, bar_width, bottom=bottom_pos, color=color,
-                           label=category if add_label else None,
-                           edgecolor="white", linewidth=0.5, hatch=hatch)
-                    if show_segment_labels:
-                        ax.text(pos, bottom_pos + val_pos / 2, f"{val_pos:,.0f}",
-                                ha="center", va="center", fontsize=6,
-                                color=_text_color_for_bg(color))
-                    bottom_pos += val_pos
-                    labeled.add(category)
-                if val_neg < 0:
-                    ax.bar(pos, val_neg, bar_width, bottom=bottom_neg, color=color,
-                           label=category if add_label else None,
-                           edgecolor="white", linewidth=0.5, hatch=hatch if hatch else "//")
-                    if show_segment_labels:
-                        ax.text(pos, bottom_neg + val_neg / 2, f"{val_neg:,.0f}",
-                                ha="center", va="center", fontsize=6,
-                                color=_text_color_for_bg(color))
-                    bottom_neg += val_neg
-                    labeled.add(category)
-            ax.text(pos, bottom_pos, f"{positive_df[scen].sum():,.0f}",
-                    ha="center", va="bottom", fontsize=8, fontweight="bold")
-
-    ax.set_xticks(positions_all)
-    ax.set_xticklabels(tick_labels_all, fontsize=8, rotation=30, ha="right")
-    for yc, year in zip(year_centers, years):
-        ax.annotate(str(year), xy=(yc, 0), xycoords=("data", "axes fraction"),
-                    xytext=(0, -46), textcoords="offset points",
-                    ha="center", va="top", fontsize=11, fontweight="bold")
-    ax.set_ylabel(unit, fontsize=11)
-    ax.set_title(title, fontsize=12, fontweight="bold")
-    ax.axhline(0, color="black", linewidth=0.5)
-
-    if show_legend:
-        handles, labels = ax.get_legend_handles_labels()
-        if handles:
-            ax.legend(handles[::-1], labels[::-1],
-                      bbox_to_anchor=(1.02, 1), loc="upper left",
-                      fontsize=10, frameon=False)
-
-
-def _power_and_storage_dfs(
-    runs: list[Run], full_run: Run,
-) -> tuple[dict[int, pd.DataFrame], dict[int, pd.DataFrame]]:
-    """Data prep for fig11: gen_by_year (generation capacity, GW) and
-    disch_by_year (storage annual discharge, GWh), each {year:
-    DataFrame(index=technology, columns=scenario label)}. disch_by_year
-    gets a single aggregated "DSM" row appended (summed across all 10
-    DSM_ENERGY_STACK_ORDER techs), nonzero only in full_run's column
-    (Base/No flexibility have no industry-heat sector) — via
-    get_dsm_energy_equivalent, see that section's comment for the
-    per-product methodology behind the number being summed here."""
-    gen_by_year: dict[int, pd.DataFrame] = {}
-    disch_by_year: dict[int, pd.DataFrame] = {}
-    dsm_total_by_year = get_dsm_energy_equivalent(full_run.results, DSM_ENERGY_STACK_ORDER, SNAPSHOT_YEARS_POWER).sum()
-    for year in SNAPSHOT_YEARS_POWER:
-        gen_series = [(r.label, get_capacity(r.results, POWER_GEN_TECHS, "power")
-                       .get(year, pd.Series(dtype=float))) for r in runs]
-        gen_df = build_comparison_df(gen_series)
-        gen_df = gen_df.reindex([t for t in POWER_GEN_STACK_ORDER if t in gen_df.index]
-                                 + [t for t in gen_df.index if t not in POWER_GEN_STACK_ORDER])
-        gen_by_year[year] = gen_df
-
-        disch_series = [(r.label, get_storage_flows(r.results, BULK_STORAGE_TECHS, "flow_storage_discharge")
-                         .get(year, pd.Series(dtype=float))) for r in runs]
-        disch_df = build_comparison_df(disch_series).reindex(STORAGE_STACK_ORDER + ["DSM"]).fillna(0.0)
-        disch_df.loc["DSM", full_run.label] = dsm_total_by_year[year]
-        disch_by_year[year] = disch_df
-    return gen_by_year, disch_by_year
-
-
-def _render_power_and_storage_figure(
-    gen_by_year: dict[int, pd.DataFrame], disch_by_year: dict[int, pd.DataFrame],
-    filename: str, storage_color_map: dict, storage_hatch_map: dict,
-) -> None:
-    """2-row (generation top, storage discharge bottom) rendering for
-    fig11 — wide, ~16:9-ish (PowerPoint-slide-ish) aspect ratio. No
-    figure-level suptitle (each row's own title carries it); segment labels
-    are off on both rows (only the bar's total, matching the generation
-    row) since the storage row's segments are dense enough to overlap."""
-    fig, axes = plt.subplots(2, 1, figsize=(14, 9))
-    with plt.rc_context({"hatch.linewidth": 0.5}):
-        _plot_grouped_stacked_bars(gen_by_year, "Power Generation Capacity", "GW", axes[0],
-                                   show_segment_labels=False, show_legend=True,
-                                   color_map=POWER_GEN_COLOR_MAP, hatch_map=POWER_GEN_HATCH_MAP)
-        _plot_grouped_stacked_bars(disch_by_year, "Storage Annual Energy Discharged", "GWh", axes[1],
-                                   show_segment_labels=False, show_legend=True,
-                                   color_map=storage_color_map, hatch_map=storage_hatch_map)
-    fig.tight_layout()
-    fig.subplots_adjust(hspace=0.55)
-    savefig(fig, filename)
-
-
-# ── SI fig11: DSM discharge translated into an energy (GWh) equivalent ─────
+# ── DSM discharge translated into an energy (GWh) equivalent (fig30) ──────
 # ammonia_DSM/methanol_DSM already store an energy carrier (GWh) natively —
 # used as-is. The other 8 INDUSTRY_DSM_TECHS store a MASS carrier
-# (kt-of-product, see fig11's/fig2's docstrings for why they can't just be
-# summed into a GWh total): this figure instead converts each product's
+# (kt-of-product, so they can't just be summed into a GWh total):
+# get_dsm_energy_equivalent instead converts each product's
 # DSM-shifted kt into an implied GWh using that PRODUCT's own system-wide
 # energy intensity in the same year — total energy input (GWh, summed across
 # every input carrier) across every technology that produces it, divided by
@@ -3818,12 +3140,7 @@ def _render_power_and_storage_figure(
 # the intensity specific to this model's own technology mix and efficiency
 # assumptions, and lets it shift across snapshot years if that mix changes
 # (e.g. primary_steel's BF_BOF/NG_DRI/H2_DRI split).
-#
-# fig11 sums all 10 into a SINGLE "DSM" bar segment (one color, no
-# per-product breakdown) — get_dsm_energy_equivalent below still computes
-# the per-product numbers first (needed to apply each product's own
-# intensity/native-GWh treatment), _power_and_storage_dfs just sums them
-# before handing the result to the plotter.
+
 _PRODUCT_CARRIER_OF_DSM_TECH = {
     "primary_steel_DSM": "primary_steel",
     "secondary_steel_DSM": "secondary_steel",
@@ -3838,10 +3155,6 @@ DSM_ENERGY_STACK_ORDER = [
     "primary_steel_DSM", "secondary_steel_DSM", "clinker_DSM", "ceramic_DSM",
     "glass_DSM", "food_DSM", "paper_DSM", "olefin_DSM", "ammonia_DSM", "methanol_DSM",
 ]
-# fig11 stacks this ON TOP OF STORAGE_COLOR_MAP's 5 techs in the same panel,
-# so pick a shade STORAGE_COLOR_MAP doesn't already use (BLUE, TURQUOISE,
-# BRONZE, PURPLE) to avoid rendering as the same color as a storage segment.
-DSM_TOTAL_COLOR = _eth_tint(_ETH_GREY, 0.55)
 
 
 def _production_energy_intensity(r, carrier: str, flow_in_all: pd.DataFrame) -> pd.Series:
@@ -3864,7 +3177,7 @@ def _production_energy_intensity(r, carrier: str, flow_in_all: pd.DataFrame) -> 
 def get_dsm_energy_equivalent(r, dsm_techs: list[str], years: list[int]) -> pd.DataFrame:
     """DSM discharge (index=dsm_techs, columns=years) expressed in GWh — see
     module comment above this section for the two different methods used."""
-    flow_in_all = r.get_total("flow_conversion_input")
+    flow_in_all = _cached_total(r, "flow_conversion_input")
     intensity_cache: dict[str, pd.Series] = {}
     rows = {}
     for tech in dsm_techs:
@@ -3881,57 +3194,6 @@ def get_dsm_energy_equivalent(r, dsm_techs: list[str], years: list[int]) -> pd.D
     return pd.DataFrame(rows).T[years]
 
 
-def fig11_power_and_storage_impact_with_dsm(base_run: Run, no_flex_run: Run, full_run: Run) -> None:
-    """Power-sector generation capacity (top) and storage annual energy
-    discharged (bottom), Crystal Ball base / No flexibility / Full
-    flexibility shown as 3 adjacent bars per year, in a single combined
-    figure spanning 3 snapshot years (2030/2040/2050) — one plot per row,
-    not one per scenario, so all 9 (scenario x year) bars are directly
-    comparable at a glance.
-
-    Isolates finding #1 (top row): adding electrified (but inflexible)
-    industry heat demand does NOT change the generation TECHNOLOGY mix —
-    every technology's SHARE of total capacity stays roughly the same across
-    scenarios — it just scales the whole fleet up (+11% total capacity at
-    2036 for No flexibility vs base, driven almost entirely by proportionally
-    more VRE: +19% PV, +12% offshore wind, +4% onshore wind, vs. essentially
-    flat dispatchable/fossil capacity). Capacity factors on the existing
-    fleet barely move either (e.g. wind onshore 0.191 vs 0.192, nuclear 0.523
-    vs 0.529 at 2036) — confirming this is a pure scale effect, not a
-    dispatch-pattern change. The mechanism: the added load is a flat,
-    non-dispatchable draw with no diurnal/seasonal shape at all (see fig7's
-    docstring for the same underlying fact about the industry-heat carriers),
-    so the optimizer meets it by building more of whatever is already
-    cheapest at the margin (predominantly VRE), not by adding new
-    technologies or new dispatchable/peaking capacity. Full flexibility is
-    included as a 3rd bar to see whether shifting the industry load itself
-    (via DSM/TES) reduces this fleet scale-up relative to No flexibility.
-
-    Isolates finding #3 (bottom row): No flexibility DISCHARGES ~16% more
-    from battery and ~16% more from salt-cavern (H2) storage than Crystal
-    Ball base at 2036 — the existing storage fleet is cycled harder to
-    buffer the added flat industry-heat electricity load. (Storage POWER
-    CAPACITY itself barely differs across scenarios — battery/pumped-hydro
-    within a few % everywhere — so that panel is omitted here; utilization
-    is where the difference actually shows up.) Full flexibility's storage
-    discharge bar here also stacks a single "DSM" segment on top of the
-    same 5 power-sector storage techs, all 10 DSM products summed into one
-    number via get_dsm_energy_equivalent (see that section's comment for
-    the per-product methodology behind the sum), one color, no per-product
-    breakdown — Base / No flexibility get 0 (no industry-heat sector).
-    Full flexibility's combined discharge sitting between No flexibility
-    and base would mean industry-side flexibility substitutes for
-    power-sector storage cycling; sitting at/above No flexibility would
-    mean it doesn't."""
-    runs = [base_run, no_flex_run, full_run]
-    gen_by_year, disch_by_year = _power_and_storage_dfs(runs, full_run)
-    combined_color_map = {**STORAGE_COLOR_MAP, "DSM": DSM_TOTAL_COLOR}
-    _render_power_and_storage_figure(
-        gen_by_year, disch_by_year,
-        "fig11_power_and_storage_impact_with_dsm", combined_color_map, {},
-    )
-
-
 # ── 12-13: Base vs. DELTA (RQ1 — how does the config actually reshape) ─────
 # Per user feedback on a first attempt (two side-by-side absolute-value
 # panels, one per scenario, requiring the reader to subtract by eye): every
@@ -3943,7 +3205,7 @@ def fig11_power_and_storage_impact_with_dsm(base_run: Run, no_flex_run: Run, ful
 #
 # fig12 (capacity | storage discharge, side by side) went through 2 rounds
 # of this feedback: v1 put base/no-flex/full-flex as 3 absolute bars
-# (fig11's own template) — too much eyeballing required. v2 added a 2nd,
+# — too much eyeballing required. v2 added a 2nd,
 # separate delta bar starting at y=0 next to the base bar — better, but the
 # delta bar was visually dwarfed sitting next to a much taller base bar
 # (e.g. +250 GW next to a 2,707 GW base). v3 (this one): the delta bar
@@ -3952,29 +3214,14 @@ def fig11_power_and_storage_impact_with_dsm(base_run: Run, no_flex_run: Run, ful
 # instead of at 0 — it lands at the height where it actually attaches to
 # the existing system, with a thin dashed guide connecting the two, plus a
 # "+X.X%" label. A "%change" is the natural complement to an absolute GW
-# delta here (unlike fig13's per-node choice below) because there's exactly
+# delta here because there's exactly
 # ONE meaningful denominator (that year's own EU-wide base total) — no
 # small-base blow-up risk.
-#
-# fig13 is the only spatial figure in this file. Went through 2 rounds too:
-# v1 was a single-hue choropleth (one flat color per node) — didn't show
-# WHAT changed, only how much. v2 replaced that with small stacked-bar
-# glyphs per node (magnitude + composition) — functional, but bars read as
-# slightly ad hoc map decoration. v3 (this one): proportional pie charts —
-# a standard cartographic convention for exactly this data shape (one
-# value + a categorical breakdown, per point location) — AREA (not radius)
-# scaled to each node's own total |delta|, wedges = technology-category
-# share. Sized in GW, not % of that node's own base: with node populations
-# this uneven (Germany's base capacity is ~50x Slovakia's), a small
-# country's small absolute change would read as a huge, misleading %,
-# while GW stays directly comparable to fig12's own EU-total number and to
-# real grid-planning relevance (a country adding 250 GW matters more for
-# transmission/siting than one "doubling" from 2 GW to 4 GW).
+
 DELTA_LABEL = r"$\Delta$ No flexibility"
 
 
-def _base_and_delta_df(base_series: pd.Series, no_flex_series: pd.Series,
-                       base_label: str | None = None, delta_label: str = DELTA_LABEL) -> pd.DataFrame:
+def _base_and_delta_df(base_series: pd.Series, no_flex_series: pd.Series) -> pd.DataFrame:
     """Two-column DataFrame: [Crystal Ball (base) absolute, Δ No flexibility
     minus base — signed, both directions] — index is the union of both
     series' technologies, missing entries filled with 0 before subtracting
@@ -3982,7 +3229,7 @@ def _base_and_delta_df(base_series: pd.Series, no_flex_series: pd.Series,
     all_idx = base_series.index.union(no_flex_series.index)
     base = base_series.reindex(all_idx, fill_value=0.0)
     no_flex = no_flex_series.reindex(all_idx, fill_value=0.0)
-    return pd.DataFrame({base_label or BASE_SCENARIO[1]: base, delta_label: no_flex - base})
+    return pd.DataFrame({BASE_SCENARIO[1]: base, DELTA_LABEL: no_flex - base})
 
 
 def _plot_base_and_floating_delta(
@@ -4082,23 +3329,20 @@ def fig12_capacity_and_storage_base_and_delta(base_run: Run, no_flex_run: Run) -
     side in one figure instead.
     -> SI_results/fig12_capacity_and_storage_base_and_delta.svg
     """
+    empty = pd.Series(dtype=float)
+    base_cap = get_capacity(base_run.results, POWER_GEN_TECHS, "power")
+    nf_cap = get_capacity(no_flex_run.results, POWER_GEN_TECHS, "power")
+    # GWh -> TWh per user request (raw GWh totals like "522,721" are
+    # unwieldy at print size; TWh keeps 3-4 significant digits instead).
+    base_dis = get_storage_flows(base_run.results, BULK_STORAGE_TECHS, "flow_storage_discharge") / 1000.0
+    nf_dis = get_storage_flows(no_flex_run.results, BULK_STORAGE_TECHS, "flow_storage_discharge") / 1000.0
     gen_by_year: dict[int, pd.DataFrame] = {}
     disch_by_year: dict[int, pd.DataFrame] = {}
     for year in SNAPSHOT_YEARS_POWER:
-        base_gen = get_capacity(base_run.results, POWER_GEN_TECHS, "power").get(year, pd.Series(dtype=float))
-        nf_gen = get_capacity(no_flex_run.results, POWER_GEN_TECHS, "power").get(year, pd.Series(dtype=float))
-        gen_df = _base_and_delta_df(base_gen, nf_gen)
-        gen_by_year[year] = gen_df.reindex(
-            [t for t in POWER_GEN_STACK_ORDER if t in gen_df.index]
-            + [t for t in gen_df.index if t not in POWER_GEN_STACK_ORDER])
-
-        # GWh -> TWh per user request (raw GWh totals like "522,721" are
-        # unwieldy at print size; TWh keeps 3-4 significant digits instead).
-        base_disch = get_storage_flows(base_run.results, BULK_STORAGE_TECHS, "flow_storage_discharge") \
-            .get(year, pd.Series(dtype=float)) / 1000.0
-        nf_disch = get_storage_flows(no_flex_run.results, BULK_STORAGE_TECHS, "flow_storage_discharge") \
-            .get(year, pd.Series(dtype=float)) / 1000.0
-        disch_by_year[year] = _base_and_delta_df(base_disch, nf_disch).reindex(STORAGE_STACK_ORDER).fillna(0.0)
+        gen_by_year[year] = _stack_ordered(
+            _base_and_delta_df(base_cap.get(year, empty), nf_cap.get(year, empty)), POWER_GEN_STACK_ORDER)
+        disch_by_year[year] = _base_and_delta_df(base_dis.get(year, empty), nf_dis.get(year, empty)) \
+            .reindex(STORAGE_STACK_ORDER).fillna(0.0)
 
     fig, axes = plt.subplots(1, 2, figsize=(16, 6))
     with plt.rc_context({"hatch.linewidth": 0.5}):
@@ -4108,391 +3352,6 @@ def fig12_capacity_and_storage_base_and_delta(base_run: Run, no_flex_run: Run) -
                                       color_map=STORAGE_COLOR_MAP, hatch_map={}, decimals=1)
     fig.tight_layout()
     savefig(fig, "fig12_capacity_and_storage_base_and_delta")
-
-
-def fig12a_capacity_and_storage_noflex_vs_full(no_flex_run: Run, full_run: Run) -> None:
-    """fig12's layout, but the reference bar is 'No flexibility' and the
-    floating delta is 'Full flexibility' minus 'No flexibility'.
-    -> SI_results/fig12a_capacity_and_storage_noflex_vs_full.svg
-    """
-    base_lbl = "No flexibility"
-    delta_lbl = r"$\Delta$ Full flexibility"
-    gen_by_year: dict[int, pd.DataFrame] = {}
-    disch_by_year: dict[int, pd.DataFrame] = {}
-    # Same single summed "DSM" segment as fig11 (GWh equivalent -> TWh);
-    # No flexibility has no industry DSM, so it only shows up in the delta.
-    dsm_total = get_dsm_energy_equivalent(full_run.results, DSM_ENERGY_STACK_ORDER, SNAPSHOT_YEARS_POWER).sum() / 1000.0
-    for year in SNAPSHOT_YEARS_POWER:
-        nf_gen = get_capacity(no_flex_run.results, POWER_GEN_TECHS, "power").get(year, pd.Series(dtype=float))
-        ff_gen = get_capacity(full_run.results, POWER_GEN_TECHS, "power").get(year, pd.Series(dtype=float))
-        gen_df = _base_and_delta_df(nf_gen, ff_gen, base_lbl, delta_lbl)
-        gen_by_year[year] = gen_df.reindex(
-            [t for t in POWER_GEN_STACK_ORDER if t in gen_df.index]
-            + [t for t in gen_df.index if t not in POWER_GEN_STACK_ORDER])
-        nf_disch = get_storage_flows(no_flex_run.results, BULK_STORAGE_TECHS, "flow_storage_discharge") \
-            .get(year, pd.Series(dtype=float)) / 1000.0
-        ff_disch = get_storage_flows(full_run.results, BULK_STORAGE_TECHS, "flow_storage_discharge") \
-            .get(year, pd.Series(dtype=float)) / 1000.0
-        disch_df = _base_and_delta_df(nf_disch, ff_disch, base_lbl, delta_lbl) \
-            .reindex(STORAGE_STACK_ORDER + ["DSM"]).fillna(0.0)
-        disch_df.loc["DSM", delta_lbl] = dsm_total[year]
-        disch_by_year[year] = disch_df
-
-    fig, axes = plt.subplots(1, 2, figsize=(16, 6))
-    with plt.rc_context({"hatch.linewidth": 0.5}):
-        _plot_base_and_floating_delta(gen_by_year, "Power Generation Capacity", "GW", axes[0],
-                                      color_map=POWER_GEN_COLOR_MAP, hatch_map=POWER_GEN_HATCH_MAP)
-        _plot_base_and_floating_delta(disch_by_year, "Storage Annual Energy Discharged", "TWh", axes[1],
-                                      color_map={**STORAGE_COLOR_MAP, "DSM": DSM_TOTAL_COLOR}, hatch_map={}, decimals=1)
-    fig.tight_layout()
-    savefig(fig, "fig12a_capacity_and_storage_noflex_vs_full")
-
-
-# ── fig13: regional map — per-node capacity | storage bar glyphs ───────────
-# Went through several rounds: v1 was a single flat-color choropleth (no
-# composition); v2 was one small stacked-bar glyph per node, 3 broad
-# categories (VRE/other-gen/storage); v3 was proportional pie charts, one
-# per node; v4 (this one) is back to bar glyphs (per user follow-up, pies
-# for both capacity AND storage at once read as "messy") — TWO bars per
-# node side by side, capacity (left) and storage (right), each stacked by
-# INDIVIDUAL technology (techs under 5% of that node's own bar total
-# grouped into a single "Other" segment). A "+X.X%" capacity label sits
-# below each node's bar pair (node's own Δcapacity / node's own base
-# capacity).
-#
-# Storage is DISCHARGE (GWh), not capacity (GW) — same quantity as fig12's
-# storage panel / fig11's bottom row, for consistency, and for a real
-# reason: storage POWER capacity barely differs across scenarios (see
-# fig11's own docstring) and salt_cavern_storage/natural_gas_storage's
-# power capacity specifically has capex_specific_storage == 0 EUR/GW
-# (confirmed directly against a solved run) — an unconstrained, free
-# "artifact" dimension, same pattern already documented for
-# heat_industry_temp_conversion_*'s ~37,700 GW capacity elsewhere in this
-# file, that swamped every real signal in an earlier capacity-based draft
-# of this map by 2 orders of magnitude. Discharge doesn't have this
-# problem (it's bounded by each tech's real, costed ENERGY/reservoir
-# capacity) and is what fig11/fig12 already use for storage throughout.
-_REGIONAL_YEAR = 2050  # final modeled year: full build-out, clearest spatial signal
-_NODE_BAR_MIN_SHARE = 0.05  # techs below this share of a node's own bar total are grouped into "Other"
-_NODE_BAR_OTHER_COLOR = "#bbbbbb"
-# BE/LU sit close enough to NL/DE that their default (at-node) bar+label
-# position collides with the neighboring country's bar/label at print font
-# size -- manual (dlon, dlat) nudges for just this cluster, found by
-# inspection (a general auto-declutter isn't worth it for 2 nodes). Applied
-# to BOTH the bar glyph and the text label (via the same dict) so they move
-# together rather than drifting apart.
-_NODE_POSITION_NUDGE = {"BE": (-1.6, -0.2), "LU": (1.5, -0.6)}
-
-
-def _node_capacity_by_tech(r, techs: list[str], year: int) -> pd.DataFrame:
-    """Per-node, per-technology capacity (GW) — index=node, columns=
-    technology. capacity's location level is named "location" (confirmed
-    directly against a solved run — flows use "node" instead), so this
-    can't reuse get_capacity (it collapses that level entirely)."""
-    cap = r.get_total("capacity")
-    cap = cap[cap.index.get_level_values("capacity_type") == "power"]
-    sub = cap[cap.index.get_level_values("technology").isin(techs)]
-    if sub.empty or year not in sub.columns:
-        return pd.DataFrame()
-    return sub[year].groupby(["location", "technology"]).sum().unstack("technology").fillna(0.0)
-
-
-def _node_storage_discharge_by_tech(r, techs: list[str], year: int) -> pd.DataFrame:
-    """Per-node, per-technology storage annual discharge (GWh) — index=node,
-    columns=technology. flow_storage_discharge's location level is named
-    "node" (unlike capacity's "location" — confirmed directly)."""
-    disch = r.get_total("flow_storage_discharge")
-    sub = disch[disch.index.get_level_values("technology").isin(techs)]
-    if sub.empty or year not in sub.columns:
-        return pd.DataFrame()
-    return sub[year].groupby(["node", "technology"]).sum().unstack("technology").fillna(0.0)
-
-
-def _group_small_shares(values: pd.Series, min_share: float = _NODE_BAR_MIN_SHARE) -> pd.Series:
-    """Techs below `min_share` of THIS node's own bar total are summed into
-    one "Other" bucket — applied per node/per bar independently, so which
-    real techs end up inside "Other" can differ node to node (a tech
-    dominant in one country may be a rounding error in another)."""
-    total = values.sum()
-    if total <= 0:
-        return values
-    share = values / total
-    small, big = values[share < min_share], values[share >= min_share]
-    if not small.empty and small.sum() > 1e-6:
-        big = pd.concat([big, pd.Series({"Other": small.sum()})])
-    return big
-
-
-def _nice_round(value: float) -> float:
-    """Round to a visually clean size-legend reference number: nearest 50
-    above 100, nearest 10 above 20, nearest 5 above 5, else nearest 1 — e.g.
-    257 -> 250, 38.7 -> 40, matching the "round numbers like 250 and 50"
-    convention requested for the legend."""
-    if value <= 0:
-        return 0.0
-    step = 50 if value >= 100 else 10 if value >= 20 else 5 if value >= 5 else 1
-    return round(value / step) * step
-
-
-def _draw_node_two_bars(
-    ax: plt.Axes, coords: pd.DataFrame, cap_deltas: pd.DataFrame, storage_deltas: pd.DataFrame,
-    cap_color_map: dict, storage_color_map: dict,
-    max_height_deg: float = 2.6, bar_width_deg: float = 0.75, gap_deg: float = 0.15,
-    cap_minor_ref: float = 20.0, storage_minor_ref: float = 10_000.0,
-) -> tuple[float, float, float, float, float, float]:
-    """Two adjacent small stacked-bar glyphs per node — capacity (left) and
-    storage (right) — each independently scaled (own max node total ->
-    max_height_deg) since the two quantities aren't on the same scale.
-    max_height_deg is deliberately generous (rather than just enough for
-    the single largest node) so smaller-but-real changes stay visible
-    rather than shrinking toward the minimum-visibility floor below.
-    Returns (cap_major_ref, cap_minor_ref, storage_major_ref,
-    storage_minor_ref, cap_scale, storage_scale) for the size legend:
-    major is the nice-rounded actual max (what the tallest bar means),
-    minor is a fixed, requested reference (20 GW / 10,000 GWh — smaller,
-    round numbers a reader can judge any bar against) rather than an
-    auto-derived fraction of major. Scale factors let the legend be drawn
-    at the exact same scale as these real bars (see _draw_size_legend_on_map
-    — an earlier draft's legend used a separate inset axes with its own
-    independent coordinate system, NOT visually calibrated to the map's
-    real degrees-per-GW scale, making the legend numerically correct but
-    visually misleading)."""
-    cap_pos = cap_deltas.clip(lower=0)
-    storage_pos = storage_deltas.clip(lower=0)
-    cap_totals = cap_pos.sum(axis=1)
-    storage_totals = storage_pos.sum(axis=1)
-    cap_max = float(cap_totals.max()) if len(cap_totals) else 0.0
-    storage_max = float(storage_totals.max()) if len(storage_totals) else 0.0
-    cap_scale = max_height_deg / cap_max if cap_max > 0 else 0.0
-    storage_scale = max_height_deg / storage_max if storage_max > 0 else 0.0
-
-    # Below this degree-height, a rectangle's own outline (a fixed line
-    # width in points, not degrees) is thicker than the rectangle itself —
-    # rendering as a small dark smudge rather than a genuine bar. Skip
-    # drawing that side entirely below the threshold (the "+X%" text label
-    # is unaffected, still drawn from the real, un-rounded value) rather
-    # than let near-zero nodes clutter the map with noise instead of signal.
-    _MIN_VISIBLE_DEG = 0.05
-
-    all_nodes = cap_deltas.index.union(storage_deltas.index)
-    for node in all_nodes:
-        if node not in coords.index:
-            continue
-        cap_total = cap_totals.get(node, 0.0)
-        storage_total = storage_totals.get(node, 0.0)
-        cap_h_total = cap_total * cap_scale
-        storage_h_total = storage_total * storage_scale
-        draw_cap = cap_h_total >= _MIN_VISIBLE_DEG
-        draw_storage = storage_h_total >= _MIN_VISIBLE_DEG
-        if not draw_cap and not draw_storage:
-            continue
-        dlon, dlat = _NODE_POSITION_NUDGE.get(node, (0.0, 0.0))
-        lon, lat = coords.loc[node, "lon"] + dlon, coords.loc[node, "lat"] + dlat
-        cap_cx = lon - gap_deg / 2 - bar_width_deg / 2
-        stor_cx = lon + gap_deg / 2 + bar_width_deg / 2
-
-        if draw_cap:
-            bottom = 0.0
-            for cat, val in _group_small_shares(cap_pos.loc[node]).items():
-                h = val * cap_scale
-                color = cap_color_map.get(cat, _NODE_BAR_OTHER_COLOR)
-                ax.add_patch(Rectangle((cap_cx - bar_width_deg / 2, lat + bottom), bar_width_deg, h,
-                                        facecolor=color, edgecolor="black", linewidth=0.25, zorder=5))
-                bottom += h
-        if draw_storage:
-            bottom = 0.0
-            for cat, val in _group_small_shares(storage_pos.loc[node]).items():
-                h = val * storage_scale
-                color = storage_color_map.get(cat, _NODE_BAR_OTHER_COLOR)
-                ax.add_patch(Rectangle((stor_cx - bar_width_deg / 2, lat + bottom), bar_width_deg, h,
-                                        facecolor=color, edgecolor="black", linewidth=0.25, zorder=5))
-                bottom += h
-        # Baseline only spans the side(s) actually drawn -- a single narrow
-        # tick under a bar-less node reads as a stray mark, not a glyph.
-        if draw_cap and draw_storage:
-            x0, x1 = cap_cx - bar_width_deg / 2, stor_cx + bar_width_deg / 2
-        elif draw_cap:
-            x0, x1 = cap_cx - bar_width_deg / 2, cap_cx + bar_width_deg / 2
-        else:
-            x0, x1 = stor_cx - bar_width_deg / 2, stor_cx + bar_width_deg / 2
-        ax.plot([x0, x1], [lat, lat], color="black", linewidth=0.5, zorder=6)
-
-    cap_major = _nice_round(cap_max)
-    storage_major = _nice_round(storage_max)
-    return cap_major, cap_minor_ref, storage_major, storage_minor_ref, cap_scale, storage_scale
-
-
-def _draw_size_legend_on_map(
-    ax: plt.Axes, anchor_lon: float, anchor_lat: float,
-    cap_major: float, cap_minor: float, cap_scale: float,
-    storage_major: float, storage_minor: float, storage_scale: float,
-    bar_width_deg: float = 0.75, gap_deg: float = 4.8,
-) -> None:
-    """Reference bars for the size legend, drawn directly on the map in the
-    SAME (lon, lat) data coordinates and the SAME cap_scale/storage_scale
-    as the real per-node bars (_draw_node_two_bars) — guarantees the
-    legend is visually true to the map, unlike an earlier draft's separate
-    inset axes (its own independent y-range stretched to fill its box,
-    completely decoupled from the map's real degrees-per-GW scale — so a
-    "200 GW" legend bar did not actually render at the same height per GW
-    as a real 200 GW bar on the map)."""
-    entries = [("Capacity", cap_major, cap_minor, cap_scale, "GW"),
-               ("Storage", storage_major, storage_minor, storage_scale, "GWh")]
-    for i, (label, major, minor, scale, unit) in enumerate(entries):
-        if major <= 0:
-            continue
-        x = anchor_lon + i * gap_deg
-        major_h, minor_h = major * scale, minor * scale
-        ax.add_patch(Rectangle((x - bar_width_deg / 2, anchor_lat), bar_width_deg, major_h,
-                                facecolor="none", edgecolor="black", linewidth=0.8, zorder=5))
-        ax.text(x, anchor_lat + major_h + 0.1, f"{major:,.0f} {unit}",
-                ha="center", va="bottom", fontsize=8.5, zorder=5)
-        ax.add_patch(Rectangle((x - bar_width_deg / 2, anchor_lat), bar_width_deg, minor_h,
-                                facecolor="black", edgecolor="black", linewidth=0.8, zorder=5))
-        if minor > 0 and minor_h < major_h - 0.08:
-            ax.text(x + bar_width_deg / 2 + 0.1, anchor_lat + minor_h, f"{minor:,.0f}",
-                    ha="left", va="center", fontsize=8, zorder=5)
-        ax.text(x, anchor_lat - 0.15, label, ha="center", va="top",
-                fontsize=8.5, fontweight="bold", zorder=5)
-    top = anchor_lat + max(cap_major * cap_scale, storage_major * storage_scale, 0.0)
-    ax.text(anchor_lon + gap_deg / 2, top + 0.9, "Bar height",
-            ha="center", va="bottom", fontsize=9.5, zorder=5)
-
-
-def fig13_regional_capacity_delta_map(base_run: Run, no_flex_run: Run) -> None:
-    """Europe map, year 2050: at each of the 28 nodes, two small bar glyphs
-    — Δ capacity (left, GW) and Δ storage annual discharge (right, GWh),
-    No flexibility minus Crystal Ball base — each stacked by individual
-    technology (techs under 5% of that node's own bar grouped into
-    "Other"), plus a "+X.X%" label below showing that node's own capacity
-    increase relative to ITS OWN base capacity. Scope is POWER_GEN_TECHS /
-    BULK_STORAGE_TECHS, i.e. the PRE-EXISTING power system's own regional
-    reshaping — not where the new industry-heat demand itself happens to
-    sit (an exogenous input fact, not a modeled response).
-
-    Skipped gracefully (with a printed note) if geopandas or the cached
-    Natural Earth shapefile (data/naturalearth/, see plots/natural_earth.py)
-    aren't available — same fallback convention as fig13_mga_axis_construction.
-    -> SI_results/fig13_regional_capacity_delta_map.svg
-    """
-    if not NATURALEARTH_SHP.exists():
-        print("  skipping fig13_regional_capacity_delta_map: Natural Earth shapefile not "
-              f"cached under {NATURALEARTH_SHP.parent.relative_to(REPO_ROOT)} — run "
-              "scripts/plot_country_groups_map.py once to download it")
-        return
-    try:
-        import geopandas as gpd
-    except ImportError:
-        print("  skipping fig13_regional_capacity_delta_map: geopandas not installed")
-        return
-
-    world = gpd.read_file(NATURALEARTH_SHP)[["ISO_A2_EH", "geometry"]]
-    minx, maxx = EUROPE_EXTENT["lon"]
-    miny, maxy = EUROPE_EXTENT["lat"]
-    world = world.cx[minx:maxx, miny:maxy]
-    coords = no_flex_run.results.get_coords()
-
-    cap_base = _node_capacity_by_tech(base_run.results, POWER_GEN_TECHS, _REGIONAL_YEAR)
-    cap_nf = _node_capacity_by_tech(no_flex_run.results, POWER_GEN_TECHS, _REGIONAL_YEAR)
-    cap_deltas = cap_nf.sub(cap_base, fill_value=0.0).fillna(0.0)
-    cap_base_total = cap_base.sum(axis=1)
-
-    storage_base = _node_storage_discharge_by_tech(base_run.results, BULK_STORAGE_TECHS, _REGIONAL_YEAR)
-    storage_nf = _node_storage_discharge_by_tech(no_flex_run.results, BULK_STORAGE_TECHS, _REGIONAL_YEAR)
-    storage_deltas = storage_nf.sub(storage_base, fill_value=0.0).fillna(0.0)
-
-    cap_pos_totals = cap_deltas.clip(lower=0).sum(axis=1)
-    pct = pd.Series({
-        node: cap_pos_totals[node] / cap_base_total.get(node, 0.0) * 100
-        for node in cap_pos_totals.index
-        if cap_pos_totals[node] > 1e-3 and cap_base_total.get(node, 0.0) > 1e-6
-    })
-
-    # EUROPE_EXTENT's lon/lat span is ~1.84:1 (wide) -- figsize matched to
-    # that so equal-aspect geopandas doesn't leave large blank margins (the
-    # same fix already applied once to fig14 in an earlier round). Sized up
-    # again per user request for larger text/glyphs overall.
-    fig, ax = plt.subplots(figsize=(15, 9))
-    world.plot(ax=ax, color="#f7f7f7", edgecolor="#B0B0B0", linewidth=0.4)
-
-    # Per-node capacity-increase % shown as a light grey country fill too
-    # (in addition to the bars/text label) — per user request, so the
-    # highest-% nodes are visible at a glance even before reading any
-    # label. Kept deliberately subtle/light-grey-only (never colorful, never
-    # dark) so it stays a background cue and doesn't compete with the
-    # bars' own technology colors, which carry the primary information.
-    # Colorbar lives in the bottom-left legend cluster with everything else
-    # (per user request to consolidate all legends into one corner).
-    if len(pct):
-        node_to_iso = {n: ISO_A2_EH_OVERRIDES.get(n, n) for n in pct.index}
-        pct_df = pd.DataFrame({"iso_a2_eh": [node_to_iso[n] for n in pct.index], "pct": pct.values})
-        shaded = world.merge(pct_df, left_on="ISO_A2_EH", right_on="iso_a2_eh", how="inner")
-        pct_cmap = LinearSegmentedColormap.from_list("pct_grey", ["#f7f7f7", "#8f8f8f"])
-        pct_vmax = float(pct.max())
-        shaded.plot(ax=ax, column="pct", cmap=pct_cmap, vmin=0, vmax=pct_vmax,
-                    edgecolor="#B0B0B0", linewidth=0.4)
-        sm = plt.cm.ScalarMappable(cmap=pct_cmap, norm=plt.Normalize(vmin=0, vmax=pct_vmax))
-        sm.set_array([])
-        cax = ax.inset_axes([0.02, 0.62, 0.20, 0.022])
-        cbar = fig.colorbar(sm, cax=cax, orientation="horizontal")
-        cbar.set_label("Node shading: capacity increase [%]", fontsize=8.5, labelpad=3)
-        cbar.ax.tick_params(labelsize=7.5)
-
-    cap_major, cap_minor, storage_major, storage_minor, cap_scale, storage_scale = _draw_node_two_bars(
-        ax, coords, cap_deltas, storage_deltas, POWER_GEN_COLOR_MAP, STORAGE_COLOR_MAP)
-
-    for node in cap_pos_totals.index:
-        if node not in coords.index or cap_pos_totals[node] <= 1e-3:
-            continue
-        label = node if node not in pct.index else f"{node}\n+{pct[node]:.0f}%"
-        dlon, dlat = _NODE_POSITION_NUDGE.get(node, (0.0, 0.0))
-        ax.text(coords.loc[node, "lon"] + dlon, coords.loc[node, "lat"] - 0.45 + dlat, label,
-                fontsize=11, ha="center", va="top", color="#222222", linespacing=1.2, zorder=6)
-
-    ax.set_xlim(minx, maxx)
-    ax.set_ylim(miny, maxy)
-    ax.set_axis_off()
-    ax.set_title(f"Difference: Crystal Ball Base vs. No Flexibility ({_REGIONAL_YEAR})",
-                 fontsize=17, fontweight="bold")
-
-    # Two separate legends (conversion vs. storage technologies, ZEN-garden's
-    # own vocabulary for the two technology classes) rather than one
-    # combined list, plus the size legend and the % colorbar — all 4 in the
-    # bottom-left corner per user request, stacked so none overlap: bar-
-    # height reference bars lowest (real lon/lat, in the open Atlantic west
-    # of Portugal -- must stay in real map coordinates, not axes-fraction,
-    # to remain visually true to the map's own scale, see
-    # _draw_size_legend_on_map), technology legends above that, colorbar on
-    # top (placed further above, near the pct-shading section above).
-    all_used = pd.concat([cap_deltas.clip(lower=0), storage_deltas.clip(lower=0)]).sum()
-    all_used = all_used[all_used > 1e-3].index.tolist()
-    used_cap_techs = [t for t in POWER_GEN_STACK_ORDER if t in all_used]
-    used_storage_techs = [t for t in STORAGE_STACK_ORDER if t in all_used]
-
-    cap_handles = [Patch(facecolor=POWER_GEN_COLOR_MAP[t], edgecolor="black", label=t) for t in used_cap_techs]
-    cap_handles.append(Patch(facecolor=_NODE_BAR_OTHER_COLOR, edgecolor="black", label="Other"))
-    storage_handles = [Patch(facecolor=STORAGE_COLOR_MAP[t], edgecolor="black", label=t) for t in used_storage_techs]
-    storage_handles.append(Patch(facecolor=_NODE_BAR_OTHER_COLOR, edgecolor="black", label="Other"))
-
-    conv_legend = ax.legend(handles=cap_handles, loc="lower left", bbox_to_anchor=(0.01, 0.18),
-                             fontsize=9.5, frameon=False, title="Conversion technologies",
-                             title_fontsize=10, ncol=2, columnspacing=1.0, handletextpad=0.6)
-    ax.add_artist(conv_legend)
-    storage_legend = ax.legend(handles=storage_handles, loc="lower left", bbox_to_anchor=(0.01, 0.32),
-                                fontsize=9.5, frameon=False, title="Storage technologies", title_fontsize=10)
-    ax.add_artist(storage_legend)
-
-    # Bar-height size legend — placed in real (lon, lat) map coordinates, in
-    # the open Atlantic west of Portugal/Ireland (no modeled node sits
-    # there) — see _draw_size_legend_on_map's docstring for why this can't
-    # be a separate inset axes like the two technology legends above.
-    _draw_size_legend_on_map(ax, anchor_lon=-24.0, anchor_lat=35.0,
-                              cap_major=cap_major, cap_minor=cap_minor, cap_scale=cap_scale,
-                              storage_major=storage_major, storage_minor=storage_minor,
-                              storage_scale=storage_scale)
-
-    fig.tight_layout()
-    savefig(fig, "fig13_regional_capacity_delta_map")
 
 
 # ── 11: MGA method schematic (no data) ──────────────────────────────────────
@@ -4709,84 +3568,6 @@ def fig11_mga_method() -> None:
 
     fig.tight_layout(rect=[0, 0.02, 1, 1])
     savefig(fig, "fig5_mga_method", subdir="method")
-
-
-# ── 12: LP formulation & problem size ───────────────────────────────────────
-
-def fig12_lp_formulation() -> None:
-    """General LP formulation of a cost-minimization energy transition model
-    (left, hand-typeset - not derived from a solved model) alongside this
-    work's actual "No flexibility" model's (approximate, rounded) problem
-    size (right, read directly from that run's own benchmarking.json/
-    system.json/solver.json - see the module-level comment above for why
-    these aren't hardcoded). Deliberately compact: one plain LP statement,
-    one stat block, nothing else.
-    """
-    model_dir = _search_var_dict(EULER_ROOT / SCENARIOS[0][0], max_depth=3)
-    if model_dir is None:
-        print(f"  skipping fig12_lp_formulation: {SCENARIOS[0][0]!r} not found under {EULER_ROOT}")
-        return
-    bench = json.loads((model_dir / "benchmarking.json").read_text())
-    system = json.loads((model_dir / "system.json").read_text())
-    solver = json.loads((model_dir / "solver.json").read_text())
-
-    fig, ax = plt.subplots(figsize=(11.5, 3.0))
-    ax.set_xlim(0, 1)
-    ax.set_ylim(0, 1)
-    ax.axis("off")
-
-    ax.add_patch(FancyBboxPatch((0.02, 0.02), 0.45, 0.89, boxstyle="round,pad=0.012,rounding_size=0.02",
-                                 facecolor=eth_tint(_ETH_GREY, 0.93), edgecolor=_ETH_GREY, linewidth=1.1))
-    ax.add_patch(FancyBboxPatch((0.53, 0.02), 0.45, 0.89, boxstyle="round,pad=0.012,rounding_size=0.02",
-                                 facecolor=eth_tint(_ETH_BLUE, 0.90), edgecolor=_ETH_BLUE, linewidth=1.1))
-
-    # ── Left: general formulation ───────────────────────────────────────
-    # h(x)=0 / g(x)<=0 - standard equality/inequality-constraint function
-    # notation, not tied to any particular linear A x = b form. Equation and
-    # its description share one y and va="center" so a big equation and
-    # small caption line up on the same visual center instead of one
-    # baseline vs. one top-aligned.
-    lx = 0.055
-    ax.text(lx, 0.83, "General Formulation", fontsize=12.5, fontweight="bold")
-    ax.text(lx, 0.71, "energy transition model (cost minimization)", fontsize=9, style="italic", color="#444444")
-
-    ax.text(lx, 0.52, r"$\min_{x \,\geq\, 0} \; c^\top x$", fontsize=15, va="center")
-    ax.text(lx, 0.34, "s.t.", fontsize=9.5, style="italic", color="#444444", va="center")
-    ax.text(lx + 0.05, 0.26, r"$h(x) = 0$", fontsize=12.5, va="center")
-    ax.text(lx + 0.24, 0.26, "energy/mass balance", fontsize=9, va="center")
-    ax.text(lx + 0.05, 0.13, r"$g(x) \leq 0$", fontsize=12.5, va="center")
-    ax.text(lx + 0.24, 0.13, "capacity, ramping, diffusion", fontsize=9, va="center")
-
-    # ── Right: this work's actual model ─────────────────────────────────
-    rx = 0.565
-    ax.text(rx, 0.83, "ZEN-garden: \"No Flexibility\" Model", fontsize=12.5, fontweight="bold")
-    ax.text(rx, 0.71, "this work, solved model", fontsize=9, style="italic", color="#444444")
-
-    # Rounded to 1 decimal place (≈) rather than the exact benchmarking.json
-    # counts - precise to the digit isn't the point here, scale is.
-    ax.text(rx, 0.565, f"≈{bench['number_variables'] / 1e6:.1f}M variables", fontsize=13, fontweight="bold",
-            color=_ETH_BLUE, va="center")
-    ax.text(rx, 0.465, f"≈{bench['number_constraints'] / 1e6:.1f}M constraints", fontsize=13, fontweight="bold",
-            color=_ETH_BLUE, va="center")
-
-    dims_line1 = (
-        f"{len(system['set_nodes'])} nodes · {len(system['set_technologies'])} technologies · "
-        f"{len(system['set_carriers'])} carriers"
-    )
-    last_year = system["reference_year"] + (system["optimized_years"] - 1) * system["interval_between_years"]
-    dims_line2 = (
-        f"{system['optimized_years']} years ({system['reference_year']}–{last_year}, "
-        f"{system['interval_between_years']}-yr steps) · "
-        f"{system['aggregated_time_steps_per_year']} h/yr (of {system['unaggregated_time_steps_per_year']})"
-    )
-    ax.text(rx, 0.30, dims_line1, fontsize=9, va="center")
-    ax.text(rx, 0.21, dims_line2, fontsize=9, va="center")
-
-    ax.text(rx, 0.09, f"Solved with {solver['name'].capitalize()} barrier solver", fontsize=9,
-            va="center", color="#444444")
-
-    fig.tight_layout(rect=[0, 0.02, 1, 0.98])
-    savefig(fig, "fig6_lp_formulation", subdir="method")
 
 
 # ── 13: MGA axis-count construction (no data) ───────────────────────────────
@@ -5327,7 +4108,6 @@ def fig20_cost_breakdown_sector_industry_heating(base_run: Run, no_flex_run: Run
     fig, axes = plt.subplots(3, 1, figsize=(15, 13.5),
                              gridspec_kw={"height_ratios": [3.1 - lo for lo in y_lo]})
     for k, (ax, lab) in enumerate(zip(axes, labels)):
-        tot_k = float(sector_df[lab].sum())
         heat_k = float(heat_df[lab].sum())
         ax.text(0, 2.62, lab, fontsize=11.5,
                 fontweight="bold", va="bottom")
@@ -5377,100 +4157,62 @@ def main() -> None:
     print(f"  wrote {(FIGURES_DIR / 'headline_metrics.csv').relative_to(REPO_ROOT)}")
 
     print(f"Loading base scenario ({BASE_SCENARIO[1]})...")
-    base_run = load_base_scenario()
-
+    base = load_base_scenario()
     print(f"Loading {NO_FLEX_SINGLE_TEMP_SCENARIO[1]!r} scenario...")
-    no_flex_single_run = load_no_flex_single_temp_scenario()
+    no_flex_single = load_no_flex_single_temp_scenario()
+
+    by = {r.label: r for r in runs}
+    no_flex = by.get("No flexibility")
+    full = by.get("Full flexibility")
+    single_temp = by.get("Single temperature level")
+    dsm_pess = by.get("DSM pessimistic")
+    available = {"base": base, "No flexibility": no_flex, "Full flexibility": full,
+                 "Single temperature level": single_temp, "DSM pessimistic": dsm_pess,
+                 NO_FLEX_SINGLE_TEMP_SCENARIO[1]: no_flex_single}
+
+    def run_if(needs: list[str], fn, *args) -> None:
+        """Call fn(*args) if every scenario in `needs` is loaded, else print a skip line."""
+        missing = [n for n in needs if available[n] is None]
+        if missing:
+            print(f"  skipping {fn.__name__}: {', '.join(missing)} not loaded")
+        else:
+            fn(*args)
 
     print("Generating figures...")
-    if base_run is not None:
-        components_with_base = compute_cost_components([base_run] + runs)
-        fig0a_cost_composition(components_with_base)
-        if any(r.label == "No flexibility" for r in runs):
-            no_flex_run = by_label(runs, "No flexibility")
-            fig5_retrofit_ccs_comparison(no_flex_run, base_run)
-            # RQ1 ("how does industry-heat integration reshape the optimal
-            # configuration") delta figures — only need base + No flexibility.
-            fig12_capacity_and_storage_base_and_delta(base_run, no_flex_run)
-            fig13_regional_capacity_delta_map(base_run, no_flex_run)
-            if any(r.label == "Full flexibility" for r in runs):
-                full_run = by_label(runs, "Full flexibility")
-                fig0b_emissions_source_comparison(base_run, no_flex_run, full_run)
-                fig1b_cost_and_emissions_totals(base_run, no_flex_run, full_run)
-                fig11_power_and_storage_impact_with_dsm(base_run, no_flex_run, full_run)
-                fig12a_capacity_and_storage_noflex_vs_full(no_flex_run, full_run)
-                fig20_cost_breakdown_sector_industry_heating(base_run, no_flex_run, full_run)
-            else:
-                print("  skipping fig0b_emissions_source_comparison/fig1b_cost_and_emissions_totals/"
-                      "fig11_power_and_storage_impact_with_dsm: 'Full flexibility' scenario not loaded")
-        else:
-            print("  skipping fig0b/fig5/fig11/fig12/fig13: 'No flexibility' scenario not loaded")
+    # results
+    if base is not None:
+        fig0a_cost_composition(compute_cost_components([base] + runs))
     else:
-        print(f"  skipping fig0a/fig0b/fig5/fig11/fig12/fig13: "
-              f"{BASE_SCENARIO[0]} not yet under {EULER_ROOT}")
-    if any(r.label == "Full flexibility" for r in runs):
-        fig1a_cost_delta(metrics)
-    else:
-        print("  skipping fig3_cost_delta: 'Full flexibility' scenario (its baseline) not loaded")
-    fig1b_industry_capacity(runs)
-    if all(any(r.label == l for r in runs) for l in ("Full flexibility", "DSM pessimistic")):
-        fig2_dsm_cycles_by_product(runs)
-        fig5b_dsm_discharge_by_product(runs)
-    else:
-        print("  skipping fig5_dsm_cycles_by_product/fig5b_dsm_discharge_by_product: "
-              "requires 'Full flexibility' and 'DSM pessimistic' loaded")
-    if any(r.label == "Single temperature level" for r in runs):
-        fig3b_heat_pathway(runs)
-        # fig14a/fig14b: No flexibility vs. its single-temp counterpart AND
-        # Full flexibility vs. its single-temp counterpart — no base run
-        # needed (all 4 are v9_0 runs).
-        if (no_flex_single_run is not None and any(r.label == "No flexibility" for r in runs)
-                and any(r.label == "Full flexibility" for r in runs)):
-            no_flex_run = by_label(runs, "No flexibility")
-            full_flex_run = by_label(runs, "Full flexibility")
-            single_temp_run = by_label(runs, "Single temperature level")
-            fig14a_heat_supply_electrification_singletemp_vs_full(no_flex_run, no_flex_single_run,
-                                                                   full_flex_run, single_temp_run)
-            fig14b_cost_and_emissions_totals_singletemp_vs_full(no_flex_run, no_flex_single_run,
-                                                                full_flex_run, single_temp_run)
-            fig30_matrix(no_flex_run, no_flex_single_run, full_flex_run, single_temp_run)
-        else:
-            print(f"  skipping fig14a/fig14b/fig30: requires 'No flexibility', 'Full flexibility', and "
-                  f"{NO_FLEX_SINGLE_TEMP_SCENARIO[1]!r} all loaded")
-    else:
-        print("  skipping fig3b_heat_pathway/fig14a/fig14b: "
-              "'Single temperature level' scenario not loaded")
-    fig4a_heat_demand_by_sector()
-    if any(r.label == "Full flexibility" for r in runs):
-        fig4b_industry_fuel_demand_comparison(runs)
-    else:
-        print("  skipping method/fig2_industry_fuel_demand_comparison: 'Full flexibility' scenario not loaded")
-    if any(r.label == "No flexibility" for r in runs):
-        fig6_diffusion_mechanisms(runs)
-        fig8a_diffusion_mechanisms_heat_pumps(runs)
-        fig7_heat_supply_trajectory(runs)
-        fig9c_heat_supply_output_twh_for(runs, "No flexibility",
-                                          "fig15a_heat_supply_output_no_flexibility_twh")
-    else:
-        print("  skipping fig6_diffusion_mechanisms/fig7_heat_supply_trajectory/fig15a_heat_supply_output_no_flexibility_twh: "
-              "'No flexibility' scenario not loaded")
-    if any(r.label == "Full flexibility" for r in runs):
-        fig7_heat_supply_trajectory_for(runs, "Full flexibility",
-                                         "fig9b_heat_supply_trajectory_full_flexibility")
-        fig9c_heat_supply_output_twh_for(runs, "Full flexibility",
-                                          "fig15b_heat_supply_output_full_flexibility_twh")
-    else:
-        print("  skipping fig9b_heat_supply_trajectory_full_flexibility/fig15b_heat_supply_output_full_flexibility_twh: "
-              "'Full flexibility' scenario not loaded")
+        print("  skipping fig0a_cost_composition: base not loaded")
+    run_if(["base", "No flexibility", "Full flexibility"],
+           fig0b_emissions_source_comparison, base, no_flex, full)
+    run_if(["Full flexibility", "DSM pessimistic"], fig5b_dsm_discharge_by_product, runs)
+    run_if(["Single temperature level"], fig3b_heat_pathway, runs)
+    run_if(["base", "No flexibility"], fig5_retrofit_ccs_comparison, no_flex, base)
+    run_if(["No flexibility"], fig8a_diffusion_mechanisms_heat_pumps, runs)
+    run_if(["No flexibility", "Full flexibility"], fig9_heat_supply_trajectory, no_flex, full)
+    run_if(["base", "No flexibility"], fig12_capacity_and_storage_base_and_delta, base, no_flex)
+    single_temp_set = ["No flexibility", NO_FLEX_SINGLE_TEMP_SCENARIO[1], "Full flexibility",
+                       "Single temperature level"]
+    for fn in (fig14a_heat_supply_electrification_singletemp_vs_full,
+               fig14b_cost_and_emissions_totals_singletemp_vs_full, fig30_matrix):
+        run_if(single_temp_set, fn, no_flex, no_flex_single, full, single_temp)
+    run_if(["No flexibility"], fig15_heat_supply_output_twh_for,
+           runs, "No flexibility", "fig15a_heat_supply_output_no_flexibility_twh")
+    run_if(["Full flexibility"], fig15_heat_supply_output_twh_for,
+           runs, "Full flexibility", "fig15b_heat_supply_output_full_flexibility_twh")
+    run_if(["base", "No flexibility", "Full flexibility"],
+           fig20_cost_breakdown_sector_industry_heating, base, no_flex, full)
+
+    # method/
+    run_if(["Full flexibility"], fig4b_industry_fuel_demand_comparison, runs)
     fig8_industry_sector_emissions_context()
     fig9_model_scope_coverage()
     fig15_global_ghg_sector_breakdown()
     fig11_mga_method()
-    fig12_lp_formulation()
     fig13_mga_axis_construction()
     fig14_mga_exploration_sequence()
     print(f"Done. Figures in {FIGURES_DIR.relative_to(REPO_ROOT)}/")
-
 
 if __name__ == "__main__":
     main()
