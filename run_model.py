@@ -41,7 +41,7 @@ CHANGES:
     #SBATCH profile actually allocates, or Gurobi will oversubscribe the
     node (see submit_euler_mga.sh's batch8/batch16 postmortem).
   * The `axes` block for every MGA mode except `weights` is no longer
-    duplicated per config file -- it's merged in from data/config_mga_axes_capex.json
+    duplicated per config file -- it's merged in from data/config_euler/config_mga_axes_capex.json
     (the default) into the private staged copy, so all five
     config_mga_{bbo,sampling,oracle,batch_bbo,batch_sampling}.json files
     share one axes definition. A row may set an `axes_config` column (e.g.
@@ -87,6 +87,7 @@ from zen_garden import run, Results  # noqa: F401  (Results kept for post-proces
 # --- Fixed locations (same layout as your original script) ----------------------
 REPO_DIR = Path(__file__).parent                                  # .../ZEN-models
 DATA_DIR_CONFIG = REPO_DIR / "data"                               # config.json + local outputs
+CONFIG_EULER_DIR = DATA_DIR_CONFIG / "config_euler"               # config_mga_*.json (MGA + axes)
 
 # Places `my_dataset` is looked up, in order. ZEN-europe's generated datasets
 # (data/outputs/zen-europe) are the primary source; older pristine copies live
@@ -127,9 +128,9 @@ DEFAULT_CONFIG = "config.json"
 # Default axes definition merged into every MGA config (see
 # apply_axes_override) so the axes block isn't duplicated per config file.
 # A row's own "axes_config" column (see main()) can point at a different
-# axes file instead -- e.g. data/config_mga_axes_capex_cum.json for the
+# axes file instead -- e.g. data/config_euler/config_mga_axes_capex_cum.json for the
 # node_capex_cumulative investigation.
-AXES_CONFIG_DEFAULT = DATA_DIR_CONFIG / "config_mga_axes_capex.json"
+AXES_CONFIG_DEFAULT = CONFIG_EULER_DIR / "config_mga_axes_capex.json"
 
 
 def apply_axes_override(config_json: dict, config_name: str, axes_config_path: Path = AXES_CONFIG_DEFAULT) -> None:
@@ -137,7 +138,7 @@ def apply_axes_override(config_json: dict, config_name: str, axes_config_path: P
 
     No-op if plugins.mga is absent (plain config.json runs). Otherwise
     overwrites plugins.mga.axes with the contents of axes_config_path
-    (defaults to data/config_mga_axes_capex.json), so the per-mode config
+    (defaults to data/config_euler/config_mga_axes_capex.json), so the per-mode config
     files don't each carry their own copy of the axes. "weights" mode also
     needs an axes block now (weight keys reference axis names), so it is no
     longer skipped here.
@@ -346,7 +347,7 @@ def main() -> None:
         config_name = str(row["config"]).strip()
     axes_config_path = AXES_CONFIG_DEFAULT
     if "axes_config" in table.columns and pd.notna(row["axes_config"]) and str(row["axes_config"]).strip():
-        axes_config_path = DATA_DIR_CONFIG / str(row["axes_config"]).strip()
+        axes_config_path = CONFIG_EULER_DIR / str(row["axes_config"]).strip()
     normalisation = None
     if "normalisation" in table.columns and pd.notna(row["normalisation"]) and str(row["normalisation"]).strip():
         normalisation = str(row["normalisation"]).strip()
@@ -387,7 +388,8 @@ def main() -> None:
           f"numeric_focus={numeric_focus}")
     print(f"[run_model] system_overrides={system_overrides}")
 
-    with open(DATA_DIR_CONFIG / config_name) as f:
+    config_dir = CONFIG_EULER_DIR if config_name.startswith("config_mga") else DATA_DIR_CONFIG
+    with open(config_dir / config_name) as f:
         config_json = json.load(f)
     apply_axes_override(config_json, config_name, axes_config_path)
     if normalisation is not None:

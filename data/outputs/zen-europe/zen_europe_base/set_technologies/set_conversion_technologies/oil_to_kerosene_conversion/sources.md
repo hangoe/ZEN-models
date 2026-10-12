@@ -1,0 +1,27 @@
+oil_to_kerosene_conversion
+==========================
+
+lifetime
+--------
+
+Step 1
+The lifetime of oil to kerosene conversion is manually set to 100 years, effectively representing an always-available refinery output-shifting pathway rather than a capital asset with a finite technical lifetime.
+
+capacity_existing
+-----------------
+
+Step 1
+The existing capacity of oil to kerosene conversion is calculated from the kerosene demand in the reference year.
+
+**Citations**
+
+- **eurostat**: Eurostat (2026). Eurostat energy balances. Eurostat. https://ec.europa.eu/eurostat/databrowser/view/nrg_bal_c/default/table?lang=en
+- **swiss_energy_balance**: Swiss Federal Statistical Office (2026). Swiss Energy Balance. Swiss Federal Statistical Office. https://opendata.swiss/en/dataset/energiebilanz-der-schweiz
+- **swiss_oil_balance**: Swiss Federal Statistical Office (2026). Swiss Crude Oil Balance. Swiss Federal Statistical Office. https://opendata.swiss/de/dataset/schweizerische-gesamtenergiestatistik-erdolbilanz-der-schweiz
+- **shipping_technologies_korberg**: A.D. Korberg, S. Brynolf, M. Grahn, I.R. Skov (2021). Techno-economic assessment of advanced fuels and propulsion systems in future fossil-free ships. Renewable and Sustainable Energy Reviews. https://doi.org/https://doi.org/10.1016/j.rser.2021.110861
+
+conversion_factor
+-----------------
+
+Step 1
+The conversion factor of oil to kerosene conversion is manually set to 1, assuming a lossless output shift within the refinery product slate.

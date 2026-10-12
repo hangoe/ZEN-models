@@ -68,7 +68,7 @@ module spider python   # available versions
 
 | File | Role |
 |---|---|
-| `run_model.py` | Runs **one row** of a sweep CSV (`--task_id`; CSV chosen by `--params`, default `parameters.csv`). Stages a private copy of the dataset, applies the row's `system` overrides to the copy, and runs ZEN-garden. Any override a row doesn't set falls back to `DEFAULT_SYSTEM_OVERRIDES`. For MGA configs it merges in the axes file (`data/config_mga_axes_capex.json`, or the row's `axes_config`). |
+| `run_model.py` | Runs **one row** of a sweep CSV (`--task_id`; CSV chosen by `--params`, default `parameters.csv`). Stages a private copy of the dataset, applies the row's `system` overrides to the copy, and runs ZEN-garden. Any override a row doesn't set falls back to `DEFAULT_SYSTEM_OVERRIDES`. For MGA configs it merges in the axes file (`data/config_euler/config_mga_axes_capex.json`, or the row's `axes_config`). |
 | `parameters.csv` | Normal sweep table, one row per run. Columns: `my_dataset`, `my_comment`, one column per `system` override, plus optional meta columns (e.g. `numeric_focus`). Runs `data/config.json`. |
 | `submit_euler.sh` | SLURM array job for `parameters.csv`. |
 | `parameters_mga.csv` | MGA sweep table. It adds the `config`, `normalisation`, `batch_size`, `n_workers`, `tolerance_explore` and `axes_config` columns. |

@@ -1,5 +1,14 @@
 """Generate print-ready figures for the MT_report SI Results section.
 
+As of 2026-10-12 the figures are generated from the zen-europe runs
+(zen_europe_ind_heat_v1_*, current ZEN-garden output format), not the
+Crystal Ball v9_0 runs the history below describes; the previous figures are
+in SI_results/archive/. zen-europe's per-sector industry techs/carriers are
+aggregated back to the Crystal Ball names at load time
+(figure_settings.SectorAggregatedResults), and the hardcoded snapshot years
+below are snapped to each run's modeled years in main() (_snap_years).
+Scenarios that haven't been run yet are skipped, as before.
+
 Covers the SI Results subsections in `MT_report_HG/Sections/03_SI.tex`
 (`\\label{sec:si-results}`), across the 7
 case-study scenarios in that section's Table~SIScenarios — 6
@@ -360,13 +369,16 @@ COMPARISON_YEARS = [2030, 2040, 2050]
 # scenario gets the same SCENARIO_PALETTE slot 0-5 everywhere; slot 6 (grey)
 # is reserved for "Crystal Ball (base)" — see the module docstring for why it
 # isn't a 7th entry here.
+# zen-europe: "No flexibility" is the full-horizon run (parameters.csv task 50,
+# 2022-2050, time steps per system.yaml). The other entries use the folder
+# names those scenarios are expected to get and self-skip until run.
 SCENARIOS = [
-    ("Crystal_Ball_ind_heat_v9_0_no_flexibility_2020_16a_2a_interval_10ts", "No flexibility"),
-    ("Crystal_Ball_ind_heat_v9_0_2020_16a_2a_interval_10ts", "Full flexibility"),
-    ("Crystal_Ball_ind_heat_v9_0_DSM_pessimistic_2020_16a_2a_interval_10ts", "DSM pessimistic"),
-    ("Crystal_Ball_ind_heat_v9_0_DSM_only_2020_16a_2a_interval_10ts", "DSM only"),
-    ("Crystal_Ball_ind_heat_v9_0_TES_only_2020_16a_2a_interval_10ts", "TES only"),
-    ("Crystal_Ball_ind_heat_v9_0_single_temp_2020_16a_2a_interval_10ts", "Single temperature level"),
+    ("zen_europe_ind_heat_v1_no_flexibility_2022_8a_4a_interval_10ts_systemyaml", "No flexibility"),
+    ("zen_europe_ind_heat_v1_2022_8a_4a_interval_7ts", "Full flexibility"),
+    ("zen_europe_ind_heat_v1_DSM_pessimistic_2022_8a_4a_interval_7ts", "DSM pessimistic"),
+    ("zen_europe_ind_heat_v1_DSM_only_2022_8a_4a_interval_7ts", "DSM only"),
+    ("zen_europe_ind_heat_v1_TES_only_2022_8a_4a_interval_7ts", "TES only"),
+    ("zen_europe_ind_heat_v1_single_temp_2022_8a_4a_interval_7ts", "Single temperature level"),
 ]
 
 # fig0a/fig0b only. Uses SCENARIO_PALETTE slot 6 (grey) — see the comment there.
@@ -391,7 +403,7 @@ SCENARIOS = [
 # 2026-09 "add 2050" re-sync: base case re-run with optimized_years=16
 # (2020-2050, matching the SCENARIOS list's new 16a runs) — see the
 # COMPARISON_YEARS comment above for the same re-sync.
-BASE_SCENARIO = ("Crystal_Ball_2020_16a_2a_interval_10ts", "Crystal Ball (base)")
+BASE_SCENARIO = ("zen_europe_2022_8a_4a_interval_7ts", "Crystal Ball (base)")
 
 # Single-temperature-band counterpart of "No flexibility", loaded separately
 # from SCENARIOS (like BASE_SCENARIO) since it isn't one of the 6 case-study
@@ -399,7 +411,7 @@ BASE_SCENARIO = ("Crystal_Ball_2020_16a_2a_interval_10ts", "Crystal Ball (base)"
 # compare singletemp vs. not for BOTH model options (No flexibility and
 # Full flexibility), not just Full flexibility as before, per user request.
 NO_FLEX_SINGLE_TEMP_SCENARIO = (
-    "Crystal_Ball_ind_heat_v9_0_no_flex_single_temp_2020_16a_2a_interval_10ts",
+    "zen_europe_ind_heat_v1_no_flex_single_temp_2022_8a_4a_interval_7ts",
     "No flexibility (single temp)")
 
 
@@ -444,6 +456,32 @@ def load_no_flex_single_temp_scenario() -> Run | None:
     # share vs. singletemp-or-not), never r.color.
     return Run(name=folder, label=label, mode="euler", results=results,
                color=SCENARIO_PALETTE[0])
+
+
+def _snap_years(wanted: list[int], available: list[int]) -> list[int]:
+    """Map hardcoded snapshot years onto the years a run actually models:
+    each to its nearest available year; if that collapses several onto the
+    same year (short test horizons), use the last len(wanted) available ones."""
+    snapped = list(dict.fromkeys(min(available, key=lambda a: abs(a - y)) for y in wanted))
+    if len(snapped) < len(wanted) and len(available) > len(snapped):
+        snapped = available[-len(wanted):]
+    return snapped
+
+
+def snap_snapshot_years(runs: list[Run]) -> None:
+    """Rebind the module-level snapshot-year constants to the loaded runs'
+    modeled years (common to all of them)."""
+    global YEAR, COMPARISON_YEARS, SNAPSHOT_YEARS_POWER, FIG30_YEAR, _REGIONAL_YEAR
+    if not runs:
+        return
+    available = sorted(set.intersection(*(set(get_available_years(r.results)) for r in runs)))
+    YEAR = _snap_years([YEAR], available)[0]
+    COMPARISON_YEARS = _snap_years(COMPARISON_YEARS, available)
+    SNAPSHOT_YEARS_POWER = _snap_years(SNAPSHOT_YEARS_POWER, available)
+    FIG30_YEAR = _snap_years([FIG30_YEAR], available)[0]
+    _REGIONAL_YEAR = _snap_years([_REGIONAL_YEAR], available)[0]
+    print(f"  snapshot years: YEAR={YEAR}, COMPARISON_YEARS={COMPARISON_YEARS}, "
+          f"SNAPSHOT_YEARS_POWER={SNAPSHOT_YEARS_POWER}")
 
 
 def by_label(runs: list[Run], label: str) -> Run:
@@ -2434,11 +2472,12 @@ def fig8a_diffusion_mechanisms_heat_pumps(runs: list[Run]) -> None:
         if clipped:
             ax2.set_ylim(0, ylim)
             off = stack_top[stack_top > ylim]
-            ax2.text(0.97, 0.97,
-                     f"bars off-scale from {off.index[0]}:\n{off.min():,.0f}-{off.max():,.0f} GW\n"
-                     f"({artifact[off.index].sum() / off.sum():.1%} from {', '.join(free_peers)})",
-                     transform=ax2.transAxes, ha="right", va="top", fontsize=7,
-                     bbox=dict(facecolor="white", edgecolor="none", alpha=0.85))
+            if not off.empty:
+                ax2.text(0.97, 0.97,
+                         f"bars off-scale from {off.index[0]}:\n{off.min():,.0f}-{off.max():,.0f} GW\n"
+                         f"({artifact[off.index].sum() / off.sum():.1%} from {', '.join(free_peers)})",
+                         transform=ax2.transAxes, ha="right", va="top", fontsize=7,
+                         bbox=dict(facecolor="white", edgecolor="none", alpha=0.85))
             for peer in free_peers:
                 peak = _peak_output_by_year(r, peer, years)
                 hp_prev = (real / msu)  # real peers' capacity_previous
@@ -5330,6 +5369,7 @@ def fig20_cost_breakdown_sector_industry_heating(base_run: Run, no_flex_run: Run
 def main() -> None:
     print(f"Loading {len(SCENARIOS)} euler scenarios...")
     runs = load_scenarios()
+    snap_snapshot_years(runs)
     print("Computing headline metrics (cost, emissions, capacity)...")
     metrics = compute_headline_metrics(runs)
     FIGURES_DIR.mkdir(parents=True, exist_ok=True)
@@ -5368,10 +5408,17 @@ def main() -> None:
     else:
         print(f"  skipping fig0a/fig0b/fig5/fig11/fig12/fig13: "
               f"{BASE_SCENARIO[0]} not yet under {EULER_ROOT}")
-    fig1a_cost_delta(metrics)
+    if any(r.label == "Full flexibility" for r in runs):
+        fig1a_cost_delta(metrics)
+    else:
+        print("  skipping fig3_cost_delta: 'Full flexibility' scenario (its baseline) not loaded")
     fig1b_industry_capacity(runs)
-    fig2_dsm_cycles_by_product(runs)
-    fig5b_dsm_discharge_by_product(runs)
+    if all(any(r.label == l for r in runs) for l in ("Full flexibility", "DSM pessimistic")):
+        fig2_dsm_cycles_by_product(runs)
+        fig5b_dsm_discharge_by_product(runs)
+    else:
+        print("  skipping fig5_dsm_cycles_by_product/fig5b_dsm_discharge_by_product: "
+              "requires 'Full flexibility' and 'DSM pessimistic' loaded")
     if any(r.label == "Single temperature level" for r in runs):
         fig3b_heat_pathway(runs)
         # fig14a/fig14b: No flexibility vs. its single-temp counterpart AND
@@ -5394,7 +5441,10 @@ def main() -> None:
         print("  skipping fig3b_heat_pathway/fig14a/fig14b: "
               "'Single temperature level' scenario not loaded")
     fig4a_heat_demand_by_sector()
-    fig4b_industry_fuel_demand_comparison(runs)
+    if any(r.label == "Full flexibility" for r in runs):
+        fig4b_industry_fuel_demand_comparison(runs)
+    else:
+        print("  skipping method/fig2_industry_fuel_demand_comparison: 'Full flexibility' scenario not loaded")
     if any(r.label == "No flexibility" for r in runs):
         fig6_diffusion_mechanisms(runs)
         fig8a_diffusion_mechanisms_heat_pumps(runs)

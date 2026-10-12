@@ -446,7 +446,8 @@ _NON_MODEL_DIRS = {"figures", "solver_files", "archive"}
 
 
 def _search_var_dict(path: Path, max_depth: int = 2) -> Path | None:
-    """BFS from `path` down to `max_depth` levels for a dir containing var_dict.h5.
+    """BFS from `path` down to `max_depth` levels for a dir containing var_dict.h5
+    (old ZEN-garden output format) or variables.nc (current format, zen-europe runs).
 
     Depth 0 = `path` itself. Returns the first match found (dirs visited in
     sorted order at each level), or None if nothing is found within depth.
@@ -456,7 +457,7 @@ def _search_var_dict(path: Path, max_depth: int = 2) -> Path | None:
     frontier = [path]
     for _ in range(max_depth + 1):
         for d in frontier:
-            if (d / "var_dict.h5").exists():
+            if (d / "var_dict.h5").exists() or (d / "variables.nc").exists():
                 return d
         next_frontier = []
         for d in frontier:
@@ -471,6 +472,81 @@ def _search_var_dict(path: Path, max_depth: int = 2) -> Path | None:
     return None
 
 
+# zen-europe splits every industry-heat technology/carrier per sector
+# (heat_pump_industry_0_100_water_ceramic, heat_industry_0_100_food,
+# fuel_to_kiln_glass, ...), while all plotting code uses the Crystal Ball
+# names without the sector suffix. SectorAggregatedResults strips the suffix
+# and sums, so the same tech lists/colors apply to both model generations.
+_SECTOR_SUFFIX_RE = re.compile(
+    r"^(.*(?:_industry|kilnfuel|fuel_to_kiln|heat_industry).*?)_(?:ceramic|food|glass|paper)$")
+_AGGREGATED_LEVELS = ("technology", "carrier")
+# Parameters that are per-unit (intensive) get averaged across sectors instead
+# of summed; everything else (variables, capacity_limit/_existing, demand, ...) is summed.
+_INTENSIVE_PARAMETER_RE = re.compile(
+    r"conversion_factor|efficiency|rate|lifetime|share|price|cost|load|factor|ratio|duration|coefficient")
+
+
+def strip_sector_suffix(name):
+    if not isinstance(name, str):
+        return name
+    m = _SECTOR_SUFFIX_RE.match(name)
+    return m.group(1) if m else name
+
+
+class SectorAggregatedResults:
+    """Thin wrapper around zen_garden.Results: get_total/get_full_ts frames get
+    their technology/carrier index levels sector-aggregated (see
+    strip_sector_suffix) — summed, except intensive parameters (conversion
+    factors, prices, rates, ...; _INTENSIVE_PARAMETER_RE) which are averaged. Set components (e.g.
+    set_reference_carriers) get suffixes stripped from index and values and
+    are de-duplicated. Everything else delegates to the wrapped Results."""
+
+    def __init__(self, results: Results):
+        self._results = results
+        self._parameters = set(results.get_component_names("parameter"))
+
+    def __getattr__(self, attr):
+        return getattr(self._results, attr)
+
+    def _aggregate(self, component: str, df):
+        if not isinstance(df, (pd.DataFrame, pd.Series)):
+            return df
+        names = list(df.index.names)
+        levels = [i for i, n in enumerate(names) if n in _AGGREGATED_LEVELS]
+        if component.startswith("set_"):
+            out = df.copy()
+            out.index = out.index.map(strip_sector_suffix)
+            if isinstance(out, pd.Series):
+                out = out.map(strip_sector_suffix)
+            return out[~out.index.duplicated()]
+        if not levels:
+            return df
+        if not any(strip_sector_suffix(v) != v
+                   for i in levels for v in df.index.get_level_values(i).unique()):
+            return df
+        out = df.copy()
+        if isinstance(out.index, pd.MultiIndex):
+            out.index = pd.MultiIndex.from_arrays(
+                [out.index.get_level_values(i).map(strip_sector_suffix) if i in levels
+                 else out.index.get_level_values(i) for i in range(len(names))], names=names)
+        else:
+            out.index = out.index.map(strip_sector_suffix)
+        grouped = out.groupby(level=list(range(len(names))), sort=False)
+        intensive = component in self._parameters and _INTENSIVE_PARAMETER_RE.search(component)
+        return grouped.mean() if intensive else grouped.sum()
+
+    def get_total(self, component, *args, **kwargs):
+        return self._aggregate(component, self._results.get_total(component, *args, **kwargs))
+
+    def get_full_ts(self, component, *args, **kwargs):
+        return self._aggregate(component, self._results.get_full_ts(component, *args, **kwargs))
+
+    def get_df(self, component, *args, **kwargs):
+        """Old-API shim (removed in the current ZEN-garden Results); only used
+        for set components such as set_reference_carriers."""
+        return self.get_total(component, *args, **kwargs)
+
+
 def load_results(root: Path, model_name: str) -> Results:
     """Load a Results object for `model_name` under `root` (LOCAL_ROOT or EULER_ROOT)."""
     path = root / model_name
@@ -478,13 +554,15 @@ def load_results(root: Path, model_name: str) -> Results:
         raise FileNotFoundError(f"Model output not found: {path}")
     match = _search_var_dict(path, max_depth=3)
     if match is None:
-        raise FileNotFoundError(f"No var_dict.h5 found under {path}")
+        raise FileNotFoundError(f"No var_dict.h5/variables.nc found under {path}")
+    if (match / "variables.nc").exists():
+        return SectorAggregatedResults(Results(path=str(match)))
     return Results(path=str(match))
 
 
 def get_available_models(root: Path, max_depth: int = 3) -> list[str]:
     """Names of `root`'s immediate subdirectories that resolve to a var_dict.h5
-    within `max_depth` levels. `root` is LOCAL_ROOT or EULER_ROOT."""
+    (or variables.nc) within `max_depth` levels. `root` is LOCAL_ROOT or EULER_ROOT."""
     if not root.exists():
         return []
     models = []

@@ -6,8 +6,7 @@
 # This is your own file — it does not depend on Jan's setup.
 #
 # Submit from the ZEN-models directory (where run_model.py + parameters.csv are):
-#   sbatch --array=49       submit_euler.sh     # zen_europe v1 mid-size test (ref 2022, 3 yrs, 7 ts, NumericFocus 2) -- run first
-#   sbatch --array=47,48    submit_euler.sh     # zen_europe v1 full horizon 2022-2050 (diffusion / nodiffusion)
+#   sbatch --array=0-4      submit_euler.sh     # zen_europe scenarios: base, no flex, full flex, single-temp no flex, single-temp full flex
 #
 # The --array range must match the task_id values in parameters.csv.
 ###############################################################################

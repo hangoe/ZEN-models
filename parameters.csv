@@ -1,6 +1,6 @@
 task_id,my_dataset,my_comment,conduct_time_series_aggregation,aggregated_time_steps_per_year,reference_year,optimized_years,interval_between_years,use_rolling_horizon,numeric_focus
-47,zen_europe_ind_heat_v1_no_flexibility,2022_8a_4a_interval_7ts,True,7,2022,8,4,False,2
-48,zen_europe_ind_heat_v1_no_flexibility_nodiffusion,2022_8a_4a_interval_7ts,True,7,2022,8,4,False,2
-49,zen_europe_ind_heat_v1_no_flexibility,2022_3a_4a_interval_7ts_to2030,True,7,2022,3,4,False,2
-50,zen_europe_ind_heat_v1_no_flexibility,2022_8a_4a_interval_10ts_systemyaml,,,,,,,2
-51,zen_europe_ind_heat_v1_no_flexibility_nodiffusion,2022_8a_4a_interval_10ts_systemyaml,,,,,,,2
+0,zen_europe_base,2022_8a_4a_interval_10ts,,,,,,,2
+1,zen_europe_ind_heat_v1_no_flexibility,2022_8a_4a_interval_10ts,,,,,,,2
+2,zen_europe_ind_heat_v1_full_flexibility,2022_8a_4a_interval_10ts,,,,,,,2
+3,zen_europe_ind_heat_v1_no_flexibility_single_temp,2022_8a_4a_interval_10ts,,,,,,,2
+4,zen_europe_ind_heat_v1_full_flexibility_single_temp,2022_8a_4a_interval_10ts,,,,,,,2
