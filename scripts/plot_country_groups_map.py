@@ -1,7 +1,8 @@
-"""Europe map of the countries/nodes implemented in the Crystal Ball model,
+"""Europe map of the countries/nodes implemented in the zen-europe model,
 colored by placeholder region group (north/west/south/east).
 
-Node codes come straight from data/Crystal_Ball/energy_system/set_nodes.csv
+Node codes come straight from the zen_europe dataset's energy_system/set_nodes.csv
+(in ../ZEN-creator/outputs)
 (EU statistical convention: EL = Greece, UK = United Kingdom -- not strict
 ISO 3166-1). Country borders come from Natural Earth's 50m admin-0-countries
 dataset, downloaded once and cached under data/naturalearth/ (gitignored).
@@ -29,7 +30,8 @@ from plots.natural_earth import EUROPE_EXTENT, ISO_A2_EH_OVERRIDES, ensure_natur
 # toggle that switches every figure script in this repo at once.
 apply_font_mode()
 
-NODES_CSV = REPO_ROOT / "data" / "Crystal_Ball" / "energy_system" / "set_nodes.csv"
+NODES_CSV = (REPO_ROOT.parent / "ZEN-creator" / "outputs" / "zen_europe_ind_heat_v1_no_flexibility"
+             / "energy_system" / "set_nodes.csv")
 FIGURES_DIR = REPO_ROOT / "data" / "outputs" / "figures" / "mga"
 
 # Placeholder region groups -- sorted by rough geography, to be replaced once

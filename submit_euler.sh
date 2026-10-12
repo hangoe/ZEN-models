@@ -6,12 +6,6 @@
 # This is your own file — it does not depend on Jan's setup.
 #
 # Submit from the ZEN-models directory (where run_model.py + parameters.csv are):
-#   sbatch --array=0        submit_euler.sh     # calibrate: run ONE row first
-#   sbatch --array=1-7      submit_euler.sh     # then the rest
-#   sbatch --array=0-7      submit_euler.sh     # or all rows at once
-#   sbatch --array=10-13    submit_euler.sh     # no_flexibility_nodiffusion ts sweep (1/3/10/20 ts)
-#   sbatch --array=20,21,27 submit_euler.sh     # v10_0 (annual, 2020-2050): full flex, no flex, Crystal_Ball base
-#   sbatch --array=20-29    submit_euler.sh     # all v10_0 rows (31 annual periods: may need more --time/--mem than below)
 #   sbatch --array=49       submit_euler.sh     # zen_europe v1 mid-size test (ref 2022, 3 yrs, 7 ts, NumericFocus 2) -- run first
 #   sbatch --array=47,48    submit_euler.sh     # zen_europe v1 full horizon 2022-2050 (diffusion / nodiffusion)
 #

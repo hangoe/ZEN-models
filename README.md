@@ -1,40 +1,33 @@
-# Crystal Ball 
+# ZEN-models — industrial heat flexibility runs
 
-[![Static Badge](https://img.shields.io/badge/ZEN--garden_version-v2.2.20-%23627313?labelColor=%23215CAF)](https://github.com/ZEN-universe/ZEN-garden) 
+[![Static Badge](https://img.shields.io/badge/ZEN--garden_version-v2.2.20-%23627313?labelColor=%23215CAF)](https://github.com/ZEN-universe/ZEN-garden)
 
-[![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/ZEN-universe/ZEN-models/data_structure_check.yml?branch=Crystal_Ball)](https://github.com/ZEN-universe/ZEN-models/actions)
+ZEN-garden runs of the sector-coupled European energy system with a detailed
+industrial heat sector (temperature levels, DSM, thermal storage, technology
+diffusion). Current runs use the **zen-europe** datasets.
 
-## 1. Description
+## Layout
 
-### Purpose
-This dataset models the transition of the sector-coupled European energy system from 2022 to 2050.
-It included 12 final energy demands: electricity, heat, passenger and truck transport, shipping, aviation, primary and secondary steel, ammonia, methanol, olefins, and cement.
+| Path | Content |
+|------|---------|
+| `run_model.py` | Runs one row of a parameters CSV (`--task_id N`, `--run_on euler\|local`, `--params parameters.csv`). Stages a private copy of the dataset and applies the row's `system` overrides. |
+| `parameters.csv` | One row per run (dataset, comment, time-series aggregation, years, ...). |
+| `parameters_mga.csv` | MGA run rows (`--params parameters_mga.csv`). |
+| `submit_euler.sh`, `submit_euler_mga.sh` | SLURM array scripts for Euler; `setup_euler_env.sh` builds the venv once. |
+| `data/config*.json` | ZEN-garden configs (plain and MGA modes / axes). |
+| `data/outputs/` | Downloaded run results and figures. |
+| `scripts/` | Analysis and figure scripts (`generate_all_figures.py` regenerates everything). |
+| `streamlit/` | Interactive dashboard: `streamlit run streamlit/app.py`. |
+| `euler/` | Euler setup and run guides. |
 
-The dataset contains capacity expansion constraints.
+## Datasets
 
-### Date
-Creation date: 26-03-2025
+Datasets are not stored here. `run_model.py` looks up `my_dataset` in
+`../ZEN-creator/outputs` first, then in `data/`.
 
-## 2. Dataset Summary
-A structured summary of key dataset attributes.
+## Running
 
-| Attribute                      | Description                |
-|--------------------------------|----------------------------|
-| **Spatial Scope**              | EU27 + NO, CH, UK - MT, CY |
-| **Number of Nodes**            | 28                         |
-| **Temporal Scope**             | 2022-2050                  |
-| **Number of Investment Years** | 15 (every 2 years)         |
-| **Number of Time Steps**       | 8760 (aggregated to 10)    |
-| **Number of Technologies**     | 82                         |
-| **Number of Energy Carriers**  | 30                         |
-
-## 3. Framework Compatibility
-
-- [x] This model runs with the main branch of ZEN-garden for the specified version.
-
-## 4. Comments
-It is the same dataset as the Optimism/Pessimism dataset, except for the treatment of carbon management technologies, as described in the paper
-
-## 5. Contributors
-
-- Jacob Mannhardt, jmannhardt@ethz.ch
+```bash
+python run_model.py --task_id 49 --run_on local   # one row locally
+sbatch --array=47,48 submit_euler.sh              # rows on Euler
+```

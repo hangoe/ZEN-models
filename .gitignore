@@ -3,4 +3,6 @@
 *.lp
 data/outputs/**/*.h5
 /data/naturalearth/
-/.venv/
+/.venv/__pycache__/
+*.pyc
+.DS_Store

@@ -84,8 +84,8 @@ REPO_DIR = Path(__file__).parent                                  # .../ZEN-mode
 DATA_DIR_CONFIG = REPO_DIR / "data"                               # config.json + local outputs
 
 # Places `my_dataset` is looked up, in order. Most datasets are pristine,
-# version-numbered copies living in ZEN-creator/outputs; a few one-off/local
-# datasets (e.g. data/Crystal_Ball) live directly in this repo instead.
+# version-numbered copies living in ZEN-creator/outputs; data/ is kept as a
+# fallback for one-off/local datasets placed directly in this repo.
 DATASET_SEARCH_DIRS = [
     REPO_DIR.parent / "ZEN-creator" / "outputs",
     REPO_DIR / "data",
@@ -122,9 +122,7 @@ DEFAULT_CONFIG = "config.json"
 # apply_axes_override) so the axes block isn't duplicated per config file.
 # A row's own "axes_config" column (see main()) can point at a different
 # axes file instead -- e.g. data/config_mga_axes_capex_cum.json for the
-# node_capex_cumulative investigation. data/config_mga_axes_capacity.json
-# holds the old technology-capacity axes (kept for reference/rollback -- not
-# currently wired in here).
+# node_capex_cumulative investigation.
 AXES_CONFIG_DEFAULT = DATA_DIR_CONFIG / "config_mga_axes_capex.json"
 
 
