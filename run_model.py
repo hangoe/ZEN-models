@@ -52,6 +52,11 @@ CHANGES:
     dataset-processing setup (e.g. parameters_mga.csv) doesn't need to repeat
     those columns in every row -- a row can still override any of them by
     adding that column, the way parameters.csv already does explicitly.
+    A BLANK cell in an existing system column means "keep the dataset's own
+    system.yaml value" (no override, no default) -- e.g. rows 50/51 run the
+    zen-europe datasets exactly as generated.
+  * Datasets are looked up first in data/outputs/zen-europe (ZEN-europe
+    output), then ZEN-creator/outputs, then data/ (see DATASET_SEARCH_DIRS).
 
 Run one row by hand (local test):   python run_model.py --task_id 0 --run_on local
 On Euler it is launched by submit_euler.sh (or submit_euler_mga.sh) via the
@@ -83,10 +88,11 @@ from zen_garden import run, Results  # noqa: F401  (Results kept for post-proces
 REPO_DIR = Path(__file__).parent                                  # .../ZEN-models
 DATA_DIR_CONFIG = REPO_DIR / "data"                               # config.json + local outputs
 
-# Places `my_dataset` is looked up, in order. Most datasets are pristine,
-# version-numbered copies living in ZEN-creator/outputs; data/ is kept as a
-# fallback for one-off/local datasets placed directly in this repo.
+# Places `my_dataset` is looked up, in order. ZEN-europe's generated datasets
+# (data/outputs/zen-europe) are the primary source; older pristine copies live
+# in ZEN-creator/outputs; data/ is kept as a fallback for one-off/local datasets.
 DATASET_SEARCH_DIRS = [
+    REPO_DIR / "data" / "outputs" / "zen-europe",
     REPO_DIR.parent / "ZEN-creator" / "outputs",
     REPO_DIR / "data",
 ]
@@ -365,9 +371,13 @@ def main() -> None:
     epsilon = None
     if "epsilon" in table.columns and pd.notna(row["epsilon"]) and str(row["epsilon"]).strip():
         epsilon = to_native(row["epsilon"])
+    # Defaults only fill keys the CSV has no column for; a blank cell in an
+    # existing column keeps the dataset's own system.yaml value.
+    system_cols = [col for col in table.columns if col not in META_COLUMNS]
     system_overrides = {
-        **DEFAULT_SYSTEM_OVERRIDES,
-        **{col: to_native(row[col]) for col in table.columns if col not in META_COLUMNS},
+        **{k: v for k, v in DEFAULT_SYSTEM_OVERRIDES.items() if k not in system_cols},
+        **{col: to_native(row[col]) for col in system_cols
+           if pd.notna(row[col]) and str(row[col]).strip()},
     }
 
     print(f"[run_model] task_id={args.task_id}  dataset={my_dataset}  comment={my_comment}")

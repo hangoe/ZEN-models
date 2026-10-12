@@ -2,3 +2,5 @@ task_id,my_dataset,my_comment,conduct_time_series_aggregation,aggregated_time_st
 47,zen_europe_ind_heat_v1_no_flexibility,2022_8a_4a_interval_7ts,True,7,2022,8,4,False,2
 48,zen_europe_ind_heat_v1_no_flexibility_nodiffusion,2022_8a_4a_interval_7ts,True,7,2022,8,4,False,2
 49,zen_europe_ind_heat_v1_no_flexibility,2022_3a_4a_interval_7ts_to2030,True,7,2022,3,4,False,2
+50,zen_europe_ind_heat_v1_no_flexibility,2022_8a_4a_interval_10ts_systemyaml,,,,,,,2
+51,zen_europe_ind_heat_v1_no_flexibility_nodiffusion,2022_8a_4a_interval_10ts_systemyaml,,,,,,,2
