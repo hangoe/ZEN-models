@@ -2509,7 +2509,7 @@ def _fig30_matrix_panel(fig: plt.Figure, ax: plt.Axes, values: dict[tuple[int, i
         ty = y0 + (0.82 if rc[0] == 0 else 0.3) * size
         text_color = "white" if t > 0.6 else "black"
         ax.text(cx, ty, f"{value_fmt.format(c)} {unit}", ha="center", va="center", fontsize=12.5,
-                fontweight="bold", color=text_color, zorder=4)
+                color=text_color, zorder=4)
         if rc == base_rc:
             sub = "baseline"
         else:
@@ -2518,7 +2518,8 @@ def _fig30_matrix_panel(fig: plt.Figure, ax: plt.Axes, values: dict[tuple[int, i
             sub = (f"{sign}{delta_fmt.format(abs(delta))} {delta_unit or unit}  "
                    f"({sign}{abs(delta) / base * 100:.2f} %)")
         ax.text(cx, ty - 0.12, sub, ha="center", va="center", fontsize=9.5,
-                style="italic" if rc == base_rc else "normal", color=text_color, zorder=4)
+                style="italic" if rc == base_rc else "normal",
+                fontweight="normal" if rc == base_rc else "bold", color=text_color, zorder=4)
 
     # ETH bronze: warm complement to the blue cell ramp, so the arrows stand
     # out equally on the lightest and darkest cells.
