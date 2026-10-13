@@ -1345,49 +1345,26 @@ def fig3b_heat_pathway(runs: list[Run]) -> None:
     savefig(fig, "fig6_heat_pathway")
 
 
-# ── 4: Low-temperature input heat demand by sector and temperature band ────
+# ── fig2 (method): industry energy input by carrier, all sectors ──────────
 
-HEAT_DEMAND_INPUT_JSON = FIGURES_DIR / "heat_demand_by_sector_input.json"
-
-# Same 4 sectors/hues as PRODUCTION_COLOR_MAP above, reused here so a sector
-# reads as the same color across every SI figure it appears in. Within each
-# sector's bar, temperature band sets the tint (darker = higher band), the
-# same hue-for-identity / tint-for-temperature convention HEAT_SUPPLY_COLOR_
-# MAP uses (source sets hue, band sets tint) — 0.55/0.3/0 tints mirror that
-# map's own 0_100/100_150/150_200 tint values exactly.
+# The four industry-heat sectors, in bar order (top to bottom).
 HEAT_DEMAND_SECTOR_LABELS = {"glass": "Glass", "ceramic": "Ceramic", "paper": "Paper", "food": "Food"}
-HEAT_DEMAND_BAND_TINTS = {"0_100": 0.55, "100_150": 0.3, "150_200": 0.0}
-HEAT_DEMAND_BAND_LABELS = {"0_100": r"0-100$^\circ$C", "100_150": r"100-150$^\circ$C", "150_200": r"150-200$^\circ$C"}
 
-# High-temperature fuel demand, stacked on top — a DIFFERENT supply pathway
-# (direct combustion, no heat_industry_* carrier involved), not a 4th heat-
-# demand band, hence one flat grey (not a sector/band hue) rather than a tint
-# scale. Carrier sets the HATCH pattern instead (fixed per carrier, so e.g.
-# natural_gas has the same pattern in every sector's bar) — hue/tint is
-# reserved for "which sector, which temperature band" (the actual question
-# this figure answers); hatch alone is enough to tell carriers apart within
-# the single "how much fuel, for scale" grey.
-_ETH_GREY = "#6F6F6F"
-FUEL_CARRIER_HATCHES = {"natural_gas": ".", "hard_coal": "x", "oil": "+", "biomass": "/",
-                        "waste": "\\", "hydrogen": "o", "fuel_to_process": ""}
-# Denser than FUEL_CARRIER_HATCHES: a legend swatch is a small fraction of a
-# bar segment's area, so the same single-character hatch that reads fine on a
-# bar all but disappears at swatch size — legend patches get their own,
-# denser pattern (plus a thicker hatch linewidth, applied via rc_context
-# where the legend is built) purely so the pattern itself stays visible;
-# bars keep the lighter version so labels drawn on top stay readable.
-FUEL_CARRIER_LEGEND_HATCHES = {"natural_gas": "...", "hard_coal": "xxx", "oil": "+++", "biomass": "///",
-                               "waste": "\\\\\\", "hydrogen": "ooo", "fuel_to_process": ""}
+# Carrier encoding (ETH palette only): one hue per carrier FAMILY, so the
+# eye reads "heat / fuel / electricity" first and the individual carrier
+# second. Heat bands (<200°C, supplied via heat_industry_* carriers) are
+# tints of ETH red, darker = hotter; >200°C fuels (direct combustion, a
+# different supply pathway) each get their own solid ETH color, with the
+# consolidated blended "fuel to process" as a neutral light grey;
+# electricity is ETH blue (drawio system-overview convention).
+HEAT_DEMAND_BAND_LABELS = {"0_100": "0-100 °C", "100_150": "100-150 °C", "150_200": "150-200 °C"}
+HEAT_BAND_COLORS = {"0_100": _eth_tint(_ETH_RED, 0.6), "100_150": _eth_tint(_ETH_RED, 0.3), "150_200": _ETH_RED}
+FUEL_CARRIER_COLORS = {"natural_gas": _ETH_TURQUOISE, "hard_coal": _ETH_GREY, "oil": _ETH_BRONZE,
+                       "biomass": _ETH_GREEN, "waste": _eth_tint(_ETH_GREEN, 0.5), "hydrogen": _ETH_PURPLE,
+                       "fuel_to_process": _eth_tint(_ETH_GREY, 0.6)}
 FUEL_CARRIER_LABELS = {"natural_gas": "Natural gas", "hard_coal": "Hard coal", "oil": "Oil", "biomass": "Biomass",
-                       "waste": "Waste", "hydrogen": "Hydrogen", "fuel_to_process": "Fuel to process"}
+                       "waste": "Waste", "hydrogen": "Hydrogen", "fuel_to_process": "Natural gas\n(fuel shift possible)"}
 
-
-def _fuel_legend_label(carrier: str) -> str:
-    """"Fuel: {label}" for every real carrier, but "fuel_to_process" already
-    reads as a complete legend entry on its own -- prefixing it too would
-    read as "Fuel: Fuel to process"."""
-    label = FUEL_CARRIER_LABELS[carrier]
-    return label if carrier == "fuel_to_process" else f"Fuel: {label}"
 # fuel_to_kiln (glass/ceramic, ZEN-creator commit 1687533) and fuel_for_cement
 # (cement_kiln's own input_carrier) are both intermediate, blended-fuel hub
 # carriers with no real-world identity of their own -- produced from actual
@@ -1430,24 +1407,12 @@ def _merge_dri_fuel(fuel_by_carrier: pd.Series) -> pd.Series:
     out = fuel_by_carrier.drop(index=dri_carriers)
     out["fuel_to_process"] = fuel_by_carrier[dri_carriers].sum()
     return out
-# Single-character hatches (sparser than the "xx"/".." used elsewhere in this
-# module) plus a white label backing (below) — a dense hatch under white text
-# was illegible; a light hatch + opaque label background reads cleanly at both
-# small and large segment sizes.
-_FUEL_LABEL_BBOX = dict(facecolor="white", edgecolor="none", alpha=0.75, pad=1.5)
 
 # Electricity: not temperature-banded and not part of the >200°C fuel mix —
-# every X_production tech has a fixed electricity input alongside both (SectorParams.
-# cf_elec). ETH blue, matching drawio's system-overview diagrams (user
-# request) — this is the CARRIER's color, deliberately independent of
-# electrode_boiler_industry's own green in HEAT_SUPPLY_COLOR_MAP (that map
-# colors boiler/heat-pump IDENTITY, not the carrier they consume; see that
-# section's own header comment).
+# every X_production tech has a fixed electricity input alongside both.
 _ELECTRICITY_COLOR = _ETH_BLUE
 _ELECTRICITY_LABEL = "Electricity"
 
-
-# ── 4b: New-sector heat demand vs. pre-existing cement/steel fuel mix ──────
 
 # Reconstruction: this figure (and fig6, originally numbered "fig99") originally existed only as a
 # raw SVG under data/outputs/euler_outputs/ and data/outputs/figures/SI_
@@ -1497,9 +1462,9 @@ def _consolidate_series(s: pd.Series) -> pd.Series:
 
 
 FIG4B_SECTOR_GROUPS = [
-    ("Cement\n(clinker)", ["cement_kiln"], _consolidate_series),
-    ("Primary steel\n(BF-BOF/DRI)", ["BF_BOF", "NG_DRI", "H2_DRI"], _merge_dri_fuel),
-    ("Secondary steel\n(EAF)", ["EAF"], None),
+    ("Cement (clinker)", ["cement_kiln"], _consolidate_series),
+    ("Primary steel (BF-BOF/DRI)", ["BF_BOF", "NG_DRI", "H2_DRI"], _merge_dri_fuel),
+    ("Secondary steel (EAF)", ["EAF"], None),
 ]
 
 
@@ -1526,136 +1491,90 @@ def _tech_fuel_by_carrier(r, techs: list[str], year: int) -> pd.Series:
 
 
 def fig4b_industry_fuel_demand_comparison(runs: list[Run]) -> None:
-    """Puts the new sectors' low-temperature heat-demand assumption (fig4a,
-    left of the divider — same JSON, same bars) next to the pre-existing
-    cement/steel sectors' actual SOLVED fuel/electricity input (right of the
-    divider), so the new sectors' scale can be read against sectors already
-    in the model before the industry-heat extension.
+    """Solved energy input by carrier for the four industry-heat sectors
+    (glass/ceramic/paper/food) next to the pre-existing cement/steel sectors,
+    so the new sectors' scale can be read against sectors already in the
+    model. Every bar is the SAME source: the "No flexibility" ZEN-europe run's
+    flow_conversion_input in its first modeled year (2022), as average GW.
 
-    Cement/steel bars are pulled from a single representative run ("Full
-    flexibility") — per project memory, cement_kiln/BF_BOF/EAF/NG_DRI/H2_DRI's
-    flows are scenario-invariant (unaffected by the industry-heat flexibility
-    scenarios), so the choice of run doesn't materially matter here, only
-    which techs/carriers do. Primary steel groups BF_BOF (blast-furnace
-    route, hard_coal only) with NG_DRI/H2_DRI (direct-reduction routes) into
-    one bar, matching how the original figure grouped "BF-BOF/DRI" — all
-    three are alternative primary-steel production pathways, not separate
-    demand sectors.
-
-    Cement/steel are each shown as ONE bar, at the LATEST year COMPARISON_YEARS
-    (2030/2040/2050, see that constant's own comment) has solved results for —
-    not one bar per year: cement_kiln/BF_BOF/EAF/NG_DRI/H2_DRI's flows do
-    change somewhat year to year, but showing all three years turned this
-    into 9 densely-hatched, per-carrier-split mini-bars — user feedback: too
-    much visual complexity for what these bars are here to do (show
-    new-sector scale against existing-sector scale), not to trace cement/
-    steel's own trajectory (fig1b/fig6 already do that). One representative
-    snapshot, fuel simplified to a single flat segment (see
-    FIG4B_SECTOR_GROUPS' own comment on _consolidate_series/_merge_dri_fuel),
-    keeps the comparison legible.
+    Horizontal stacked bars, one per sector: heat bands (red tints), then
+    >200°C fuels (one solid color each), then electricity. Blended hub fuels
+    (fuel_to_kiln/fuel_for_cement) and NG_DRI/H2_DRI's fuels are merged into
+    one "Natural gas (fuel shift possible)" segment — see _consolidate_blended_fuel/
+    _merge_dri_fuel and FIG4B_SECTOR_GROUPS' comment.
     """
-    run = by_label(runs, "Full flexibility")
-    r = run.results
-    years_available = get_available_years(r)
-    solved_years = [y for y in COMPARISON_YEARS if y in years_available]
-    solved_year = solved_years[-1]
+    r = by_label(runs, "No flexibility").results
+    year = get_available_years(r)[0]
 
-    if not HEAT_DEMAND_INPUT_JSON.exists():
-        print(f"  skipping fig4b_industry_fuel_demand_comparison: {HEAT_DEMAND_INPUT_JSON.relative_to(REPO_ROOT)} "
-              "not found — run scripts/extract_heat_demand_by_sector.py under zen-creator-env first")
-        return
-    data = json.loads(HEAT_DEMAND_INPUT_JSON.read_text())
-    new_sectors = list(HEAT_DEMAND_SECTOR_LABELS)
-    for s in new_sectors:
-        data[s]["fuel_by_carrier"] = _consolidate_blended_fuel(data[s]["fuel_by_carrier"])
-    bands = list(HEAT_DEMAND_BAND_TINTS)
-
-    solved = {}
+    rows: list[tuple[str, pd.Series]] = []
+    for s, label in HEAT_DEMAND_SECTOR_LABELS.items():
+        rows.append((label, _consolidate_series(_tech_fuel_by_carrier(r, [f"{s}_production"], year))))
+    n_new = len(rows)
     for label, techs, post in FIG4B_SECTOR_GROUPS:
-        s = _tech_fuel_by_carrier(r, techs, solved_year)
-        solved[label] = post(s) if post is not None else s
-    solved_fuel_carriers = [c for c in FUEL_CARRIER_HATCHES
-                             if any(c in s.index for s in solved.values()) and c != "electricity"]
+        s = _tech_fuel_by_carrier(r, techs, year)
+        rows.append((label, post(s) if post is not None else s))
 
-    new_x = np.arange(len(new_sectors))
-    # One bar per sector group now (not one per COMPARISON_YEARS year — see
-    # docstring), so group centers are just evenly spaced same as new_x;
-    # +1 after new_x still leaves the divider gap.
-    solved_x = np.arange(len(FIG4B_SECTOR_GROUPS)) + len(new_sectors) + 1
-    fig, ax = plt.subplots(figsize=(14, 7))
+    segments = ([(f"heat_industry_{b}", HEAT_BAND_COLORS[b]) for b in HEAT_BAND_COLORS]
+                + [(c, FUEL_CARRIER_COLORS[c]) for c in FUEL_CARRIER_COLORS]
+                + [("electricity", _ELECTRICITY_COLOR)])
+    present = [(c, col) for c, col in segments if any(v.get(c, 0.0) > 0 for _, v in rows)]
 
-    # Left group: identical to fig4a's stacking (heat bands, then fuel-by-
-    # carrier, then electricity) — see fig4a_heat_demand_by_sector's docstring.
-    heat_vals = {band: np.array([data[s]["heat"][band] for s in new_sectors]) for band in bands}
-    fuel_vals = {c: np.array([data[s]["fuel_by_carrier"].get(c, 0.0) for s in new_sectors])
-                 for c in FUEL_CARRIER_HATCHES if any(c in data[s]["fuel_by_carrier"] for s in new_sectors)}
-    electricity_vals = np.array([data[s]["electricity"] for s in new_sectors])
-    bottom = np.zeros(len(new_sectors))
-    for band in bands:
-        vals = heat_vals[band]
-        colors = [_eth_tint(PRODUCTION_COLOR_MAP[f"{s}_production"], HEAT_DEMAND_BAND_TINTS[band]) for s in new_sectors]
-        ax.bar(new_x, vals, 0.6, bottom=bottom, color=colors, edgecolor="white", linewidth=0.5)
-        bottom += vals
-    with plt.rc_context({"hatch.linewidth": 0.5}):
-        for carrier, vals in fuel_vals.items():
-            ax.bar(new_x, vals, 0.6, bottom=bottom, color=_ETH_GREY, edgecolor="white",
-                   linewidth=0.5, hatch=FUEL_CARRIER_HATCHES[carrier])
-            bottom += vals
-    ax.bar(new_x, electricity_vals, 0.6, bottom=bottom, color=_ELECTRICITY_COLOR, edgecolor="white", linewidth=0.5)
-    bottom += electricity_vals
-    for xi, total in zip(new_x, bottom):
-        ax.text(xi, total, f"{total:.2f}", ha="center", va="bottom", fontsize=9, fontweight="bold")
+    # One-row gap between the two groups, top to bottom.
+    y = np.array([i if i < n_new else i + 1 for i in range(len(rows))], dtype=float)
+    totals = np.array([sum(v.get(c, 0.0) for c, _ in present) for _, v in rows])
+    min_label = 0.035 * totals.max()
 
-    # Right group: solved-model fuel/electricity input, ONE bar per sector
-    # group (see docstring) at solved_year, same grey-hatched-by-carrier +
-    # green-electricity convention as the left group and as fig4a — except
-    # the fuel_to_process carrier (cement/steel's consolidated blended fuel,
-    # see FIG4B_SECTOR_GROUPS' comment), which stays a flat, unhatched grey.
-    bottom = np.zeros(len(solved_x))
-    with plt.rc_context({"hatch.linewidth": 0.5}):
-        for carrier in solved_fuel_carriers:
-            vals = np.array([solved[label].get(carrier, 0.0) for label, _, _ in FIG4B_SECTOR_GROUPS])
-            ax.bar(solved_x, vals, 0.6, bottom=bottom, color=_ETH_GREY, edgecolor="white",
-                   linewidth=0.5, hatch=FUEL_CARRIER_HATCHES[carrier])
-            for xi, bi, vi in zip(solved_x, bottom, vals):
-                if vi > 0.5:
-                    ax.text(xi, bi + vi / 2, f"{vi:.2f}", ha="center", va="center", fontsize=8,
-                            color="black", bbox=_FUEL_LABEL_BBOX)
-            bottom += vals
-    elec_vals = np.array([solved[label].get("electricity", 0.0) for label, _, _ in FIG4B_SECTOR_GROUPS])
-    ax.bar(solved_x, elec_vals, 0.6, bottom=bottom, color=_ELECTRICITY_COLOR, edgecolor="white", linewidth=0.5)
-    for xi, bi, vi in zip(solved_x, bottom, elec_vals):
-        if vi > 0.5:
-            ax.text(xi, bi + vi / 2, f"{vi:.2f}", ha="center", va="center", fontsize=8,
-                    color=_text_color_for_bg(_ELECTRICITY_COLOR))
-    bottom += elec_vals
-    for xi, total in zip(solved_x, bottom):
-        ax.text(xi, total, f"{total:.2f}", ha="center", va="bottom", fontsize=9, fontweight="bold")
+    fig, ax = plt.subplots(figsize=(11, 5.6))
+    left = np.zeros(len(rows))
+    for carrier, color in present:
+        vals = np.array([v.get(carrier, 0.0) for _, v in rows])
+        ax.barh(y, vals, 0.62, left=left, color=color, edgecolor="white", linewidth=0.8)
+        for yi, li, vi in zip(y, left, vals):
+            if vi >= min_label:
+                ax.text(li + vi / 2, yi, f"{vi:.1f}", ha="center", va="center", fontsize=7.5,
+                        color=_text_color_for_bg(color))
+        left += vals
+    for yi, total in zip(y, totals):
+        ax.text(total + 0.006 * totals.max(), yi, f"{total:.1f}", ha="left", va="center",
+                fontsize=9, fontweight="bold")
 
-    divider_x = (new_x[-1] + solved_x.min()) / 2
-    ax.axvline(divider_x, color="black", linewidth=0.8)
+    ax.set_yticks(y)
+    ax.set_yticklabels([label for label, _ in rows], fontsize=9.5)
+    ax.invert_yaxis()
+    ax.set_xlim(0, totals.max() * 1.08)
+    ax.axhline(n_new, color="black", linewidth=0.6, alpha=0.6)
+    for y_text, text in ((-0.6, "Additional in extended model"), (n_new + 0.4, "Base model sectors")):
+        ax.text(-0.01, y_text, text, transform=ax.get_yaxis_transform(), ha="right", va="center",
+                fontsize=8.5, fontstyle="italic", color=_ETH_GREY)
+    ax.set_ylim(len(rows) + 0.5, -1.0)
 
-    ax.set_xticks(np.concatenate([new_x, solved_x]))
-    ax.set_xticklabels([HEAT_DEMAND_SECTOR_LABELS[s] + "\n(2023 assumption)" for s in new_sectors]
-                       + [label.replace("\n", " ") + f"\n({solved_year} solved)" for label, _, _ in FIG4B_SECTOR_GROUPS],
-                       fontsize=9)
-    ax.set_ylabel("Heat / fuel / electricity demand [GW]")
-    ax.set_title(f"Industry Fuel & Heat Demand: New Sectors vs. Pre-Existing Cement/Steel\n"
-                 f"(new sectors: ZEN-creator input assumption, 2023; cement/steel: solved model flow, {solved_year})",
-                 fontsize=12, fontweight="bold")
+    ax.set_xlabel("Average energy input [GW]")
+    ax.set_title(f"Industrial energy input by carrier in {year}", fontsize=12, fontweight="bold", loc="left", pad=20)
+    ax.text(0, 1.015, "ZEN-europe without flexibility",
+            transform=ax.transAxes, fontsize=9, color=_ETH_GREY, va="bottom")
+    for spine in ("top", "right", "left"):
+        ax.spines[spine].set_visible(False)
+    ax.tick_params(axis="y", length=0)
+    ax.grid(axis="x", alpha=0.3)
+    ax.set_axisbelow(True)
 
-    band_handles = [Patch(facecolor=_eth_tint(_ETH_GREY, HEAT_DEMAND_BAND_TINTS[b]),
-                           edgecolor="white", label=f"Heat carrier: {HEAT_DEMAND_BAND_LABELS[b]}") for b in bands]
-    all_fuel_carriers = sorted(set(fuel_vals) | set(solved_fuel_carriers), key=list(FUEL_CARRIER_HATCHES).index)
-    fuel_handles = [Patch(facecolor=_ETH_GREY, edgecolor="white", linewidth=0.4,
-                           hatch=FUEL_CARRIER_LEGEND_HATCHES[c],
-                           label=_fuel_legend_label(c)) for c in all_fuel_carriers]
-    electricity_handle = [Patch(facecolor=_ELECTRICITY_COLOR, edgecolor="white", label=_ELECTRICITY_LABEL)]
-    with plt.rc_context({"hatch.linewidth": 1.3}):
-        ax.legend(handles=band_handles + fuel_handles + electricity_handle, fontsize=8, frameon=True,
-                  facecolor="white", framealpha=0.9, edgecolor="none", loc="upper left", ncol=2,
-                  handlelength=3.0, handleheight=1.8, columnspacing=1.2)
-    ax.grid(axis="y", alpha=0.3)
+    def header(text: str) -> Patch:
+        return Patch(facecolor="none", edgecolor="none", label=text)
+
+    present_carriers = {c for c, _ in present}
+    headers = ["Heat (<200 °C)", "Other fuel"]
+    handles = [header(headers[0])]
+    handles += [Patch(facecolor=HEAT_BAND_COLORS[b], label=HEAT_DEMAND_BAND_LABELS[b])
+                for b in HEAT_BAND_COLORS if f"heat_industry_{b}" in present_carriers]
+    handles += [header(headers[1])]
+    handles += [Patch(facecolor=FUEL_CARRIER_COLORS[c], label=FUEL_CARRIER_LABELS[c])
+                for c in FUEL_CARRIER_COLORS if c in present_carriers]
+    handles += [header(""), Patch(facecolor=_ELECTRICITY_COLOR, label=_ELECTRICITY_LABEL)]
+    leg = ax.legend(handles=handles, fontsize=8.5, frameon=False, loc="upper right",
+                    handlelength=1.4, handleheight=1.0, labelspacing=0.35)
+    for t in leg.get_texts():
+        if t.get_text() in headers:
+            t.set_fontweight("bold")
 
     fig.tight_layout()
     savefig(fig, "fig2_industry_fuel_demand_comparison", subdir="method")
@@ -4206,7 +4125,7 @@ def main() -> None:
            fig20_cost_breakdown_sector_industry_heating, base, no_flex, full)
 
     # method/
-    run_if(["Full flexibility"], fig4b_industry_fuel_demand_comparison, runs)
+    run_if(["No flexibility"], fig4b_industry_fuel_demand_comparison, runs)
     fig8_industry_sector_emissions_context()
     fig9_model_scope_coverage()
     fig15_global_ghg_sector_breakdown()
