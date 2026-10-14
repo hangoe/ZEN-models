@@ -55,6 +55,14 @@ CHANGES:
     A BLANK cell in an existing system column means "keep the dataset's own
     system.yaml value" (no override, no default) -- e.g. rows 50/51 run the
     zen-europe datasets exactly as generated.
+  * Solver/degeneracy tests for the TES/DSM (full flexibility) models, all
+    applied to the private staged copies only:
+    `solver_options` ("BarOrder=1;BarHomogeneous=0") merges any Gurobi
+    parameters into solver.solver_options; `cost_noise` (+ `noise_seed`)
+    multiplies TES/DSM cost parameters by (1 + eps*u), u ~ U(-1, 1), per node;
+    `flex_cost_fix` = 1 gives TES/DSM a power capex (0.1 x energy capex) and
+    TES a 0.5 Euro/MWh variable opex (numerical test, not final data).
+    See scripts/solver_tests/NOTES.md.
   * Datasets are looked up first in data/outputs/zen-europe (ZEN-europe
     output), then ZEN-creator/outputs, then data/ (see DATASET_SEARCH_DIRS).
 
@@ -104,6 +112,7 @@ META_COLUMNS = {
     "my_dataset", "my_comment", "config", "normalisation", "batch_size",
     "n_workers", "axes_config", "tolerance_explore", "seed_rng",
     "solver_threads", "epsilon", "numeric_focus",
+    "solver_options", "cost_noise", "noise_seed", "flex_cost_fix",
 }
 
 # Fallback system.json overrides, used for any of these keys a CSV row
@@ -263,6 +272,110 @@ def apply_numeric_focus_override(config_json: dict, config_name: str, numeric_fo
     solver_options["NumericFocus"] = numeric_focus
 
 
+def apply_solver_options_override(config_json: dict, config_name: str, solver_options_str) -> None:
+    """Merge a row's "Key=val;Key=val" string into solver.solver_options in-place.
+
+    Same private-staged-copy pattern as the other overrides, but generic: one
+    column covers any Gurobi parameter (BarOrder, BarHomogeneous, BarConvTol,
+    Presolve, ...) for solver-setting sweeps, instead of one column per
+    parameter. Values go through to_native, so "1" -> int, "1e-6" -> float.
+    """
+    if solver_options_str is None:
+        return
+    solver_options = config_json.get("solver", {}).get("solver_options")
+    if solver_options is None:
+        raise SystemExit(
+            f"[run_model] row sets solver_options but {config_name} has no "
+            f"solver.solver_options block to apply it to."
+        )
+    for item in str(solver_options_str).split(";"):
+        if not item.strip():
+            continue
+        if "=" not in item:
+            raise SystemExit(f"[run_model] bad solver_options entry {item!r} (expected Key=value)")
+        key, value = item.split("=", 1)
+        solver_options[key.strip()] = to_native(value)
+
+
+# Storage techs touched by cost_noise / flex_cost_fix: the industry
+# flexibility options (TES and DSM) suspected of making the LP degenerate.
+FLEX_STORAGE_PREFIXES = ("industry_TES_",)
+FLEX_STORAGE_SUFFIXES = ("_DSM",)
+NOISE_ATTRIBUTES = (
+    "capex_specific_storage", "capex_specific_storage_energy",
+    "opex_specific_variable", "opex_specific_fixed_energy",
+)
+
+
+def flex_storage_dirs(dataset_dir: Path) -> list[Path]:
+    storage_root = dataset_dir / "set_technologies" / "set_storage_technologies"
+    if not storage_root.exists():
+        return []
+    return sorted(
+        d for d in storage_root.iterdir()
+        if d.is_dir() and (d.name.startswith(FLEX_STORAGE_PREFIXES) or d.name.endswith(FLEX_STORAGE_SUFFIXES))
+    )
+
+
+def apply_flex_cost_fix(dataset_dir: Path) -> None:
+    """Give TES/DSM non-zero power capex and TES a non-negligible variable opex, in the STAGED copy.
+
+    Numerical test of the degeneracy hypothesis, NOT final data: as generated,
+    TES/DSM have power capex 0 and TES opex_specific_variable 1 Euro/GWh, so
+    power capacity and flows are (nearly) free and the LP has a large optimal
+    face. Here capex_specific_storage = 0.1 x capex_specific_storage_energy
+    ("0.1 h equivalent", same money unit per power unit) and TES
+    opex_specific_variable = 0.5 Euro/MWh.
+    """
+    for tech_dir in flex_storage_dirs(dataset_dir):
+        path = tech_dir / "attributes.yaml"
+        with open(path) as f:
+            attrs = yaml.safe_load(f)
+        # capex_specific_storage keeps its own unit (Euro/MW or Euro/(tproduct/h)),
+        # the per-power-unit counterpart of the energy capex unit.
+        energy_capex = float(attrs["capex_specific_storage_energy"]["default_value"])
+        attrs["capex_specific_storage"]["default_value"] = 0.1 * energy_capex
+        if tech_dir.name.startswith(FLEX_STORAGE_PREFIXES):
+            attrs["opex_specific_variable"]["default_value"] = 0.5
+            attrs["opex_specific_variable"]["unit"] = "Euro/MWh"
+        with open(path, "w") as f:
+            yaml.safe_dump(attrs, f, sort_keys=False)
+    print(f"[run_model] flex_cost_fix applied to {len(flex_storage_dirs(dataset_dir))} TES/DSM techs")
+
+
+def apply_cost_noise(dataset_dir: Path, eps: float, seed: int) -> None:
+    """Multiply TES/DSM cost parameters by (1 + eps*u), u ~ U(-1, 1), per node, in the STAGED copy.
+
+    Tests whether breaking exact cost ties between identical TES/DSM techs
+    (and nodes) speeds up the solve. Writes one <attribute>.csv per attribute
+    in node,<attribute> format (like capacity_limit.csv), so each node gets
+    its own draw; attributes that already have a CSV are left alone. Zero
+    costs stay zero. eps must be well above the barrier tolerances
+    (~1e-4..1e-2), otherwise it changes nothing.
+    """
+    rng = np.random.default_rng(seed)
+    system_path = next(dataset_dir / n for n in ("system.json", "system.yaml", "system.yml")
+                       if (dataset_dir / n).exists())
+    with open(system_path) as f:
+        system = json.load(f) if system_path.suffix == ".json" else yaml.safe_load(f)
+    nodes = system["set_nodes"]
+    n_files = 0
+    for tech_dir in flex_storage_dirs(dataset_dir):
+        with open(tech_dir / "attributes.yaml") as f:
+            attrs = yaml.safe_load(f)
+        for attr in NOISE_ATTRIBUTES:
+            csv_path = tech_dir / f"{attr}.csv"
+            if attr not in attrs or csv_path.exists():
+                continue
+            base = float(attrs[attr]["default_value"])
+            if base == 0.0:
+                continue
+            values = base * (1.0 + eps * rng.uniform(-1.0, 1.0, size=len(nodes)))
+            pd.DataFrame({"node": nodes, attr: values}).to_csv(csv_path, index=False)
+            n_files += 1
+    print(f"[run_model] cost_noise eps={eps} seed={seed}: wrote {n_files} per-node cost files")
+
+
 def validate_plugin_config(config_json: dict, config_name: str) -> None:
     """Fail fast on an invalid plugins.mga block, before staging/running.
 
@@ -372,6 +485,18 @@ def main() -> None:
     epsilon = None
     if "epsilon" in table.columns and pd.notna(row["epsilon"]) and str(row["epsilon"]).strip():
         epsilon = to_native(row["epsilon"])
+    solver_options_str = None
+    if "solver_options" in table.columns and pd.notna(row["solver_options"]) and str(row["solver_options"]).strip():
+        solver_options_str = str(row["solver_options"]).strip()
+    cost_noise = None
+    if "cost_noise" in table.columns and pd.notna(row["cost_noise"]) and str(row["cost_noise"]).strip():
+        cost_noise = float(row["cost_noise"])
+    noise_seed = 0
+    if "noise_seed" in table.columns and pd.notna(row["noise_seed"]) and str(row["noise_seed"]).strip():
+        noise_seed = int(to_native(row["noise_seed"]))
+    flex_cost_fix = False
+    if "flex_cost_fix" in table.columns and pd.notna(row["flex_cost_fix"]) and str(row["flex_cost_fix"]).strip():
+        flex_cost_fix = bool(to_native(row["flex_cost_fix"]))
     # Defaults only fill keys the CSV has no column for; a blank cell in an
     # existing column keeps the dataset's own system.yaml value.
     system_cols = [col for col in table.columns if col not in META_COLUMNS]
@@ -386,6 +511,8 @@ def main() -> None:
     print(f"[run_model] batch_size={batch_size}  n_workers={n_workers}  tolerance_explore={tolerance_explore}  "
           f"seed_rng={seed_rng}  solver_threads={solver_threads}  epsilon={epsilon}  "
           f"numeric_focus={numeric_focus}")
+    print(f"[run_model] solver_options={solver_options_str}  cost_noise={cost_noise}  "
+          f"noise_seed={noise_seed}  flex_cost_fix={flex_cost_fix}")
     print(f"[run_model] system_overrides={system_overrides}")
 
     config_dir = CONFIG_EULER_DIR if config_name.startswith("config_mga") else DATA_DIR_CONFIG
@@ -397,6 +524,7 @@ def main() -> None:
     apply_batch_overrides(config_json, config_name, batch_size, n_workers, tolerance_explore, seed_rng)
     apply_solver_threads_override(config_json, config_name, solver_threads)
     apply_numeric_focus_override(config_json, config_name, numeric_focus)
+    apply_solver_options_override(config_json, config_name, solver_options_str)
     if epsilon is not None:
         apply_epsilon_override(config_json, config_name, epsilon)
     validate_plugin_config(config_json, config_name)
@@ -408,6 +536,11 @@ def main() -> None:
         shutil.rmtree(staged_dataset)
     staged_dataset.parent.mkdir(parents=True, exist_ok=True)
     shutil.copytree(resolve_dataset_dir(my_dataset), staged_dataset)
+    # Cost fix first, so noise (if both are set) perturbs the fixed values.
+    if flex_cost_fix:
+        apply_flex_cost_fix(staged_dataset)
+    if cost_noise is not None:
+        apply_cost_noise(staged_dataset, cost_noise, noise_seed)
 
     # Write the (possibly normalisation-patched) config to the same private
     # per-task folder, so the shared data/*.json file is never touched and
