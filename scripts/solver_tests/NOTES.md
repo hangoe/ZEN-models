@@ -50,7 +50,6 @@ noise (~1e-15).
 ### Commands (Euler)
 ```bash
 cd ~/ZEN-models && git pull
-sbatch --array=2 --time=72:00:00 submit_euler.sh            # the real full-flex run, longer walltime
 sbatch --array=12,13,16-20 --time=04:00:00 submit_euler.sh  # round 1
 # when finished:
 python scripts/solver_tests/parse_logs.py zen_run_<JOBID>_*.out
@@ -86,5 +85,52 @@ Threads 4 → **Optimal 1.54973e6, 72 it, 838 s**. The solved model's parameters
 - Factor Ops 1.8e11 (~11 s/it on the Mac), vs 3.9e9 for the no-flex smoke model (2 years, 3 ts) in
   zen-europe-bugfix. The TES/DSM part mainly makes each iteration far more expensive.
 
-### Round 1 (Euler)
+### Round 1 (Euler job 17074492, all OPTIMAL)
+
+| task | test | it | it_1e-4 | solve s | s/it | rows | Factor NZ | Factor Ops |
+|---|---|---|---|---|---|---|---|---|
+| 12 | no-flex | 88 | 56 | 116 | 1.3 | 0.78 M | 2.6e7 | 8.0e9 |
+| 13 | full-flex | 121 | 84 | 2047 | 16.9 | 4.22 M | 1.0e9 | 5.4e11 |
+| 16 | TES only | 158 | 125 | 1847 | 11.7 | 2.76 M | 6.7e8 | 3.5e11 |
+| 17 | DSM only | 88 | 56 | 731 | 8.3 | 2.24 M | 5.6e8 | 3.0e11 |
+| 18 | BarOrder=1 | 121 | 84 | 2082 | 17.2 | same | same | same |
+| 19 | BarHomogeneous=0 | 135 | 105 | 1913 | 14.2 | same | same | same |
+| 20 | flex_cost_fix | 112 | 81 | 1950 | 17.4 | same | same | same |
+
+- The small tier reproduces the slowdown (17.6x solve time). It is **cost per iteration** (Factor NZ 40x), not
+  the iteration count (1.4x).
+- None of the solver settings, nor the cost fix, help (±5%). BarOrder=1 gives an identical factor.
+- **TES is the main driver**: most iterations (158) and ~90% of the full-flex solve time. DSM is cheaper.
+- Objectives are equal to ~1e-6 (TES_only = no-flex exactly): flexibility is worth ~nothing in 2022/2026.
+
+### TES use per temperature band (row 4, full 2022-2050 single_temp run)
+| band | energy cap. 2050 | power cap. 2050 | discharge 2050 |
+|---|---|---|---|
+| water 100-150 | 204 GWh (63%) | 192 GW | 30.1 TWh (62%) |
+| water 0-100 | 74 GWh (23%) | 69 GW | 10.1 TWh (21%) |
+| steam 150-200 | 49 GWh (15%) | 180 GW | 8.6 TWh (18%) |
+TES ≈ 0 before 2030. Storage sits at its minimum energy-to-power ratio (1 h water, 0.25 h steam). Power
+capacity is free (0 capex) and floats under barrier without crossover, which is why there are values like
+123 GW paper TES vs. a few GW of paper heat demand.
+
+### Round 2 setup (2026-10-14)
+TES `capacity_limit` added in ZEN-europe (uncommitted, `industry_heat_supply.get_capacity_limit_tes`,
+`IndustryTES._set_capacity_limit`): heat demand of the band + all lower bands × `capacity_limit_margin`
+(2.0), in MW, 0 at nodes without demand. **Caveat: every sector has heat demand in all 28 nodes, so no TES chain
+is removed; expect little speed-up from the limit alone.** New ZEN-europe model
+`zen_europe_ind_heat_v1_full_flexibility_TES_100_150` (8 TES techs removed).
+In ZEN-models, only the TES folders of `zen_europe_ind_heat_v1_full_flexibility` were replaced (now with
+`capacity_limit.csv`), so rows 2/13/18-20 use the limited TES from now on.
+
+| task | dataset | question |
+|---|---|---|
+| 21 | full_flexibility (with TES limit) | does the limit alone help? compare to 13 |
+| 22 | full_flexibility_TES_100_150 (with limit) | how much does dropping 8 of 12 TES techs give? |
+
+```bash
+sbatch --array=21,22 --time=04:00:00 submit_euler.sh
+python3 scripts/solver_tests/parse_logs.py zen_run_<JOBID>_*.out
+```
+
+### Round 2 results
 (fill in)

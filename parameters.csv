@@ -11,3 +11,5 @@ task_id,my_dataset,my_comment,conduct_time_series_aggregation,aggregated_time_st
 18,zen_europe_ind_heat_v1_full_flexibility,test_2022_2a_4a_5ts_barorder1,True,5,2022,2,4,False,2,BarOrder=1,,,
 19,zen_europe_ind_heat_v1_full_flexibility,test_2022_2a_4a_5ts_barhomog0,True,5,2022,2,4,False,2,BarHomogeneous=0,,,
 20,zen_europe_ind_heat_v1_full_flexibility,test_2022_2a_4a_5ts_costfix,True,5,2022,2,4,False,2,,,,1
+21,zen_europe_ind_heat_v1_full_flexibility,test_2022_2a_4a_5ts_tescaplimit,True,5,2022,2,4,False,2,,,,
+22,zen_europe_ind_heat_v1_full_flexibility_TES_100_150,test_2022_2a_4a_5ts_tescaplimit,True,5,2022,2,4,False,2,,,,
