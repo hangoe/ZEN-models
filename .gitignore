@@ -8,3 +8,4 @@ zen_run_*.out
 zen_run_*.err
 *.pyc
 .DS_Store
+data/outputs/euler_outputs/zen_europe_ind_heat_v1_full_flexibility_single_temp_2022_8a_4a_interval_10ts/zen_europe_ind_heat_v1_full_flexibility_single_temp/duals.nc
