@@ -478,12 +478,12 @@ def _search_var_dict(path: Path, max_depth: int = 2) -> Path | None:
 # names without the sector suffix. SectorAggregatedResults strips the suffix
 # and sums, so the same tech lists/colors apply to both model generations.
 _SECTOR_SUFFIX_RE = re.compile(
-    r"^(.*(?:_industry|kilnfuel|fuel_to_kiln|heat_industry).*?)_(?:ceramic|food|glass|paper)$")
+    r"^(.*(?:_industry|industry_TES|kilnfuel|fuel_to_kiln|heat_industry).*?)_(?:ceramic|food|glass|paper)$")
 _AGGREGATED_LEVELS = ("technology", "carrier")
 # Parameters that are per-unit (intensive) get averaged across sectors instead
 # of summed; everything else (variables, capacity_limit/_existing, demand, ...) is summed.
 _INTENSIVE_PARAMETER_RE = re.compile(
-    r"conversion_factor|efficiency|rate|lifetime|share|price|cost|load|factor|ratio|duration|coefficient")
+    r"conversion_factor|efficiency|rate|lifetime|share|price|cost|load|factor|ratio|duration|coefficient|self_discharge")
 
 
 def strip_sector_suffix(name):

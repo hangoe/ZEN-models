@@ -3044,6 +3044,21 @@ STORAGE_COLOR_MAP = {
 }
 STORAGE_STACK_ORDER = ["battery", "pumped_hydro", "natural_gas_storage", "oil_storage", "salt_cavern_storage"]
 
+# Industry flexibility in fig12's storage panel (only non-zero in runs with
+# the flexibility options): TES per temperature band in ETH_RED tints (heat,
+# hotter = darker), DSM summed over all products as GWh energy equivalent
+# (get_dsm_energy_equivalent) in ETH_GREEN — both colors unused by the bulk
+# storage techs above.
+INDUSTRY_DSM_LABEL = "industry DSM (energy equiv.)"
+STORAGE_COLOR_MAP.update({
+    "industry_TES_water_0_100": _eth_tint(_ETH_RED, 0.55),
+    "industry_TES_water_100_150": _eth_tint(_ETH_RED, 0.25),
+    "industry_TES_steam_150_200": _ETH_RED,
+    INDUSTRY_DSM_LABEL: _ETH_GREEN,
+})
+STORAGE_STACK_ORDER += ["industry_TES_water_0_100", "industry_TES_water_100_150",
+                        "industry_TES_steam_150_200", INDUSTRY_DSM_LABEL]
+
 
 # ── DSM discharge translated into an energy (GWh) equivalent (fig30) ──────
 # ammonia_DSM/methanol_DSM already store an energy carrier (GWh) natively —
@@ -3139,17 +3154,25 @@ def get_dsm_energy_equivalent(r, dsm_techs: list[str], years: list[int]) -> pd.D
 # small-base blow-up risk.
 
 DELTA_LABEL = r"$\Delta$ No flexibility"
+DELTA_FULL_LABEL = r"$\Delta$ Full flexibility"
 
 
-def _base_and_delta_df(base_series: pd.Series, no_flex_series: pd.Series) -> pd.DataFrame:
-    """Two-column DataFrame: [Crystal Ball (base) absolute, Δ No flexibility
-    minus base — signed, both directions] — index is the union of both
-    series' technologies, missing entries filled with 0 before subtracting
-    so a tech present in only one run still gets a correct (not NaN) delta."""
+def _base_and_delta_df(base_series: pd.Series, no_flex_series: pd.Series,
+                       full_series: pd.Series | None = None) -> pd.DataFrame:
+    """[Crystal Ball (base) absolute, Δ No flexibility minus base — signed,
+    both directions] plus, if full_series is given, a 3rd Δ Full flexibility
+    minus base column — index is the union of all series' technologies,
+    missing entries filled with 0 before subtracting so a tech present in
+    only one run still gets a correct (not NaN) delta."""
     all_idx = base_series.index.union(no_flex_series.index)
+    if full_series is not None:
+        all_idx = all_idx.union(full_series.index)
     base = base_series.reindex(all_idx, fill_value=0.0)
     no_flex = no_flex_series.reindex(all_idx, fill_value=0.0)
-    return pd.DataFrame({BASE_SCENARIO[1]: base, DELTA_LABEL: no_flex - base})
+    df = pd.DataFrame({BASE_SCENARIO[1]: base, DELTA_LABEL: no_flex - base})
+    if full_series is not None:
+        df[DELTA_FULL_LABEL] = full_series.reindex(all_idx, fill_value=0.0) - base
+    return df
 
 
 def _plot_base_and_floating_delta(
@@ -3168,7 +3191,8 @@ def _plot_base_and_floating_delta(
     scale values in the thousands; 1 for TWh-scale storage values, where a
     whole-number round-off would hide a real ~1-digit swing)."""
     years = sorted(dfs_by_year)
-    base_label, delta_label = dfs_by_year[years[0]].columns.tolist()
+    base_label, *delta_labels = dfs_by_year[years[0]].columns.tolist()
+    group = len(delta_labels) + 2  # base + deltas + 1 gap slot
     bar_width = 0.8
     labeled: set[str] = set()
     positions_all: list[float] = []
@@ -3177,11 +3201,10 @@ def _plot_base_and_floating_delta(
 
     for yi, year in enumerate(years):
         df = dfs_by_year[year]
-        base_pos = yi * 3
-        delta_pos = base_pos + 1
-        positions_all.extend([base_pos, delta_pos])
-        tick_labels_all.extend([base_label, delta_label])
-        year_centers.append((base_pos + delta_pos) / 2)
+        base_pos = yi * group
+        positions_all.extend(base_pos + i for i in range(len(delta_labels) + 1))
+        tick_labels_all.extend([base_label, *delta_labels])
+        year_centers.append(base_pos + len(delta_labels) / 2)
 
         bottom = 0.0
         for category in df.index:
@@ -3198,30 +3221,32 @@ def _plot_base_and_floating_delta(
         ax.text(base_pos, base_total, f"{base_total:,.{decimals}f}", ha="center", va="bottom",
                  fontsize=8, fontweight="bold")
 
-        top, bot = base_total, base_total
-        for category in df.index:
-            val = df.loc[category, delta_label]
-            color = color_map[category]
-            hatch = hatch_map.get(category, "")
-            if val > 0:
-                ax.bar(delta_pos, val, bar_width, bottom=top, color=color,
-                       label=category if category not in labeled else None,
-                       edgecolor="white", linewidth=0.5, hatch=hatch)
-                top += val
-                labeled.add(category)
-            elif val < 0:
-                ax.bar(delta_pos, val, bar_width, bottom=bot, color=color,
-                       label=category if category not in labeled else None,
-                       edgecolor="white", linewidth=0.5, hatch=hatch if hatch else "//")
-                bot += val
-                labeled.add(category)
-        delta_total = df[delta_label].sum()
-        pct = (delta_total / base_total * 100) if base_total else 0.0
-        label_y, va = (top, "bottom") if delta_total >= 0 else (bot, "top")
-        ax.text(delta_pos, label_y, f"{delta_total:+,.{decimals}f} ({pct:+.1f}%)",
-                 ha="center", va=va, fontsize=8, fontweight="bold")
-        ax.plot([base_pos + bar_width / 2, delta_pos - bar_width / 2], [base_total, base_total],
-                color="#888888", linestyle="--", linewidth=0.8, zorder=0)
+        for di, delta_label in enumerate(delta_labels):
+            delta_pos = base_pos + 1 + di
+            top, bot = base_total, base_total
+            for category in df.index:
+                val = df.loc[category, delta_label]
+                color = color_map[category]
+                hatch = hatch_map.get(category, "")
+                if val > 0:
+                    ax.bar(delta_pos, val, bar_width, bottom=top, color=color,
+                           label=category if category not in labeled else None,
+                           edgecolor="white", linewidth=0.5, hatch=hatch)
+                    top += val
+                    labeled.add(category)
+                elif val < 0:
+                    ax.bar(delta_pos, val, bar_width, bottom=bot, color=color,
+                           label=category if category not in labeled else None,
+                           edgecolor="white", linewidth=0.5, hatch=hatch if hatch else "//")
+                    bot += val
+                    labeled.add(category)
+            delta_total = df[delta_label].sum()
+            pct = (delta_total / base_total * 100) if base_total else 0.0
+            label_y, va = (top, "bottom") if delta_total >= 0 else (bot, "top")
+            ax.text(delta_pos, label_y, f"{delta_total:+,.{decimals}f}\n({pct:+.1f}%)",
+                     ha="center", va=va, fontsize=8, fontweight="bold")
+            ax.plot([base_pos + bar_width / 2, delta_pos - bar_width / 2], [base_total, base_total],
+                    color="#888888", linestyle="--", linewidth=0.8, zorder=0)
 
     ax.set_xticks(positions_all)
     ax.set_xticklabels(tick_labels_all, fontsize=8, rotation=30, ha="right")
@@ -3239,7 +3264,8 @@ def _plot_base_and_floating_delta(
                       loc="upper left", fontsize=8, frameon=False)
 
 
-def fig12_capacity_and_storage_base_and_delta(base_run: Run, no_flex_run: Run) -> None:
+def fig12_capacity_and_storage_base_and_delta(base_run: Run, no_flex_run: Run,
+                                              full_run: Run | None = None) -> None:
     """Power generation capacity (left) and storage annual energy discharged
     (right), side by side, 3 snapshot years each (2030/2040/2050, same
     SNAPSHOT_YEARS_POWER/tech scope as fig11) — each year cluster is base
@@ -3247,6 +3273,12 @@ def fig12_capacity_and_storage_base_and_delta(base_run: Run, no_flex_run: Run) -
     _plot_base_and_floating_delta) with a "+X.X%" label. Replaces 2 earlier
     separate figures (one per panel) per user request to show both side by
     side in one figure instead.
+
+    If full_run is given, each year cluster gets a 3rd Δ Full flexibility
+    bar (also floating from the base bar's top), and the storage panel also
+    shows industry TES (per temperature band) and DSM (all products, as GWh
+    energy equivalent via get_dsm_energy_equivalent) — both only exist in
+    runs with the flexibility options, so they only appear in that bar.
     -> SI_results/fig12_capacity_and_storage_base_and_delta.svg
     """
     empty = pd.Series(dtype=float)
@@ -3254,17 +3286,27 @@ def fig12_capacity_and_storage_base_and_delta(base_run: Run, no_flex_run: Run) -
     nf_cap = get_capacity(no_flex_run.results, POWER_GEN_TECHS, "power")
     # GWh -> TWh per user request (raw GWh totals like "522,721" are
     # unwieldy at print size; TWh keeps 3-4 significant digits instead).
-    base_dis = get_storage_flows(base_run.results, BULK_STORAGE_TECHS, "flow_storage_discharge") / 1000.0
-    nf_dis = get_storage_flows(no_flex_run.results, BULK_STORAGE_TECHS, "flow_storage_discharge") / 1000.0
+    def discharge_twh(r: Run) -> pd.DataFrame:
+        dis = get_storage_flows(r.results, BULK_STORAGE_TECHS + INDUSTRY_TES_TECHS, "flow_storage_discharge")
+        dsm = get_dsm_energy_equivalent(r.results, DSM_ENERGY_STACK_ORDER, SNAPSHOT_YEARS_POWER)
+        if not dsm.empty and dsm.values.sum() > 1e-3:
+            dis = pd.concat([dis, dsm.sum().rename(INDUSTRY_DSM_LABEL).to_frame().T])
+        return dis / 1000.0
+
+    base_dis, nf_dis = discharge_twh(base_run), discharge_twh(no_flex_run)
+    full_cap = get_capacity(full_run.results, POWER_GEN_TECHS, "power") if full_run else None
+    full_dis = discharge_twh(full_run) if full_run else None
     gen_by_year: dict[int, pd.DataFrame] = {}
     disch_by_year: dict[int, pd.DataFrame] = {}
     for year in SNAPSHOT_YEARS_POWER:
         gen_by_year[year] = _stack_ordered(
-            _base_and_delta_df(base_cap.get(year, empty), nf_cap.get(year, empty)), POWER_GEN_STACK_ORDER)
-        disch_by_year[year] = _base_and_delta_df(base_dis.get(year, empty), nf_dis.get(year, empty)) \
+            _base_and_delta_df(base_cap.get(year, empty), nf_cap.get(year, empty),
+                               full_cap.get(year, empty) if full_run else None), POWER_GEN_STACK_ORDER)
+        disch_by_year[year] = _base_and_delta_df(base_dis.get(year, empty), nf_dis.get(year, empty),
+                                                 full_dis.get(year, empty) if full_run else None) \
             .reindex(STORAGE_STACK_ORDER).fillna(0.0)
 
-    fig, axes = plt.subplots(1, 2, figsize=(16, 6))
+    fig, axes = plt.subplots(1, 2, figsize=(20 if full_run else 16, 6))
     with plt.rc_context({"hatch.linewidth": 0.5}):
         _plot_base_and_floating_delta(gen_by_year, "Power Generation Capacity", "GW", axes[0],
                                       color_map=POWER_GEN_COLOR_MAP, hatch_map=POWER_GEN_HATCH_MAP)
@@ -4111,7 +4153,7 @@ def main() -> None:
     run_if(["base", "No flexibility"], fig5_retrofit_ccs_comparison, no_flex, base)
     run_if(["No flexibility"], fig8a_diffusion_mechanisms_heat_pumps, runs)
     run_if(["No flexibility", "Full flexibility"], fig9_heat_supply_trajectory, no_flex, full)
-    run_if(["base", "No flexibility"], fig12_capacity_and_storage_base_and_delta, base, no_flex)
+    run_if(["base", "No flexibility"], fig12_capacity_and_storage_base_and_delta, base, no_flex, full)
     single_temp_set = ["No flexibility", NO_FLEX_SINGLE_TEMP_SCENARIO[1], "Full flexibility",
                        "Single temperature level"]
     for fn in (fig14a_heat_supply_electrification_singletemp_vs_full,
