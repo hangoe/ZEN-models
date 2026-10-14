@@ -132,5 +132,20 @@ sbatch --array=21,22 --time=04:00:00 submit_euler.sh
 python3 scripts/solver_tests/parse_logs.py zen_run_<JOBID>_*.out
 ```
 
-### Round 2 results
-(fill in)
+### Round 2 results (job 17080911; both on AMD EPYC nodes eu-a2p, ~1.5x slower per work unit than Round 1's eu-g9)
+| task | test | it | solve s | work units | rows | Factor NZ |
+|---|---|---|---|---|---|---|
+| 13 (ref) | full-flex | 121 | 2047 | 7267 | 4.22 M | 1.0e9 |
+| 21 | + TES limit | ~95-100 (not finished at last check, it 90 at 2185 s) | – | ~5500 (est.) | 4.22 M | 1.0e9 |
+| 22 | TES 100-150 only + limit | 93 | 1547 | 3721 (−49%) | 2.90 M | 7.1e8 |
+Work units of Round 1 rows: 16 = 6637, 17 = 2727, 18 = 7415, 19 = 6669, 20 = 6879.
+- TES limit: same size, ~20% fewer iterations. Dropping 2 TES bands: −30% work per iteration.
+- Use work units (not seconds) to compare runs on different node types.
+
+### Decision for the production runs (2026-10-14)
+Rows 2 and 4 edited in place: all 3 TES bands, TES capacity limit (ZEN-europe code), `BarHomogeneous=0`, no cost
+changes, comment `2022_8a_4a_interval_10ts_tescaplimit_bh0`. The TES_100_150 model/dataset and row 22 were removed.
+The full_flexibility_single_temp dataset was regenerated (only its TES folders replaced; they are identical to
+full_flexibility's). Literature review on TES/DSM power capex and variable opex (not applied):
+scratchpad `lit_review_tes_dsm_costs.md`. TES power capex 40k/50k/20k EUR/MW, TES opex 0.5 EUR/MWh, DSM power
+capex 0 (production overcapacity already costed); DSM variable costs in the literature are much higher than current.

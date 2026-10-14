@@ -14,12 +14,15 @@ Columns:
              it_1e-4 and it means a long tail (degeneracy), a big it_1e-4 means slow
              progress overall
   solve_s    barrier time in seconds (last iteration time if not finished)
+  work       Gurobi work units: roughly hardware-independent, use this to compare runs on
+             different Euler nodes (seconds are not comparable across node types)
   s_per_it   solve_s / it
   rows/cols  after presolve
   dense      dense columns
   factor_nz  nonzeros in the Cholesky factor
   factor_ops floating point ops per iteration (cost of one iteration; BarOrder changes this)
   order_s    ordering time in seconds
+  host, cpu  Euler node and CPU model the run used
   opts       non-default parameters set via "Set parameter" (except Username/Threads)
 """
 import argparse
@@ -36,7 +39,9 @@ RE = {
     "fnz": re.compile(r"Factor NZ\s*:\s*([\d.e+]+)"),
     "fops": re.compile(r"Factor Ops\s*:\s*([\d.e+]+)"),
     "iter": re.compile(r"^\s*(\d+)\s+([-+\d.e]+)\s+([-+\d.e]+)\s+[\d.e+-]+\s+[\d.e+-]+\s+[\d.e+-]+\s+(\d+)s\s*$"),
-    "solved": re.compile(r"Barrier (?:solved model|performed) (?:in )?(\d+) iterations (?:in )?(?:and )?([\d.]+) seconds"),
+    "solved": re.compile(r"Barrier (?:solved model|performed) (?:in )?(\d+) iterations (?:in )?(?:and )?([\d.]+) seconds(?: \(([\d.]+) work units\))?"),
+    "cpu": re.compile(r"CPU model: ([^,]+)"),
+    "host": re.compile(r"Starting task_id=\d+ on (\S+)"),
     "optimal": re.compile(r"Optimal objective\s+([-+\d.e]+)"),
     "subopt": re.compile(r"Sub-optimal termination - objective\s+([-+\d.e]+)"),
     "param": re.compile(r"Set parameter (\w+) to value (\S+)"),
@@ -46,7 +51,7 @@ SKIP_PARAMS = {"Username", "Threads", "LogFile", "TimeLimit"}
 
 def parse(path: Path) -> dict:
     r = {"file": path.name, "task": "", "comment": "", "status": "RUNNING?", "obj": "", "it": "",
-         "it_1e-4": "", "solve_s": "", "s_per_it": "", "rows": "", "cols": "", "dense": "",
+         "it_1e-4": "", "solve_s": "", "work": "", "cpu": "", "host": "", "s_per_it": "", "rows": "", "cols": "", "dense": "",
          "factor_nz": "", "factor_ops": "", "order_s": "", "opts": ""}
     m = re.search(r"_(\d+)\.(out|log)$", path.name)
     if m:
@@ -76,6 +81,11 @@ def parse(path: Path) -> dict:
                     r["it_1e-4"] = it
             elif (m := RE["solved"].search(line)):
                 r["it"], r["solve_s"] = int(m.group(1)), float(m.group(2))
+                r["work"] = float(m.group(3)) if m.group(3) else ""
+            elif (m := RE["cpu"].search(line)):
+                r["cpu"] = m.group(1).strip()
+            elif (m := RE["host"].search(line)):
+                r["host"] = m.group(1)
             elif (m := RE["optimal"].search(line)):
                 r["status"], r["obj"] = "OPTIMAL", float(m.group(1))
             elif (m := RE["subopt"].search(line)):
@@ -98,8 +108,8 @@ def main() -> None:
     ap.add_argument("--csv", type=Path, help="also write the table to this CSV")
     args = ap.parse_args()
     rows = sorted((parse(p) for p in args.logs), key=lambda r: (int(r["task"]) if str(r["task"]).isdigit() else 1e9))
-    cols = ["task", "comment", "status", "obj", "it", "it_1e-4", "solve_s", "s_per_it", "rows", "cols",
-            "dense", "factor_nz", "factor_ops", "order_s", "opts", "file"]
+    cols = ["task", "comment", "status", "obj", "it", "it_1e-4", "solve_s", "work", "s_per_it", "rows", "cols",
+            "dense", "factor_nz", "factor_ops", "order_s", "host", "cpu", "opts", "file"]
     fmt = lambda v: f"{v:.6e}" if isinstance(v, float) and abs(v) > 1e5 else str(v)
     table = [[fmt(r[c]) for c in cols] for r in rows]
     widths = [max(len(c), *(len(t[i]) for t in table)) for i, c in enumerate(cols)]
