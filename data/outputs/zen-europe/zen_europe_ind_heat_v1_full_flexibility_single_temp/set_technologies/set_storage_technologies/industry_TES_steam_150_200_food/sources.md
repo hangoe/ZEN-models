@@ -21,19 +21,23 @@ efficiency_charge
 -----------------
 
 Step 1
-Losses in the self-discharge.
+Losses neglected.
 
 efficiency_discharge
 --------------------
 
 Step 1
-Losses in the self-discharge.
+Losses neglected.
 
 self_discharge
 --------------
 
 Step 1
-5 % standing loss per hour.
+hot water tank decentral, tau = 3 days.
+
+**Citation**
+
+Brown, T., Schlachtberger, D., Kies, A., Schramm, S., Greiner, M. (2018). Synergies of sector coupling and transmission reinforcement in a cost-optimised, highly renewable European energy system. Energy. https://doi.org/10.1016/j.energy.2018.06.222. Note: Table 1 and Section 3, hot water tanks.
 
 capex_specific_storage_energy
 -----------------------------

@@ -31,7 +31,7 @@ max_load
 --------
 
 Step 1
-Maximum load data for run-of-river hydro technologies is derived from the generation and capacity data from the ENTSOE Transparency Platform for 2019. If available, the Pan-European Climate Database is used to fill in missing nodes.  For SE, DK, the maximum load is estimated based on other countries. For ES, the maximum load is above 1; therefore, the maximum load is normalized to 1 based on the maximum generation.
+Maximum load data for run-of-river hydro technologies is derived from the generation and capacity data from the ENTSOE Transparency Platform for 2019. If available, the Pan-European Climate Database is used to fill in missing nodes.  For DK, SE, the maximum load is estimated based on other countries. For ES, the maximum load is above 1; therefore, the maximum load is normalized to 1 based on the maximum generation.
 
 **Citations**
 

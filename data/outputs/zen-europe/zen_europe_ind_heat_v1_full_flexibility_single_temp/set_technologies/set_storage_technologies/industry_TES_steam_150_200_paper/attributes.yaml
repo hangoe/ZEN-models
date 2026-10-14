@@ -53,7 +53,7 @@ efficiency_discharge:
   default_value: 1.0
   unit: '1'
 self_discharge:
-  default_value: 0.05
+  default_value: 0.013792883256083743
   unit: '1'
 capex_specific_storage:
   default_value: 0.0
