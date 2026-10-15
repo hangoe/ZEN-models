@@ -2389,8 +2389,8 @@ def _fig30_matrix_panel(fig: plt.Figure, ax: plt.Axes, values: dict[tuple[int, i
                         value_fmt: str = "{:,.0f}", delta_fmt: str = "{:,.1f}",
                         delta_unit: str | None = None):
     """One 2x2 flexibility x temperature-resolution matrix of fig30: `values`
-    keyed by (row, col) — row 0 = 3 temp levels (top), col 1 = Full
-    flexibility (right). Cells shaded by value (light -> dark blue,
+    keyed by (row, col) — row 0 = 3 temp levels (top), col 0 = Full
+    flexibility (left). Cells shaded by value (light -> dark blue,
     normalised min..max, own colourbar), unlabelled arrows from the baseline
     cell (Full flexibility, 3 temp levels) to the other 3; each target cell
     carries its own absolute and relative difference to the baseline in
@@ -2400,7 +2400,7 @@ def _fig30_matrix_panel(fig: plt.Figure, ax: plt.Axes, values: dict[tuple[int, i
     the colourbar so the caller can
     centre `title` over cells + colourbar once the layout is final — the
     title itself is NOT drawn here."""
-    base_rc = (0, 1)
+    base_rc = (0, 0)
     base = values[base_rc]
 
     size, gap = 1.0, 0.12
@@ -2426,8 +2426,12 @@ def _fig30_matrix_panel(fig: plt.Figure, ax: plt.Axes, values: dict[tuple[int, i
         # Value + its change vs. the baseline sit at each cell's outer
         # (top/bottom) edge, leaving the middle for the arrows.
         ty = y0 + (0.82 if rc[0] == 0 else 0.3) * size
-        text_color = "white" if t > 0.6 else "black"
-        ax.text(cx, ty, f"{value_fmt.format(c)} {unit}", ha="center", va="center", fontsize=12.5,
+        # Pick by the cell colour's relative luminance (WCAG cross-over 0.179),
+        # not by t: mid-ramp blues are already dark enough to need white.
+        r_, g_, b_ = (v / 12.92 if v <= 0.04045 else ((v + 0.055) / 1.055) ** 2.4
+                      for v in cmap(t)[:3])
+        text_color = "white" if 0.2126 * r_ + 0.7152 * g_ + 0.0722 * b_ < 0.179 else "black"
+        ax.text(cx, ty, f"{value_fmt.format(c)} {unit}", ha="center", va="center", fontsize=11,
                 color=text_color, zorder=4)
         if rc == base_rc:
             sub = "baseline"
@@ -2436,7 +2440,7 @@ def _fig30_matrix_panel(fig: plt.Figure, ax: plt.Axes, values: dict[tuple[int, i
             sign = "+" if delta >= 0 else "−"
             sub = (f"{sign}{delta_fmt.format(abs(delta))} {delta_unit or unit}  "
                    f"({sign}{abs(delta) / base * 100:.2f} %)")
-        ax.text(cx, ty - 0.12, sub, ha="center", va="center", fontsize=9.5,
+        ax.text(cx, ty - 0.12, sub, ha="center", va="center", fontsize=11.5,
                 style="italic" if rc == base_rc else "normal",
                 fontweight="normal" if rc == base_rc else "bold", color=text_color, zorder=4)
 
@@ -2446,11 +2450,11 @@ def _fig30_matrix_panel(fig: plt.Figure, ax: plt.Axes, values: dict[tuple[int, i
     bx0, by0 = corner(base_rc)
     # Each arrow gets its own start/end (fractions of a cell, relative to the
     # baseline cell's lower-left corner) so the 3 don't pile up on one point:
-    # horizontal from the lower-middle-left, vertical from the right, diagonal
+    # horizontal from the lower-middle-right, vertical from the left, diagonal
     # from the inner corner.
-    arrows = {(0, 0): ((0.3, 0.42), (-0.4, 0.42)),
-              (1, 1): ((0.72, 0.3), (0.72, -0.4)),
-              (1, 0): ((0.1, 0.1), (-0.42, -0.42))}
+    arrows = {(0, 1): ((0.7, 0.42), (1.4, 0.42)),
+              (1, 0): ((0.28, 0.3), (0.28, -0.4)),
+              (1, 1): ((0.9, 0.1), (1.42, -0.42))}
     head_len = 0.13
     # Arrow width encodes |delta| within this panel: proportional to the
     # panel's largest |delta| (NOT min-max — that would always draw the
@@ -2470,7 +2474,7 @@ def _fig30_matrix_panel(fig: plt.Figure, ax: plt.Axes, values: dict[tuple[int, i
                                 facecolor=arrow_color, edgecolor="white", linewidth=1.2, zorder=3))
 
     top_y = 2 * size + gap
-    for col, label in enumerate(["No flexibility", "Full flexibility"]):
+    for col, label in enumerate(["Full flexibility", "No flexibility"]):
         ax.text(col * (size + gap) + size / 2, top_y + 0.06, label, ha="center", va="bottom",
                 fontsize=11, color="black")
     for row, label in enumerate(["3 temp. levels", "Single temp. level"] if row_labels else []):
@@ -2491,8 +2495,8 @@ def _fig30_matrix_panel(fig: plt.Figure, ax: plt.Axes, values: dict[tuple[int, i
 
 def fig30_matrix(no_flex_run: Run, no_flex_single_run: Run, full_run: Run,
                  single_temp_run: Run) -> None:
-    """fig14b's 4 runs laid out as 2x2 matrices — columns No flexibility /
-    Full flexibility, rows 3 temperature levels / single level — per user
+    """fig14b's 4 runs laid out as 2x2 matrices — columns Full flexibility /
+    No flexibility, rows 3 temperature levels / single level — per user
     sketch, 3 panels side by side (see _fig30_matrix_panel). Each cell is
     shaded by its value, and arrows from the cheapest cell, Full flexibility
     with 3 temp levels, point to each of the other 3 cells labelled with the
@@ -2516,8 +2520,8 @@ def fig30_matrix(no_flex_run: Run, no_flex_single_run: Run, full_run: Run,
     is what fig12 already shows (battery-dominated).
     -> SI_results/fig30_matrix.svg
     """
-    cells = {(0, 0): no_flex_run, (0, 1): full_run,
-             (1, 0): no_flex_single_run, (1, 1): single_temp_run}
+    cells = {(0, 0): full_run, (0, 1): no_flex_run,
+             (1, 0): single_temp_run, (1, 1): no_flex_single_run}
     cost = {rc: _discounted_total_cost_bn(r) for rc, r in cells.items()}
     vre = {rc: float(get_capacity(r.results, FIG30_VRE_TECHS, "power")
                      .get(FIG30_YEAR, pd.Series(dtype=float)).sum())
