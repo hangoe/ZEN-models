@@ -290,11 +290,11 @@ COMPARISON_YEARS = [2030, 2040, 2050]
 # names those scenarios are expected to get and self-skip until run.
 SCENARIOS = [
     ("zen_europe_ind_heat_v1_no_flexibility_2022_8a_4a_interval_10ts", "No flexibility"),
-    ("zen_europe_ind_heat_v1_2022_8a_4a_interval_7ts", "Full flexibility"),
-    ("zen_europe_ind_heat_v1_DSM_pessimistic_2022_8a_4a_interval_7ts", "DSM pessimistic"),
-    ("zen_europe_ind_heat_v1_DSM_only_2022_8a_4a_interval_7ts", "DSM only"),
-    ("zen_europe_ind_heat_v1_TES_only_2022_8a_4a_interval_7ts", "TES only"),
-    ("zen_europe_ind_heat_v1_single_temp_2022_8a_4a_interval_7ts", "Single temperature level"),
+    ("zen_europe_ind_heat_v1_full_flexibility_2022_8a_4a_interval_10ts", "Full flexibility"),
+    ("zen_europe_ind_heat_v1_DSM_pessimistic_2022_8a_4a_interval_10ts", "DSM pessimistic"),
+    ("zen_europe_ind_heat_v1_DSM_only_2022_8a_4a_interval_10ts", "DSM only"),
+    ("zen_europe_ind_heat_v1_TES_only_2022_8a_4a_interval_10ts", "TES only"),
+    ("zen_europe_ind_heat_v1_full_flexibility_single_temp_2022_8a_4a_interval_10ts", "Single temperature level"),
 ]
 
 # fig0a/fig0b only. Uses SCENARIO_PALETTE slot 6 (grey) — see the comment there.
@@ -319,7 +319,7 @@ SCENARIOS = [
 # 2026-09 "add 2050" re-sync: base case re-run with optimized_years=16
 # (2020-2050, matching the SCENARIOS list's new 16a runs) — see the
 # COMPARISON_YEARS comment above for the same re-sync.
-BASE_SCENARIO = ("zen_europe_2022_8a_4a_interval_7ts", "Crystal Ball (base)")
+BASE_SCENARIO = ("zen_europe_base", "Crystal Ball (base)")
 
 # Single-temperature-band counterpart of "No flexibility", loaded separately
 # from SCENARIOS (like BASE_SCENARIO) since it isn't one of the 6 case-study
@@ -327,7 +327,7 @@ BASE_SCENARIO = ("zen_europe_2022_8a_4a_interval_7ts", "Crystal Ball (base)")
 # compare singletemp vs. not for BOTH model options (No flexibility and
 # Full flexibility), not just Full flexibility as before, per user request.
 NO_FLEX_SINGLE_TEMP_SCENARIO = (
-    "zen_europe_ind_heat_v1_no_flex_single_temp_2022_8a_4a_interval_7ts",
+    "zen_europe_ind_heat_v1_no_flexibility_single_temp_2022_8a_4a_interval_10ts",
     "No flexibility (single temp)")
 
 

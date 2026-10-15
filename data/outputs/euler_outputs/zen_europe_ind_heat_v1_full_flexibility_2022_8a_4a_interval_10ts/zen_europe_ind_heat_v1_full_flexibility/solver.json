@@ -3,7 +3,7 @@
   "solver_options": {
     "Method": 2,
     "NodeMethod": 2,
-    "BarHomogeneous": 1,
+    "BarHomogeneous": 0,
     "DualReductions": 0,
     "Threads": 16,
     "Crossover": 0,
@@ -12,7 +12,7 @@
     "NumericFocus": 2
   },
   "check_unit_consistency": true,
-  "solver_dir": "../../../scratch/hgoericke/zen_runs/outputs/zen_europe_ind_heat_v1_no_flexibility_nodiffusion_2022_8a_4a_interval_10ts_systemyaml",
+  "solver_dir": "../../../scratch/hgoericke/zen_runs/outputs/zen_europe_ind_heat_v1_full_flexibility_2022_8a_4a_interval_10ts_tescaplimit_bh0",
   "keep_files": false,
   "io_api": "lp",
   "save_duals": true,

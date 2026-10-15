@@ -121,6 +121,7 @@
     "constraint_technology_construction_time_outside",
     "constraint_technology_lifetime",
     "constraint_technology_lifetime_previous",
+    "constraint_technology_diffusion_limit_total",
     "constraint_cost_capex_yearly",
     "constraint_cost_capex_yearly_total",
     "constraint_cost_opex_yearly",

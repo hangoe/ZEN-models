@@ -14,6 +14,7 @@
   "constraint_technology_construction_time_outside": "name:constraint_technology_construction_time_outside;doc:;dims:set_technologies,set_capacity_types,set_location,set_time_steps_construction",
   "constraint_technology_lifetime": "name:constraint_technology_lifetime;doc:;dims:set_technologies,set_capacity_types,set_location,set_years",
   "constraint_technology_lifetime_previous": "name:constraint_technology_lifetime_previous;doc:;dims:set_technologies,set_capacity_types,set_location,set_years",
+  "constraint_technology_diffusion_limit_total": "name:constraint_technology_diffusion_limit_total;doc:;dims:set_technologies,set_capacity_types,set_years",
   "constraint_cost_capex_yearly": "name:constraint_cost_capex_yearly;doc:;dims:set_technologies,set_capacity_types,set_location,set_years",
   "constraint_cost_capex_yearly_total": "name:constraint_cost_capex_yearly_total;doc:;dims:set_years",
   "constraint_cost_opex_yearly": "name:constraint_cost_opex_yearly;doc:;dims:set_technologies,set_location,set_years",

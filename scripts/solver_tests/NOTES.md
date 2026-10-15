@@ -149,3 +149,10 @@ The full_flexibility_single_temp dataset was regenerated (only its TES folders r
 full_flexibility's). Literature review on TES/DSM power capex and variable opex (not applied):
 scratchpad `lit_review_tes_dsm_costs.md`. TES power capex 40k/50k/20k EUR/MW, TES opex 0.5 EUR/MWh, DSM power
 capex 0 (production overcapacity already costed); DSM variable costs in the literature are much higher than current.
+
+### Production runs TES only / DSM only (2026-10-15)
+Rows 2/4 downloaded; output folders renamed to `..._2022_8a_4a_interval_10ts` (suffix `_tescaplimit_bh0` dropped,
+`my_comment` of rows 2/4 changed to match). Test rows 12-21 removed from `parameters.csv`.
+`zen_europe_ind_heat_v1_{TES,DSM}_only` regenerated with ZEN-europe (`zen-europe --model ...`, uncommitted TES
+capacity-limit code), so TES_only now has the TES `capacity_limit.csv`. Apart from that, they differ from the old versions by float noise
+only (≤5e-14). New rows 5 (TES_only) and 6 (DSM_only): same setup as 2/4, `BarHomogeneous=0`.
