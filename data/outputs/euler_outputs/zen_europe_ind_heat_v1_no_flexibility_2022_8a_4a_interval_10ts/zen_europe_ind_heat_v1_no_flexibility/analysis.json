@@ -1,5 +1,5 @@
 {
-  "dataset": "../../../scratch/hgoericke/zen_runs/task_50/zen_europe_ind_heat_v1_no_flexibility",
+  "dataset": "../../../scratch/hgoericke/zen_runs/task_1/zen_europe_ind_heat_v1_no_flexibility",
   "objective": "total_cost",
   "sense": "min",
   "subsets": {
@@ -45,7 +45,7 @@
     "representationMethod": "mean",
     "resolution": 1
   },
-  "folder_output": "../../../scratch/hgoericke/zen_runs/outputs/zen_europe_ind_heat_v1_no_flexibility_2022_8a_4a_interval_10ts_systemyaml",
+  "folder_output": "../../../scratch/hgoericke/zen_runs/outputs/zen_europe_ind_heat_v1_no_flexibility_2022_8a_4a_interval_10ts",
   "overwrite_output": true,
   "output_format": "h5",
   "output_version": 4,
