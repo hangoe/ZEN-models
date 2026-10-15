@@ -4,8 +4,8 @@ Two modes:
   * dataset (no solve): reads a ZEN-europe dataset and computes, per sector and
     temperature band, the largest heat pump share the diffusion limit allows in
     the first year, i.e. Σ_nodes capacity_addition_unbounded + market_share_unbounded
-    × existing capacity of the peers (same reference carrier), versus the band
-    demand. Upper bound: assumes the heat pumps run flat at full load.
+    × existing capacity of the peers (same reference carrier), capped by the
+    first-year capacity_limit, versus the band demand. Upper bound: assumes the heat pumps run flat at full load.
   * results: reads a solved run and prints the heat pump share of the industry
     heat per year, and for the first year each heat pump's capacity addition
     next to the rebuilt diffusion limit and the dual of
@@ -27,7 +27,7 @@ import yaml
 from plots.figure_settings import EULER_ROOT, OUTPUT_DIR, _search_var_dict
 
 DATASET_ROOT = OUTPUT_DIR / "zen-europe"
-TARGET_SHARE = 0.10
+TARGET_SHARE = 0.02
 HP_PREFIX = "heat_pump_industry_"
 
 
@@ -47,6 +47,17 @@ def _capacity_existing(tech_dir: Path, attributes: dict, year: int) -> float:
     df = pd.read_csv(path)
     lifetime = _value(attributes, "lifetime")
     return df.loc[df.year_construction + lifetime > year, "capacity_existing"].sum()
+
+
+def _capacity_limit(tech_dir: Path, year: int) -> float:
+    """Capacity limit (GW, summed over nodes) in `year`; inf if unlimited."""
+    path = tech_dir / "capacity_limit.csv"
+    if not path.exists():
+        return float("inf")
+    df = pd.read_csv(path)
+    if "year" in df.columns:
+        df = df[df.year == year]
+    return df.capacity_limit.sum()
 
 
 def _band_demand(dataset: Path) -> pd.Series:
@@ -90,11 +101,12 @@ def check_dataset(dataset: Path) -> None:
                 "tech": tech,
                 "seed": seed,
                 "market_share": market_share * sum(existing[t] for t in peers),
+                "capacity_limit": _capacity_limit(conversion / tech, year),
             }
         )
     df = pd.DataFrame(rows)
-    df["limit"] = df.seed + df.market_share
-    band = df.groupby("carrier")[["seed", "market_share", "limit"]].sum()
+    df["limit"] = (df.seed + df.market_share).clip(upper=df.capacity_limit)
+    band = df.groupby("carrier")[["seed", "market_share", "capacity_limit", "limit"]].sum()
     band["demand"] = demand.reindex(band.index)
     band["max_hp_share"] = (band.limit / band.demand).clip(upper=1)
     print(f"\n{dataset.name}: first year {year}, {nodes} nodes, "
@@ -128,9 +140,10 @@ def check_results(path: Path) -> None:
     print(f"\n{path.name}")
     print("heat pump share of industry heat:")
     print(share.map("{:.1%}".format).to_string())
-    band = final.groupby(level="carrier").sum()
+    # per carrier, the cascade inflow counts too (lower bands have no boilers)
+    band = flow.groupby(level="carrier").sum()
     band_hp = final[is_hp].groupby(level="carrier").sum()
-    print("\nheat pump share per heat carrier:")
+    print("\nheat pump share per heat carrier (incl. cascade inflow):")
     print((band_hp / band).reindex(band.index).fillna(0).round(2).to_string())
 
     # first year: addition vs. rebuilt diffusion limit

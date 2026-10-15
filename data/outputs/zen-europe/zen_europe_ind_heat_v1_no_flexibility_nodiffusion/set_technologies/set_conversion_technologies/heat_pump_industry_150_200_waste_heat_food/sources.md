@@ -22,7 +22,7 @@ capacity_addition_unbounded
 ---------------------------
 
 Step 1
-The existing district heating heat pumps, split by the sector's share in the heat demand of the band and by node, built over 2 years, see docs, 'Diffusion'.
+The existing district heating heat pumps, built over 15.0 years, per investment period, split by the sector's and band's share in the total industry heat demand, by heat source and by node, see docs, 'Diffusion'.
 
 **Citations**
 
@@ -59,7 +59,7 @@ capacity_limit
 --------------
 
 Step 1
-The waste heat of the processes above 200 °C, i.e., their fuel demand, split by the sector's heat demand per temperature band.
+The waste heat of the processes above 200 °C, i.e., their fuel demand, split by the sector's heat demand per temperature band. In 2022, at most 2% of the band demand per node (no industrial heat pumps today), split by heat source.
 
 **Citations**
 

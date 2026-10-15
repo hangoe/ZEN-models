@@ -14,7 +14,7 @@ capacity_addition_max:
   default_value: inf
   unit: GW
 capacity_addition_unbounded:
-  default_value: 0.11539447906047848
+  default_value: 0.0025714993202090065
   unit: GW
 capacity_existing:
   default_value: 0.0
