@@ -12,7 +12,7 @@
     "NumericFocus": 2
   },
   "check_unit_consistency": true,
-  "solver_dir": "../../../scratch/hgoericke/zen_runs/outputs/zen_europe_ind_heat_v1_full_flexibility_2022_8a_4a_interval_10ts_tescaplimit_bh0",
+  "solver_dir": "../../../scratch/hgoericke/zen_runs/outputs/zen_europe_ind_heat_v1_full_flexibility_2022_8a_4a_interval_10ts",
   "keep_files": false,
   "io_api": "lp",
   "save_duals": true,

@@ -8,8 +8,8 @@ zen_run_*.out
 zen_run_*.err
 *.pyc
 .DS_Store
-data/outputs/euler_outputs/zen_europe_ind_heat_v1_full_flexibility_single_temp_2022_8a_4a_interval_10ts/zen_europe_ind_heat_v1_full_flexibility_single_temp/duals.nc
-data/outputs/euler_outputs/zen_europe_ind_heat_v1_full_flexibility_2022_8a_4a_interval_10ts/zen_europe_ind_heat_v1_full_flexibility/duals.nc
+# solver duals: large (up to >100 MB, GitHub's hard limit) and not needed for figures
+data/outputs/euler_outputs/**/duals.nc
 
 # local run staging (run_model.py --run_on local)
 _runs/

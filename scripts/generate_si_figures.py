@@ -294,7 +294,7 @@ SCENARIOS = [
     ("zen_europe_ind_heat_v1_DSM_pessimistic_2022_8a_4a_interval_10ts", "DSM pessimistic"),
     ("zen_europe_ind_heat_v1_DSM_only_2022_8a_4a_interval_10ts", "DSM only"),
     ("zen_europe_ind_heat_v1_TES_only_2022_8a_4a_interval_10ts", "TES only"),
-    ("zen_europe_ind_heat_v1_full_flexibility_single_temp_2022_8a_4a_interval_10ts", "Single temperature level"),
+    ("zen_europe_ind_heat_v1_full_flexibility_single_temp", "Single temperature level"),
 ]
 
 # fig0a/fig0b only. Uses SCENARIO_PALETTE slot 6 (grey) — see the comment there.
@@ -2347,9 +2347,9 @@ def fig14b_cost_and_emissions_totals_singletemp_vs_full(no_flex_run: Run, no_fle
     emissions identical to the last digit across all 4 — confirmed
     directly), so the temperature-band resolution changes HOW the budget is
     met, not how much of it is used, in BOTH model options. Cost deltas are
-    similarly small in both pairs (No flexibility: +90.6 bn EUR = +0.37%;
-    Full flexibility: +82.9 bn EUR = +0.34%), so the y-limits are pinned
-    tight around all 4 bars (24,300-24,650) instead of the automatic 0.9x
+    similarly small in both pairs (No flexibility: +86.7 bn EUR = +0.33%;
+    Full flexibility: +88.8 bn EUR = +0.34%), so the y-limits are pinned
+    tight around all 4 bars (derived from their totals) instead of the automatic 0.9x
     truncation, which at this delta size would leave the cost deltas a
     1-pixel sliver. `delta_fmt` keeps 1 decimal on the delta labels for the
     same reason. Emissions panel dropped per user request — all 4 runs share
@@ -2365,9 +2365,20 @@ def fig14b_cost_and_emissions_totals_singletemp_vs_full(no_flex_run: Run, no_fle
     # Extra gap (0.6 instead of the usual 1.0 spacing) between the 2 pairs so
     # they read as visually distinct groups, not one continuous 4-bar comparison.
     x = np.array([0, 1, 2.6, 3.6])
-    _cost_and_emissions_totals([no_flex_run, no_flex_single_run, full_run, single_temp_run], base_for,
+    # Tight y-limits derived from the 4 totals (rounded out to 50 bn EUR):
+    # one data-span of headroom below the lowest bar and 0.6 above the
+    # highest for the value/delta labels. Previously hardcoded to
+    # 24,300-24,650, which silently pushed every bar off-axis once a re-run
+    # shifted the totals (zen-europe runs: ~26,250-26,370).
+    runs = [no_flex_run, no_flex_single_run, full_run, single_temp_run]
+    costs = [_discounted_total_cost_bn(r) for r in runs]
+    lo, hi = min(costs), max(costs)
+    span = max(hi - lo, 1.0)
+    bottom = np.floor((lo - span) / 50) * 50
+    top = np.ceil((hi + 0.6 * span) / 50) * 50
+    _cost_and_emissions_totals(runs, base_for,
                                delta_color, "fig14b_cost_emissions_totals_singletemp_vs_full",
-                               bottom=24300, top=24650, delta_fmt="{:,.1f}", x=x, figsize=(7.5, 4.6),
+                               bottom=bottom, top=top, delta_fmt="{:,.1f}", x=x, figsize=(7.5, 4.6),
                                cost_only=True)
 
 
