@@ -2,9 +2,9 @@
 
 As of 2026-10-12 the figures are generated from the zen-europe runs
 (zen_europe_ind_heat_v1_*, current ZEN-garden output format), not the
-Crystal Ball v9_0 runs the history below describes; the previous figures are
+ZEN-Europe v9_0 runs the history below describes; the previous figures are
 in SI_results/archive/. zen-europe's per-sector industry techs/carriers are
-aggregated back to the Crystal Ball names at load time
+aggregated back to the ZEN-Europe names at load time
 (figure_settings.SectorAggregatedResults), and the hardcoded snapshot years
 below are snapped to each run's modeled years in main() (_snap_years).
 Scenarios that haven't been run yet are skipped, as before.
@@ -14,7 +14,7 @@ Covers the SI Results subsections in `MT_report_HG/Sections/03_SI.tex`
 case-study scenarios in that section's Table~SIScenarios — 6
 Crystal_Ball_HG_v7_0 euler runs (Full flexibility, No flexibility, DSM only,
 TES only, Single temperature level, DSM pessimistic) plus the unmodified
-"Crystal Ball (base)" reference case (dataset `Crystal_Ball`, plain — no
+"ZEN-Europe (base)" reference case (dataset `Crystal_Ball`, plain — no
 `Crystal_Ball_HG_v7_0` prefix, staged from data/Crystal_Ball, see
 run_model.py):
 
@@ -35,12 +35,12 @@ it actually lands on disk.
 SI_results/ (results; removed/superseded figures are kept in SI_results/archive/,
 the zen-europe versions of removed ones in archive/zen_europe/):
   fig1_cost_composition (was fig0a)            — CAPEX/OPEX/carrier/carbon-cost breakdown of each v7_0
-                                          scenario's cost increase vs Crystal Ball base
-  fig2_emissions_source_comparison (was fig0b) — Full flex vs Crystal Ball base, year 2025: where the
+                                          scenario's cost increase vs ZEN-Europe base
+  fig2_emissions_source_comparison (was fig0b) — Full flex vs ZEN-Europe base, year 2025: where the
                                           emissions increase comes from vs. only a modest cost delta
   fig5b_dsm_discharge_by_product        — annual DSM throughput per product: optimistic vs pessimistic
   fig6_heat_pathway (was fig3b)        — direct vs temp-conversion heat production, 2050
-  fig7_retrofit_ccs_comparison (was fig5) — CO2 captured by retrofit-CCS technology, No flexibility vs Crystal Ball base
+  fig7_retrofit_ccs_comparison (was fig5) — CO2 captured by retrofit-CCS technology, No flexibility vs ZEN-Europe base
   fig8a_diffusion_mechanisms_heat_pumps — technology-diffusion limit decomposition for the industry heat pumps
   fig9_heat_supply_trajectory_noflex_vs_fullflex — industry heat output / capacity stock / capacity
                                           additions over every modeled year, No flexibility (left) next
@@ -49,7 +49,7 @@ the zen-europe versions of removed ones in archive/zen_europe/):
                                           supply") panel only, in TWh
   fig15b_heat_supply_output_full_flexibility_twh — same as fig15a, for the Full flexibility scenario
   fig12_capacity_and_storage_base_and_delta — power generation capacity & storage annual energy
-                                          discharged at 2030/2040/2050, as Crystal Ball base (absolute
+                                          discharged at 2030/2040/2050, as ZEN-Europe base (absolute
                                           stack) + a floating Δ No flexibility bar per year
   fig14a_heat_supply_electrification_singletemp_vs_full — "electrified" industry heat share (heat
                                           pump + electrode boiler, stacked) at 2030/2040/2050, as 2
@@ -65,17 +65,25 @@ the zen-europe versions of removed ones in archive/zen_europe/):
                                           counterpart's difference, and (separately) Full flexibility's
                                           own totals in grey vs. its single-temp counterpart's difference
   fig30_matrix                         — fig14b's 4 runs as a 2x2 matrix (flexibility x temperature
-                                          resolution), cells shaded by total cost, with arrows from the
+                                          resolution), 2x3 panels (cost, HP share / VRE, bulk storage
+                                          discharge), cells shaded by value, with arrows from the
                                           cheapest cell (Full flexibility, 3 temp levels) giving each
                                           other cell's extra cost in % and bn EUR
   fig20_cost_breakdown_sector_industry_heating — total system cost drilled down sector ->
                                           industries -> low-temperature heat
+  fig40_flex_scenarios                 — flexibility scenarios (DSM pessimistic/DSM only/TES only/
+                                          No flexibility) as horizontal-bar differences to Full
+                                          flexibility on fig30's 4 dimensions + DSM and TES discharge (2x3)
+  fig41_flex_scenarios_table           — fig40's data as a heatmap table: absolute values, cells
+                                          shaded by the difference to Full flexibility (per column)
+  fig42_flex_decomposition             — fig40's data as steps No flexibility -> TES only / DSM only
+                                          -> Full flexibility, per metric
 
 SI_results/method/ (no results — methodological/context only; removed ones in archive/method/):
   fig2_industry_fuel_demand_comparison (was fig4b) — new-sector heat/fuel demand vs. pre-existing cement/steel fuel mix
   fig3_industry_sector_emissions_context (was fig8) — European industry CO2 emissions by
-                                          subsector (JRC-IDEES-2023), colored by Crystal Ball scope
-  fig4_model_scope_coverage (was fig9)  — Crystal Ball's (+ its industry-heat extension's) share of
+                                          subsector (JRC-IDEES-2023), colored by ZEN-Europe scope
+  fig4_model_scope_coverage (was fig9)  — ZEN-Europe's (+ its industry-heat extension's) share of
                                           total European direct CO2 emissions (Mannhardt 2026 + UNFCCC CRF)
   fig9_global_ghg_sector_breakdown (new, fig15) — global GHG emissions by sector (WRI/Climate Watch):
                                           Energy -> Electricity & Heat / industry energy use, plus
@@ -110,7 +118,7 @@ SI_results/method/ (no results — methodological/context only; removed ones in 
 fig4b (now method/fig2) and fig8/fig9 (now method/fig3, method/fig4) live
 in method/ because none of them plot a SOLVED MODEL RESULT: fig4b is an
 input-vs-context comparison, and fig8/fig9 plot external JRC-IDEES-2023/
-UNFCCC input data establishing Crystal Ball's scope. fig11/fig13/fig14
+UNFCCC input data establishing ZEN-Europe's scope. fig11/fig13/fig14
 (now method/fig5, fig7, fig8) are method figures by construction (see
 below).
 
@@ -157,11 +165,11 @@ standalone comparison across the 6 v7_0 scenarios: their horizon-total
 emissions only span ~2.3% of each other (headline_metrics.csv), so an
 absolute-scale trajectory or decomposition just shows six overlapping lines/
 bars. fig0b covers a single-scenario ("Full flexibility") emissions
-comparison against Crystal Ball base instead — see
+comparison against ZEN-Europe base instead — see
 fig0b_emissions_source_comparison's docstring — without a dedicated,
 mostly-flat fig3b-only pairing.
 
-"Crystal Ball (base)" only feeds fig0a/0b. `load_base_scenario()` still skips
+"ZEN-Europe (base)" only feeds fig0a/0b. `load_base_scenario()` still skips
 them gracefully (with a printed note) if Crystal_Ball_2025_10a_5a_interval_10ts/
 isn't present under EULER_ROOT, but as of v7_0 it has converged and is loaded
 normally. It's deliberately NOT a 7th entry in SCENARIOS below or
@@ -172,7 +180,7 @@ absence. Cost and emissions totals, by contrast, are well-defined for any
 run regardless of sector structure, which is what makes it fig0a/0b material.
 
 CAUTION on fig0a's headline numbers (found while building it): each v7_0
-scenario's cost increase vs Crystal Ball base is NOT evenly spread across the
+scenario's cost increase vs ZEN-Europe base is NOT evenly spread across the
 horizon or across cost components — see fig0a_cost_composition's docstring
 for the full breakdown. In short: (1) ~half the cost delta is concentrated
 in the single final year 2070, which behaves very differently between the
@@ -278,12 +286,12 @@ COMPARISON_YEARS = [2030, 2040, 2050]
 # Thesis-consistent scenario order/labels (Table~SIScenarios) — matches the
 # dashboard's own "Full Flexibility" label for this run (figure_settings.
 # EULER_SCENARIO_LABELS; the dashboard separately labels the true
-# "Crystal Ball (base)" run "Baseline" — a different run from this one, not
+# "ZEN-Europe (base)" run "Baseline" — a different run from this one, not
 # to be confused with each other despite the overlapping word). Order matches
-# Table SIScenarios (excluding "Crystal Ball (base)", handled separately via
+# Table SIScenarios (excluding "ZEN-Europe (base)", handled separately via
 # BASE_SCENARIO below) and figure_settings.EULER_SCENARIO_ORDER, so the same
 # scenario gets the same SCENARIO_PALETTE slot 0-5 everywhere; slot 6 (grey)
-# is reserved for "Crystal Ball (base)" — see the module docstring for why it
+# is reserved for "ZEN-Europe (base)" — see the module docstring for why it
 # isn't a 7th entry here.
 # zen-europe: "No flexibility" is the full-horizon run (parameters.csv task 50,
 # 2022-2050, time steps per system.yaml). The other entries use the folder
@@ -319,7 +327,7 @@ SCENARIOS = [
 # 2026-09 "add 2050" re-sync: base case re-run with optimized_years=16
 # (2020-2050, matching the SCENARIOS list's new 16a runs) — see the
 # COMPARISON_YEARS comment above for the same re-sync.
-BASE_SCENARIO = ("zen_europe_base", "Crystal Ball (base)")
+BASE_SCENARIO = ("zen_europe_base", "ZEN-Europe (base)")
 
 # Single-temperature-band counterpart of "No flexibility", loaded separately
 # from SCENARIOS (like BASE_SCENARIO) since it isn't one of the 6 case-study
@@ -495,7 +503,7 @@ PLOTTED_COST_COMPONENT_COLORS = COST_COMPONENT_COLORS[:3]
 
 
 def fig0a_cost_composition(components_with_base: pd.DataFrame) -> None:
-    """Decomposes each v7_0 scenario's cost increase vs Crystal Ball base into
+    """Decomposes each v7_0 scenario's cost increase vs ZEN-Europe base into
     CAPEX/OPEX/carrier (carbon emissions cost excluded — see
     PLOTTED_COST_COMPONENTS above), to show what's actually driving the
     non-carbon part of the increase.
@@ -521,7 +529,7 @@ def fig0a_cost_composition(components_with_base: pd.DataFrame) -> None:
     others = components_with_base.drop(base_label)
     others = others.drop(index="Single temperature level", errors="ignore")
     delta = others.subtract(baseline, axis=1)
-    # Percentages are relative to "No flexibility" (first scenario), not the Crystal Ball base.
+    # Percentages are relative to "No flexibility" (first scenario), not the ZEN-Europe base.
     ref_label = SCENARIOS[0][1]
     ref_total_cost = others.loc[ref_label].sum()  # all 4 components, i.e. full net_present_cost
 
@@ -547,8 +555,8 @@ def fig0a_cost_composition(components_with_base: pd.DataFrame) -> None:
     ax.axhline(0, color="black", linewidth=0.8)
     ax.set_xticks(x)
     ax.set_xticklabels(delta.index, rotation=25, ha="right", fontsize=9)
-    ax.set_ylabel(r"$\Delta$ discounted system cost vs Crystal Ball base [MEUR]")
-    ax.set_title("Non-Carbon Cost Increase vs Crystal Ball Base\n(% labels relative to No flexibility)",
+    ax.set_ylabel(r"$\Delta$ discounted system cost vs ZEN-Europe base [MEUR]")
+    ax.set_title("Non-Carbon Cost Increase vs ZEN-Europe Base\n(% labels relative to No flexibility)",
                  fontsize=12, fontweight="bold")
     ax.set_ylim(top=ax.get_ylim()[1] * 1.15)  # headroom so the legend clears the bars
     ax.legend(fontsize=9, frameon=True, facecolor="white", framealpha=0.9, loc="upper center", ncol=3)
@@ -671,7 +679,7 @@ def fig9_heat_supply_trajectory(no_flex_run: Run, full_run: Run) -> None:
     axis: operated output (TWh), capacity stock (GW), capacity additions
     (GW/period). Replaces the former separate fig9 (No flexibility) and
     fig9b (Full flexibility). The mechanism notes below were written for the
-    No flexibility case (Crystal Ball v9_0 numbers).
+    No flexibility case (ZEN-Europe v9_0 numbers).
 
     Middle row: capacity stock per period. Bottom row: capacity
     ADDITIONS per period (capacity_addition, i.e. new builds only, not net of
@@ -1063,7 +1071,7 @@ def fig14a_heat_supply_electrification_singletemp_vs_full(no_flex_run: Run, no_f
 # year's hours gives a genuine annual kt-CO2-captured total, not something
 # needing a HOURS_PER_YEAR correction). cement_post_comb/BF_BOF_CCS/NG_DRI_
 # CCS/SMR_CCS/biomass_plant_CCS/natural_gas_turbine_CCS exist in both "No
-# flexibility" and "Crystal Ball (base)" (steel/cement/power-sector CCS
+# flexibility" and "ZEN-Europe (base)" (steel/cement/power-sector CCS
 # predates the industry-heat extension); ceramic_post_comb/glass_post_comb
 # exist ONLY in "No flexibility" (ceramic/glass production don't exist in
 # base at all — see project memory) and so show as 0 for base, by design.
@@ -1104,7 +1112,7 @@ def _ccs_captured_by_tech(r, year: int) -> pd.Series:
 
 def fig5_retrofit_ccs_comparison(no_flex_run: Run, base_run: Run) -> None:
     """CO2 actually captured (kt CO2eq) by each retrofit-CCS technology,
-    "No flexibility" (v9_0) vs. "Crystal Ball (base)", for 2030/2040/2050 —
+    "No flexibility" (v9_0) vs. "ZEN-Europe (base)", for 2030/2040/2050 —
     one axes, grouped bars (per tech: base 2030/2040/2050, then no-flex
     2030/2040/2050). See RETROFIT_CCS_TECHS above for which technologies
     count as "retrofit" and why DAC/carbon_storage/carbon_pipeline are
@@ -1965,7 +1973,7 @@ def fig8a_diffusion_mechanisms_heat_pumps(runs: list[Run]) -> None:
     savefig(fig, "fig8a_diffusion_mechanisms_heat_pumps")
 
 
-# ── 0b: Emissions-source comparison, Full flexibility vs Crystal Ball base ──
+# ── 0b: Emissions-source comparison, Full flexibility vs ZEN-Europe base ──
 
 # Print-figure-specific ETH palette (does NOT touch the shared, dashboard-wide
 # COLOR_MAP in figure_settings.py — see plot_stacked_bars(color_map=...)),
@@ -2006,7 +2014,7 @@ EMISSIONS_COLOR_MAP = {
 
 def fig0b_emissions_source_comparison(base_run: Run, no_flex_run: Run, full_run: Run) -> None:
     """Panel A explains the emissions increase for "Full flexibility" vs
-    "Crystal Ball (base)" being much larger (proportionally) than the cost
+    "ZEN-Europe (base)" being much larger (proportionally) than the cost
     increase (fig0a): decomposes each run's year-2025 emissions into carrier
     (fuel combustion) and technology (process + carbon capture) components.
     Panel B then shows WHY the system can't just decarbonize its way out of
@@ -2047,7 +2055,7 @@ def fig0b_emissions_source_comparison(base_run: Run, no_flex_run: Run, full_run:
     year is simultaneously the fair comparison on the WRI single-year
     dimension AND avoids needing the gross/net distinction at all.
 
-    Root cause of the gap itself: "Crystal Ball (base)" has NO industry-heat
+    Root cause of the gap itself: "ZEN-Europe (base)" has NO industry-heat
     or production sector demand at all — no glass/ceramic/paper/food, no
     heat_industry_0_100/100_150/150_200 (confirmed via `results.get_total
     ("demand")`: these carriers are entirely absent from the base run's
@@ -2063,7 +2071,7 @@ def fig0b_emissions_source_comparison(base_run: Run, no_flex_run: Run, full_run:
     the size of the gap here is a real modeling consequence of extending
     scope, not an error.
 
-    Crystal Ball's scope (README.md: EU27+NO+CH+UK-MT-CY, electricity/heat/
+    ZEN-Europe's scope (README.md: EU27+NO+CH+UK-MT-CY, electricity/heat/
     transport/steel/cement/ammonia/methanol/olefins) maps onto WRI's
     "Energy" (76.7%) + "Industrial processes" (6.2%) categories but excludes
     agriculture (12.3%) and land use (0.9%) — so the ~12% figure here is
@@ -2504,6 +2512,57 @@ def _fig30_matrix_panel(fig: plt.Figure, ax: plt.Axes, values: dict[tuple[int, i
     return cbar
 
 
+_FIG30_METRICS_CACHE: dict[tuple[int, int], dict[str, float]] = {}
+
+
+def _fig30_metrics(r: Run) -> dict[str, float]:
+    """The 6 dimensions fig30 (and fig40) compare, for one run: discounted
+    total system cost [bn EUR]; FIG30_YEAR total heat-pump share of industry
+    heat output [%] (all temperature bands and sources, same
+    _electrification_stack data as fig14a); FIG30_YEAR variable renewable
+    capacity [GW]; and FIG30_YEAR annual discharge [TWh, GWh -> TWh] split
+    three ways — bulk storage (BULK_STORAGE_TECHS), industry DSM energy
+    equivalent (get_dsm_energy_equivalent) and industry TES
+    (INDUSTRY_TES_TECHS). DSM/TES are 0 in runs without them."""
+    key = (id(r.results), FIG30_YEAR)  # memoized: fig30/40/41/42 all need it
+    if key in _FIG30_METRICS_CACHE:
+        return _FIG30_METRICS_CACHE[key]
+
+    def discharge_twh(techs: list[str]) -> float:
+        return float(get_storage_flows(r.results, techs, "flow_storage_discharge")
+                     .get(FIG30_YEAR, pd.Series(dtype=float)).sum()) / 1000.0
+    vre = float(get_capacity(r.results, FIG30_VRE_TECHS, "power")
+                .get(FIG30_YEAR, pd.Series(dtype=float)).sum())
+    dsm = get_dsm_energy_equivalent(r.results, DSM_ENERGY_STACK_ORDER, [FIG30_YEAR]).sum() \
+        .get(FIG30_YEAR, 0.0)
+    stack = _electrification_stack(r)
+    hp_cols = [c for c in stack.columns if c.startswith("heat_pump")]
+    _FIG30_METRICS_CACHE[key] = {"cost": _discounted_total_cost_bn(r),
+                                 "hp_share": float(stack.loc[FIG30_YEAR, hp_cols].sum()),
+                                 "vre": vre,
+                                 "storage": discharge_twh(BULK_STORAGE_TECHS),
+                                 "dsm": float(dsm) / 1000.0,
+                                 "tes": discharge_twh(INDUSTRY_TES_TECHS)}
+    return _FIG30_METRICS_CACHE[key]
+
+
+# fig30 panels in grid order (row-major, 2x2): metric key (_fig30_metrics)
+# -> (title, unit, colourbar label, _fig30_matrix_panel kwargs). Storage is
+# bulk storage only — DSM/TES discharge are 0 in No flexibility, so a matrix
+# against it says nothing; fig40 shows them per scenario instead.
+FIG30_PANELS = {
+    "cost": ("Total cumulative costs in bn €", "bn €",
+             "Discounted total system cost [bn EUR]", {}),
+    "hp_share": (f"Heat-pump share of industrial heat {FIG30_YEAR} in %", "%",
+                 f"Heat-pump share of industry heat output {FIG30_YEAR} [%]",
+                 dict(value_fmt="{:.1f}", delta_unit="pp")),
+    "vre": (f"Variable renewable capacity {FIG30_YEAR} in GW", "GW",
+            f"Solar + wind + hydro capacity {FIG30_YEAR} [GW]", {}),
+    "storage": (f"Storage discharge {FIG30_YEAR} in TWh", "TWh",
+                f"Annual bulk storage discharge {FIG30_YEAR} [TWh]", {}),
+}
+
+
 def fig30_matrix(no_flex_run: Run, no_flex_single_run: Run, full_run: Run,
                  single_temp_run: Run) -> None:
     """fig14b's 4 runs laid out as 2x2 matrices — columns Full flexibility /
@@ -2516,56 +2575,27 @@ def fig30_matrix(no_flex_run: Run, no_flex_single_run: Run, full_run: Run,
     (the diagonal + horizontal arrows) — the whole point of the matrix is a
     single shared baseline.
 
-    Panels (2x2, row-major): (1) discounted total system cost [bn EUR];
-    (1b) 2050 total heat-pump share of industry heat output [%] — same
-    _electrification_stack data as fig14a, change shown in pp; (2) 2050 variable
-    renewable power capacity [GW] — solar + wind (on/offshore) + hydro
-    (reservoir, run-of-river), summed; (3) 2050 annual storage discharge
-    [TWh/yr] over BULK_STORAGE_TECHS plus the industry DSM energy
-    equivalent (get_dsm_energy_equivalent), i.e. bulk discharge + DSM
-    combined — without DSM, Full flexibility's bulk discharge is ~91 TWh
-    BELOW No flexibility's (DSM displaces battery/gas-storage cycling),
-    with it slightly above. Discharge rather than storage ENERGY capacity per user choice:
-    energy capacity is ~98% natural_gas_storage (~1,015 TWh, essentially
-    all existing stock and identical across scenarios), whereas discharge
-    is what fig12 already shows (battery-dominated).
+    Panels (2x2, row-major, see _fig30_metrics): top row discounted total
+    system cost [bn EUR] | 2050 total heat-pump share of industry heat
+    output [%] (change in pp); bottom row 2050 variable renewable power
+    capacity [GW] (solar + wind on/offshore + reservoir/run-of-river hydro)
+    | 2050 annual bulk storage discharge [TWh], without DSM and TES (per
+    user: DSM/TES are 0 in No flexibility, so their matrix cells say
+    nothing — fig40 shows them per flexibility scenario). Discharge rather than storage ENERGY
+    capacity per user choice: energy capacity is ~98% natural_gas_storage
+    (~1,015 TWh, essentially all existing stock and identical across
+    scenarios), whereas discharge is what fig12 already shows
+    (battery-dominated).
     -> SI_results/fig30_matrix.svg
     """
     cells = {(0, 0): full_run, (0, 1): no_flex_run,
              (1, 0): single_temp_run, (1, 1): no_flex_single_run}
-    cost = {rc: _discounted_total_cost_bn(r) for rc, r in cells.items()}
-    vre = {rc: float(get_capacity(r.results, FIG30_VRE_TECHS, "power")
-                     .get(FIG30_YEAR, pd.Series(dtype=float)).sum())
-           for rc, r in cells.items()}
-    # Bulk storage discharge + industry DSM energy equivalent, both GWh ->
-    # TWh (DSM is 0 in No flexibility).
-    storage = {}
-    for rc, r in cells.items():
-        bulk = get_storage_flows(r.results, BULK_STORAGE_TECHS, "flow_storage_discharge") \
-            .get(FIG30_YEAR, pd.Series(dtype=float)).sum()
-        dsm = get_dsm_energy_equivalent(r.results, DSM_ENERGY_STACK_ORDER, [FIG30_YEAR]).sum() \
-            .get(FIG30_YEAR, 0.0)
-        storage[rc] = float(bulk + dsm) / 1000.0
+    metrics = {rc: _fig30_metrics(r) for rc, r in cells.items()}
+    vals = {k: {rc: m[k] for rc, m in metrics.items()} for k in FIG30_PANELS}
 
-    # Total heat-pump share of industry heat output (all temperature bands
-    # and sources), same _electrification_stack data as fig14a.
-    hp_share = {}
-    for rc, r in cells.items():
-        stack = _electrification_stack(r)
-        hp_cols = [c for c in stack.columns if c.startswith("heat_pump")]
-        hp_share[rc] = float(stack.loc[FIG30_YEAR, hp_cols].sum())
-
-    # 2x2 grid of panels: top row cost | HP share, bottom row VRE | storage.
+    # 2x2 grid of panels: cost | HP share over VRE | storage.
     fig, axes = plt.subplots(2, 2, figsize=(15, 14))
-    panels = [(cost, "Total cumulative costs in bn €", "bn €",
-               "Discounted total system cost [bn EUR]", {}),
-              (hp_share, f"Heat-pump share of industrial heat {FIG30_YEAR} in %", "%",
-               f"Heat-pump share of industry heat output {FIG30_YEAR} [%]",
-               dict(value_fmt="{:.1f}", delta_unit="pp")),
-              (vre, f"Variable renewable capacity {FIG30_YEAR} in GW", "GW",
-               f"Solar + wind + hydro capacity {FIG30_YEAR} [GW]", {}),
-              (storage, f"Storage discharge incl. DSM {FIG30_YEAR} in TWh", "TWh",
-               f"Annual storage + DSM discharge {FIG30_YEAR} [TWh]", {})]
+    panels = [(vals[k], *FIG30_PANELS[k]) for k in FIG30_PANELS]
     cbars = [_fig30_matrix_panel(fig, ax, vals, title, unit, cbar_label, row_labels=(i % 2 == 0),
                                  **kw)
              for i, (ax, (vals, title, unit, cbar_label, kw)) in enumerate(zip(axes.flat, panels))]
@@ -2588,6 +2618,205 @@ def fig30_matrix(no_flex_run: Run, no_flex_single_run: Run, full_run: Run,
                  "the largest change within each panel.", ha="center", va="top", fontsize=10,
                  style="italic", color="black")
     savefig(fig, "fig30_matrix")
+
+
+# fig40 panels — fig30's 4 plus DSM and TES discharge: key -> (title, Δ unit,
+# value format). The baseline's absolute value is shown in "%" for hp_share.
+FIG40_PANELS = {"cost": ("Total cumulative costs", "bn €", "{:,.0f}"),
+                "hp_share": (f"Heat-pump share {FIG30_YEAR}", "pp", "{:.1f}"),
+                "vre": (f"Variable renewables {FIG30_YEAR}", "GW", "{:,.0f}"),
+                "storage": (f"Storage discharge {FIG30_YEAR}", "TWh", "{:,.0f}"),
+                "dsm": (f"DSM discharge {FIG30_YEAR}", "TWh", "{:,.0f}"),
+                "tes": (f"TES discharge {FIG30_YEAR}", "TWh", "{:,.1f}")}
+# Full flexibility on top (the zero line), No flexibility at the bottom,
+# behind a dashed separator.
+FIG40_ORDER = ["Full flexibility", "DSM pessimistic", "DSM only", "TES only", "No flexibility"]
+
+
+def fig40_flex_scenarios(runs: list[Run]) -> None:
+    """The flexibility scenarios compared on fig30's 4 dimensions plus DSM
+    and TES discharge (2x3 panels), per user sketch rotated to horizontal: scenarios down the
+    y-axis, one bar per scenario giving its difference to Full flexibility
+    (the vertical zero line, labelled with its absolute value), with No
+    flexibility set apart at the bottom behind a dashed line. Bars in each
+    run's SCENARIO_PALETTE colour; each carries its absolute and relative
+    difference. Heat-pump share differences are in percentage points.
+    -> SI_results/fig40_flex_scenarios.svg
+    """
+    by = {r.label: r for r in runs}
+    order = [lbl for lbl in FIG40_ORDER if lbl in by]
+    metrics = {lbl: _fig30_metrics(by[lbl]) for lbl in order}
+    base = metrics["Full flexibility"]
+    y = np.arange(len(order))
+
+    fig, axes = plt.subplots(2, 3, figsize=(16, 8), sharey=True)
+    for ax, (key, (title, unit, fmt)) in zip(axes.flat, FIG40_PANELS.items()):
+        deltas = [metrics[lbl][key] - base[key] for lbl in order]
+        ax.barh(y, deltas, height=0.6, color=[by[lbl].color for lbl in order],
+                edgecolor="#1F2A3A", linewidth=1.0, zorder=2)
+        ax.axvline(0, color="#1F2A3A", linewidth=1.2, zorder=3)
+        lo, hi = min(0.0, *deltas), max(0.0, *deltas)
+        span = (hi - lo) or 1.0
+        # Room beside the bar ends for the labels.
+        ax.set_xlim(lo - (0.6 if lo < 0 else 0.1) * span, hi + (0.6 if hi > 0 else 0.1) * span)
+        pct_fmt = "{:.2f}" if key == "cost" else "{:.1f}"
+        for yi, lbl, d in zip(y, order, deltas):
+            if lbl == "Full flexibility":
+                abs_unit = "%" if key == "hp_share" else unit
+                left = hi <= 0  # put it on whichever side has room
+                ax.text(-0.03 * span if left else 0.03 * span, yi,
+                        f"{fmt.format(base[key])} {abs_unit}", ha="right" if left else "left",
+                        va="center", fontsize=9, style="italic")
+                continue
+            sign = "+" if d >= 0 else "−"
+            pct = f" ({sign}{pct_fmt.format(abs(d) / base[key] * 100)} %)" if base[key] else ""
+            ax.text(d + (0.03 if d >= 0 else -0.03) * span, yi,
+                    f"{sign}{fmt.format(abs(d))} {unit}\n{pct.strip()}",
+                    ha="left" if d >= 0 else "right", va="center", fontsize=8.5)
+        ax.axhline(len(order) - 1.5, color="#1F2A3A", linestyle="--", linewidth=1.0)
+        ax.set_title(title, fontsize=11.5, fontweight="bold")
+        ax.set_xlabel(f"Δ {unit}", fontsize=10)
+        ax.xaxis.set_major_formatter(plt.FuncFormatter(lambda v, _, span=span: f"{v:,.0f}"
+                                                       if span >= 10 else f"{v:,.1f}"))
+        ax.tick_params(axis="x", labelsize=9)
+        ax.tick_params(axis="y", length=0, labelsize=10.5)
+        for side in ("top", "right", "left"):
+            ax.spines[side].set_visible(False)
+    axes[0, 0].set_yticks(y)
+    axes[0, 0].set_yticklabels(order)
+    axes[0, 0].invert_yaxis()
+    fig.tight_layout()
+    savefig(fig, "fig40_flex_scenarios")
+
+
+def fig41_flex_scenarios_table(runs: list[Run]) -> None:
+    """fig40's data as an annotated heatmap table (alternative to fig40, per
+    user): scenarios as rows (FIG40_ORDER, No flexibility below a dashed
+    line), the FIG40_PANELS metrics as columns. Each cell gives the absolute
+    value and, under it, the difference to Full flexibility (absolute and
+    %; pp for the heat-pump share), and is shaded by that difference — ETH
+    blue below / red above Full flexibility, scaled per column to its
+    largest |difference| (cost moves by ~0.1 %, DSM/TES by up to 100 %, so a
+    shared scale would leave most columns white).
+    -> SI_results/fig41_flex_scenarios_table.svg
+    """
+    by = {r.label: r for r in runs}
+    order = [lbl for lbl in FIG40_ORDER if lbl in by]
+    metrics = {lbl: _fig30_metrics(by[lbl]) for lbl in order}
+    base = metrics["Full flexibility"]
+    cmap = LinearSegmentedColormap.from_list("fig41_delta", [_ETH_BLUE, "white", _ETH_RED])
+    norm = Normalize(vmin=-1, vmax=1)
+
+    fig, ax = plt.subplots(figsize=(15, 5.6))
+    for col, (key, (title, unit, fmt)) in enumerate(FIG40_PANELS.items()):
+        abs_unit = "%" if key == "hp_share" else unit
+        ax.text(col + 0.5, -0.12, f"{title}\n[{abs_unit}]", ha="center", va="bottom",
+                fontsize=10.5, fontweight="bold")
+        max_abs = max(abs(metrics[lbl][key] - base[key]) for lbl in order) or 1.0
+        pct_fmt = "{:.2f}" if key == "cost" else "{:.1f}"
+        for row, lbl in enumerate(order):
+            val = metrics[lbl][key]
+            d = val - base[key]
+            color = cmap(norm(d / max_abs))
+            ax.add_patch(Rectangle((col, row), 1, 1, facecolor=color, edgecolor="white",
+                                   linewidth=2, zorder=1))
+            text_color = _text_color_for_bg(color)
+            ax.text(col + 0.5, row + 0.4, fmt.format(val), ha="center", va="center",
+                    fontsize=12, fontweight="bold", color=text_color)
+            if lbl == "Full flexibility":
+                sub = "baseline"
+            else:
+                sign = "+" if d >= 0 else "−"
+                sub = (f"{sign}{fmt.format(abs(d))} {unit} "
+                       f"({sign}{pct_fmt.format(abs(d) / base[key] * 100)} %)")
+            ax.text(col + 0.5, row + 0.72, sub, ha="center", va="center", fontsize=9,
+                    style="italic" if lbl == "Full flexibility" else "normal", color=text_color)
+    n_cols = len(FIG40_PANELS)
+    for row, lbl in enumerate(order):
+        ax.text(-0.08, row + 0.5, lbl, ha="right", va="center", fontsize=11)
+    ax.plot([-0.9, n_cols], [len(order) - 1] * 2, color="#1F2A3A", linestyle="--",
+            linewidth=1.2, clip_on=False, zorder=3)
+    ax.set_xlim(0, n_cols)
+    ax.set_ylim(len(order), 0)
+    ax.axis("off")
+    cbar = fig.colorbar(ScalarMappable(norm=norm, cmap=cmap), ax=ax, fraction=0.025, pad=0.02,
+                        ticks=[-1, 0, 1])
+    cbar.ax.set_yticklabels(["largest\ndecrease", "same as\nFull flex.", "largest\nincrease"],
+                            fontsize=9)
+    cbar.set_label("Difference to Full flexibility (scaled per column)", fontsize=10)
+    savefig(fig, "fig41_flex_scenarios_table")
+
+
+def fig42_flex_decomposition(runs: list[Run]) -> None:
+    """fig40's data as a stepwise decomposition (alternative to fig40, per
+    user): per metric (FIG40_PANELS, same 2x3 order), the path from No
+    flexibility via one flexibility option to Full flexibility — once via TES
+    only (No flex -> TES only -> Full flex, i.e. add TES, then DSM) and once
+    via DSM only (add DSM, then TES) — so each step shows what that option
+    contributes and whether the two are additive (both paths end in the same
+    point by construction). DSM pessimistic is the DSM-only step with the
+    pessimistic DSM categories (no TES), drawn as a dotted step from No
+    flexibility. Points in each run's SCENARIO_PALETTE colour, arrows in the
+    colour of the intermediate scenario.
+    -> SI_results/fig42_flex_decomposition.svg
+    """
+    by = {r.label: r for r in runs}
+    needed = ["No flexibility", "TES only", "DSM only", "Full flexibility"]
+    if any(lbl not in by for lbl in needed):
+        print(f"  skipping fig42_flex_decomposition: needs {', '.join(needed)}")
+        return
+    labels = needed + (["DSM pessimistic"] if "DSM pessimistic" in by else [])
+    metrics = {lbl: _fig30_metrics(by[lbl]) for lbl in labels}
+    # (intermediate scenario, x of the intermediate point, line style)
+    paths = [("TES only", 1.0, "-"), ("DSM only", 1.0, "-")]
+    if "DSM pessimistic" in by:
+        paths.append(("DSM pessimistic", 1.0, ":"))
+
+    fig, axes = plt.subplots(2, 3, figsize=(15, 8.5))
+    for ax, (key, (title, unit, fmt)) in zip(axes.flat, FIG40_PANELS.items()):
+        v = {lbl: metrics[lbl][key] for lbl in labels}
+        abs_unit = "%" if key == "hp_share" else unit
+        for mid, x_mid, ls in paths:
+            color = by[mid].color
+            steps = [((0, v["No flexibility"]), (x_mid, v[mid]))]
+            if mid != "DSM pessimistic":
+                steps.append(((x_mid, v[mid]), (2, v["Full flexibility"])))
+            for (x0, y0), (x1, y1) in steps:
+                ax.annotate("", xy=(x1, y1), xytext=(x0, y0),
+                            arrowprops=dict(arrowstyle="-|>", color=color, lw=1.8, linestyle=ls,
+                                            shrinkA=7, shrinkB=7, mutation_scale=14), zorder=2)
+        for lbl, x in [("No flexibility", 0), ("Full flexibility", 2)] + \
+                      [(mid, x_mid) for mid, x_mid, _ in paths]:
+            hollow = lbl == "DSM pessimistic"
+            ax.scatter(x, v[lbl], s=70, zorder=3, linewidths=1.5,
+                       facecolor="white" if hollow else by[lbl].color,
+                       edgecolor=by[lbl].color if hollow else "#1F2A3A")
+            ha, dx = {0: ("right", -9), 2: ("left", 9)}.get(x, ("left", 9))
+            ax.annotate(fmt.format(v[lbl]), (x, v[lbl]), xytext=(dx, 0),
+                        textcoords="offset points", ha=ha, va="center", fontsize=8.5,
+                        color=by[lbl].color, fontweight="bold")
+        lo, hi = min(v.values()), max(v.values())
+        pad = 0.12 * ((hi - lo) or abs(hi) or 1.0)
+        ax.set_ylim(lo - pad, hi + pad)
+        ax.set_xlim(-0.6, 2.6)
+        ax.set_xticks([0, 1, 2])
+        ax.set_xticklabels(["No\nflexibility", "One option", "Full\nflexibility"], fontsize=9.5)
+        ax.set_title(title, fontsize=11.5, fontweight="bold")
+        ax.set_ylabel(f"[{abs_unit}]", fontsize=10)
+        ax.yaxis.set_major_formatter(plt.FuncFormatter(lambda val, _: f"{val:,.0f}"))
+        ax.tick_params(axis="y", labelsize=9)
+        ax.tick_params(axis="x", length=0)
+        ax.grid(axis="y", color="#E0E0E0", linewidth=0.6, zorder=0)
+        for side in ("top", "right"):
+            ax.spines[side].set_visible(False)
+    handles = [Line2D([], [], color=by[mid].color, lw=1.8, linestyle=ls,
+                      marker="o", markerfacecolor="white" if mid == "DSM pessimistic" else by[mid].color,
+                      markeredgecolor=by[mid].color if mid == "DSM pessimistic" else "#1F2A3A",
+                      label=f"via {mid}") for mid, _, ls in paths]
+    fig.legend(handles=handles, loc="lower center", ncol=len(handles), frameon=False,
+               fontsize=10.5, bbox_to_anchor=(0.5, -0.02))
+    fig.tight_layout(rect=[0, 0.04, 1, 1])
+    savefig(fig, "fig42_flex_decomposition")
 
 
 def _cost_and_emissions_totals(runs: list[Run], base_for: dict[str, str], delta_color: dict[str, str],
@@ -2641,7 +2870,7 @@ def _cost_and_emissions_totals(runs: list[Run], base_for: dict[str, str], delta_
 # ── 8/9: Real-world industry-emissions context (input data, no model results) ──
 # Neither figure below depends on a solved ZEN-garden run: both plot exogenous,
 # real-world emissions data (JRC-IDEES-2023 / UNFCCC CRF, reached via
-# ZEN-creator's input_data) that motivate/contextualize Crystal Ball's
+# ZEN-creator's input_data) that motivate/contextualize ZEN-Europe's
 # sectoral scope, per user request — generated unconditionally in main().
 
 INDUSTRY_SECTOR_EMISSIONS_JSON = FIGURES_DIR / "industry_sector_emissions_input.json"
@@ -2650,15 +2879,15 @@ INDUSTRY_SECTOR_EMISSIONS_JSON = FIGURES_DIR / "industry_sector_emissions_input.
 MODEL_SCOPE_CSV = REPO_ROOT.parent / "ZEN-creator" / "input_data" / "Emissionbudget" / "sector_emissions_2022.csv"
 
 _SCOPE_COLOR = {"old": _ETH_BLUE, "new": _ETH_GREEN, None: _ETH_GREY}
-_SCOPE_LABEL = {"old": "Existing Crystal Ball sectors (Mannhardt, 2026)",
+_SCOPE_LABEL = {"old": "Existing ZEN-Europe sectors (Mannhardt, 2026)",
                 "new": "Industry-heat extension (this work)",
-                None: "Not modeled by Crystal Ball"}
+                None: "Not modeled by ZEN-Europe"}
 
 
 def fig8_industry_sector_emissions_context() -> None:
     """European industrial CO2 emissions by subsector (JRC-IDEES-2023, EU27,
     2022) — pure real-world input-data context, no solved model results.
-    Answers "how big are the industry sectors Crystal Ball (and its
+    Answers "how big are the industry sectors ZEN-Europe (and its
     industry-heat extension) model, relative to the rest of European
     industry": each bar is colored/stacked by whether that slice is inside
     Mannhardt's original 11-sector scope (blue), the four new industry-heat
@@ -2679,7 +2908,7 @@ def fig8_industry_sector_emissions_context() -> None:
     here, so their bars understate those two sectors' full footprint
     relative to sector_emissions_2022.csv (fig9's source), which DOES fold
     UNFCCC process-emission CRF categories in on top of combustion for the
-    specific sectors Crystal Ball models. Not comparable 1:1 with fig9's Mt
+    specific sectors ZEN-Europe models. Not comparable 1:1 with fig9's Mt
     figures for that reason — this figure's job is relative subsector SCALE
     across ALL of European industry, fig9's is the model's total coverage
     SHARE of all-sector European emissions.
@@ -2743,7 +2972,7 @@ MANNHARDT_OLD_SECTORS_SHARE_OF_TOTAL = 0.900
 
 def fig9_model_scope_coverage() -> None:
     """How much of total European (28-country: EU27+CH+NO-MT-CY) direct CO2
-    emissions Crystal Ball's modeled sectors cover, and how much of that
+    emissions ZEN-Europe's modeled sectors cover, and how much of that
     coverage the industry-heat extension (this work) adds on top of
     Mannhardt (2026)'s original 11-sector scope.
 
@@ -2779,9 +3008,9 @@ def fig9_model_scope_coverage() -> None:
     share_uncovered = 1 - share_old - share_new
     total_mt = e_old / share_old / 1000
 
-    segments = [("Existing Crystal Ball sectors\n(Mannhardt, 2026)", share_old, _ETH_BLUE, e_old / 1000),
+    segments = [("Existing ZEN-Europe sectors\n(Mannhardt, 2026)", share_old, _ETH_BLUE, e_old / 1000),
                 ("+ Industry-heat extension\n(this work)", share_new, _ETH_GREEN, e_new / 1000),
-                ("Not covered by Crystal Ball", share_uncovered, _ETH_GREY, None)]
+                ("Not covered by ZEN-Europe", share_uncovered, _ETH_GREY, None)]
 
     fig, ax = plt.subplots(figsize=(10, 3.4))
     left = 0.0
@@ -2810,7 +3039,7 @@ def fig9_model_scope_coverage() -> None:
     ax.set_yticks([])
     ax.set_xlabel("Share of total European direct CO$_2$ emissions [%]  "
                   f"(28 countries $\\approx$ {total_mt:,.0f} Mt CO$_2$/yr, approx.)")
-    ax.set_title("Crystal Ball's Coverage of Total European Direct CO$_2$ Emissions",
+    ax.set_title("ZEN-Europe's Coverage of Total European Direct CO$_2$ Emissions",
                  fontsize=12, fontweight="bold")
     for spine in ("top", "right", "left"):
         ax.spines[spine].set_visible(False)
@@ -2842,7 +3071,7 @@ def fig9_model_scope_coverage() -> None:
 #    doesn't publish that per-industry electricity-vs-fuel split, so it
 #    can't be read exactly off the source-sector column alone.
 #
-# Per user instruction: this is NOT filtered down to Crystal Ball's own
+# Per user instruction: this is NOT filtered down to ZEN-Europe's own
 # modeled sectors (sector_emissions_2022.csv's list) — it's every end-use
 # category the WRI Sankey itself labels as industry: Iron & steel, Chemical
 # & petrochemical, Non-ferrous metals, Non-metallic minerals (cement/glass/
@@ -2868,7 +3097,7 @@ _GHG_AGRICULTURE_SHARE = 0.123
 _GHG_WASTE_SHARE = 0.038
 _GHG_LULUCF_SHARE = 0.009
 # Every industrial end-use category in the WRI Sankey (see comment above) —
-# not filtered to Crystal Ball's own modeled sector list.
+# not filtered to ZEN-Europe's own modeled sector list.
 _GHG_INDUSTRY_ENDUSE = {
     "Iron & steel": 0.058,
     "Chemical & petrochemical": 0.065,
@@ -2892,7 +3121,7 @@ def fig15_global_ghg_sector_breakdown() -> None:
     with a green wedge carved out of Electricity & Heat sized to EVERY
     industrial end-use category in the WRI Sankey (24.3% — iron & steel,
     chemicals, non-ferrous metals, non-metallic minerals, machinery, food &
-    tobacco, other industry; NOT filtered to Crystal Ball's own modeled
+    tobacco, other industry; NOT filtered to ZEN-Europe's own modeled
     sectors — see the module comment above for exactly which categories and
     why). Dashed guide lines tie bar 2's span to bar 1's Energy segment so
     the drill-down relationship reads immediately.
@@ -2900,7 +3129,7 @@ def fig15_global_ghg_sector_breakdown() -> None:
     The two green wedges are industry's two-part global footprint: process
     emissions (top bar, 6.2%, uncapturable by any energy-system model) and
     industry's energy-side footprint (bottom bar, 24.3%, most — not all —
-    of which is Crystal Ball's industry-heat extension's actual target,
+    of which is ZEN-Europe's industry-heat extension's actual target,
     since it also models cement/glass/ceramics as heat-supply sectors)
     together approach a QUARTER of all global GHG emissions.
 
@@ -2970,9 +3199,9 @@ def fig15_global_ghg_sector_breakdown() -> None:
 
 
 # ── 10: Power-sector impact of industry-heat flexibility ───────────────────
-# No flexibility vs Crystal Ball base isolates the power-sector cost of
+# No flexibility vs ZEN-Europe base isolates the power-sector cost of
 # electrifying industry heat WITHOUT any flexibility (DSM/TES) to shape that
-# new load — Crystal Ball base has no industry-heat sector at all (see
+# new load — ZEN-Europe base has no industry-heat sector at all (see
 # BASE_SCENARIO's comment), so it's the "before electrification" reference.
 # Full flexibility is added as a 3rd bar throughout, to see whether
 # flexibility elsewhere in the system changes how much fleet buildout /
@@ -3042,7 +3271,7 @@ POWER_GEN_STACK_ORDER = [
 
 
 # BULK_STORAGE_TECHS (figures_by_run.py) is power-sector storage that exists
-# in every run, including Crystal Ball base — unlike industry TES/DSM, which
+# in every run, including ZEN-Europe base — unlike industry TES/DSM, which
 # only exist once the industry-heat extension is loaded. ETH-7-colors-only
 # (see the palette note above POWER_GEN_COLOR_MAP), keyed to what each tech
 # stores: electricity=ETH_BLUE (battery=full strength, "hydro shade" tint for
@@ -3113,7 +3342,14 @@ def _production_energy_intensity(r, carrier: str, flow_in_all: pd.DataFrame) -> 
     technology mix), using each producer's TOTAL energy input (every input
     carrier summed; already confirmed unit-homogeneous, all GWh, via
     Results.get_unit())."""
-    prod = get_carrier_production(r, carrier)  # kt, index=technology, columns=year
+    # kt, index=technology, columns=year — get_carrier_production's logic, but
+    # on the memoized flow_conversion_output: it re-reads the frame (~7 s)
+    # on every call, and this runs once per DSM product.
+    flow_out = _cached_total(r, "flow_conversion_output")
+    if carrier not in flow_out.index.get_level_values("carrier"):
+        return pd.Series(dtype=float)
+    prod = flow_out.xs(carrier, level="carrier").groupby("technology").sum()
+    prod = prod[(prod.abs() > 1e-3).any(axis=1)]
     if prod.empty:
         return pd.Series(dtype=float)
     output_kt = prod.sum()
@@ -3169,32 +3405,24 @@ def get_dsm_energy_equivalent(r, dsm_techs: list[str], years: list[int]) -> pd.D
 # small-base blow-up risk.
 
 DELTA_LABEL = r"$\Delta$ No flexibility"
-DELTA_FULL_LABEL = r"$\Delta$ Full flexibility"
 
 
-def _base_and_delta_df(base_series: pd.Series, no_flex_series: pd.Series,
-                       full_series: pd.Series | None = None) -> pd.DataFrame:
-    """[Crystal Ball (base) absolute, Δ No flexibility minus base — signed,
-    both directions] plus, if full_series is given, a 3rd Δ Full flexibility
-    minus base column — index is the union of all series' technologies,
+def _base_and_delta_df(base_series: pd.Series, no_flex_series: pd.Series) -> pd.DataFrame:
+    """[ZEN-Europe (base) absolute, Δ No flexibility minus base — signed,
+    both directions] — index is the union of both series' technologies,
     missing entries filled with 0 before subtracting so a tech present in
     only one run still gets a correct (not NaN) delta."""
     all_idx = base_series.index.union(no_flex_series.index)
-    if full_series is not None:
-        all_idx = all_idx.union(full_series.index)
     base = base_series.reindex(all_idx, fill_value=0.0)
     no_flex = no_flex_series.reindex(all_idx, fill_value=0.0)
-    df = pd.DataFrame({BASE_SCENARIO[1]: base, DELTA_LABEL: no_flex - base})
-    if full_series is not None:
-        df[DELTA_FULL_LABEL] = full_series.reindex(all_idx, fill_value=0.0) - base
-    return df
+    return pd.DataFrame({BASE_SCENARIO[1]: base, DELTA_LABEL: no_flex - base})
 
 
 def _plot_base_and_floating_delta(
     dfs_by_year: dict[int, pd.DataFrame], title: str, unit: str, ax: plt.Axes,
     color_map: dict, hatch_map: dict, show_legend: bool = True, decimals: int = 0,
 ) -> None:
-    """Per year: 2 adjacent bars — Crystal Ball base (stacked normally from
+    """Per year: 2 adjacent bars — ZEN-Europe base (stacked normally from
     0) and the delta (stacked from the TOP of that same year's base bar
     instead of from 0: positive segments extend up from there, negative
     extend down from there) — so the delta is drawn at the height where it
@@ -3213,6 +3441,7 @@ def _plot_base_and_floating_delta(
     positions_all: list[float] = []
     tick_labels_all: list[str] = []
     year_centers: list[float] = []
+    y_max, y_min = 0.0, 0.0  # bar extents, for headroom above the "+X (+Y%)" labels
 
     for yi, year in enumerate(years):
         df = dfs_by_year[year]
@@ -3255,6 +3484,7 @@ def _plot_base_and_floating_delta(
                            edgecolor="white", linewidth=0.5, hatch=hatch if hatch else "//")
                     bot += val
                     labeled.add(category)
+            y_max, y_min = max(y_max, base_total, top), min(y_min, bot)
             delta_total = df[delta_label].sum()
             pct = (delta_total / base_total * 100) if base_total else 0.0
             label_y, va = (top, "bottom") if delta_total >= 0 else (bot, "top")
@@ -3271,6 +3501,10 @@ def _plot_base_and_floating_delta(
                     ha="center", va="top", fontsize=11, fontweight="bold")
     ax.set_ylabel(unit, fontsize=11)
     ax.set_title(title, fontsize=12, fontweight="bold")
+    # Headroom for the 2-line value labels above the tallest bar (and below
+    # the lowest, if any delta goes negative) so they don't hit the title.
+    span = y_max - y_min
+    ax.set_ylim(y_min - (0.12 * span if y_min < 0 else 0.0), y_max + 0.12 * span)
     ax.axhline(0, color="black", linewidth=0.5)
     if show_legend:
         handles, labels = ax.get_legend_handles_labels()
@@ -3279,21 +3513,15 @@ def _plot_base_and_floating_delta(
                       loc="upper left", fontsize=8, frameon=False)
 
 
-def fig12_capacity_and_storage_base_and_delta(base_run: Run, no_flex_run: Run,
-                                              full_run: Run | None = None) -> None:
+def fig12_capacity_and_storage_base_and_delta(base_run: Run, no_flex_run: Run) -> None:
     """Power generation capacity (left) and storage annual energy discharged
     (right), side by side, 3 snapshot years each (2030/2040/2050, same
     SNAPSHOT_YEARS_POWER/tech scope as fig11) — each year cluster is base
     (absolute stack) + delta (floating from the base bar's own top, see
     _plot_base_and_floating_delta) with a "+X.X%" label. Replaces 2 earlier
     separate figures (one per panel) per user request to show both side by
-    side in one figure instead.
-
-    If full_run is given, each year cluster gets a 3rd Δ Full flexibility
-    bar (also floating from the base bar's top), and the storage panel also
-    shows industry TES (per temperature band) and DSM (all products, as GWh
-    energy equivalent via get_dsm_energy_equivalent) — both only exist in
-    runs with the flexibility options, so they only appear in that bar.
+    side in one figure instead. The former 3rd Δ Full flexibility bar was
+    dropped per user request — only No flexibility vs. base is compared.
     -> SI_results/fig12_capacity_and_storage_base_and_delta.svg
     """
     empty = pd.Series(dtype=float)
@@ -3309,19 +3537,15 @@ def fig12_capacity_and_storage_base_and_delta(base_run: Run, no_flex_run: Run,
         return dis / 1000.0
 
     base_dis, nf_dis = discharge_twh(base_run), discharge_twh(no_flex_run)
-    full_cap = get_capacity(full_run.results, POWER_GEN_TECHS, "power") if full_run else None
-    full_dis = discharge_twh(full_run) if full_run else None
     gen_by_year: dict[int, pd.DataFrame] = {}
     disch_by_year: dict[int, pd.DataFrame] = {}
     for year in SNAPSHOT_YEARS_POWER:
         gen_by_year[year] = _stack_ordered(
-            _base_and_delta_df(base_cap.get(year, empty), nf_cap.get(year, empty),
-                               full_cap.get(year, empty) if full_run else None), POWER_GEN_STACK_ORDER)
-        disch_by_year[year] = _base_and_delta_df(base_dis.get(year, empty), nf_dis.get(year, empty),
-                                                 full_dis.get(year, empty) if full_run else None) \
+            _base_and_delta_df(base_cap.get(year, empty), nf_cap.get(year, empty)), POWER_GEN_STACK_ORDER)
+        disch_by_year[year] = _base_and_delta_df(base_dis.get(year, empty), nf_dis.get(year, empty)) \
             .reindex(STORAGE_STACK_ORDER).fillna(0.0)
 
-    fig, axes = plt.subplots(1, 2, figsize=(20 if full_run else 16, 6))
+    fig, axes = plt.subplots(1, 2, figsize=(16, 6))
     with plt.rc_context({"hatch.linewidth": 0.5}):
         _plot_base_and_floating_delta(gen_by_year, "Power Generation Capacity", "GW", axes[0],
                                       color_map=POWER_GEN_COLOR_MAP, hatch_map=POWER_GEN_HATCH_MAP)
@@ -3969,7 +4193,7 @@ _FIG20_INDUSTRY_COLORS = {
 
 
 def fig20_cost_breakdown_sector_industry_heating(base_run: Run, no_flex_run: Run, full_run: Run) -> None:
-    """Cumulative discounted total system cost (the objective) for Crystal Ball base / No
+    """Cumulative discounted total system cost (the objective) for ZEN-Europe base / No
     flexibility / Full flexibility, drilled down in 3 panels: (A) the whole
     system split into transport / power generation /
     industries / others; (B) industries only, by branch; (C) low-temperature
@@ -4168,7 +4392,7 @@ def main() -> None:
     run_if(["base", "No flexibility"], fig5_retrofit_ccs_comparison, no_flex, base)
     run_if(["No flexibility"], fig8a_diffusion_mechanisms_heat_pumps, runs)
     run_if(["No flexibility", "Full flexibility"], fig9_heat_supply_trajectory, no_flex, full)
-    run_if(["base", "No flexibility"], fig12_capacity_and_storage_base_and_delta, base, no_flex, full)
+    run_if(["base", "No flexibility"], fig12_capacity_and_storage_base_and_delta, base, no_flex)
     single_temp_set = ["No flexibility", NO_FLEX_SINGLE_TEMP_SCENARIO[1], "Full flexibility",
                        "Single temperature level"]
     for fn in (fig14a_heat_supply_electrification_singletemp_vs_full,
@@ -4180,6 +4404,9 @@ def main() -> None:
            runs, "Full flexibility", "fig15b_heat_supply_output_full_flexibility_twh")
     run_if(["base", "No flexibility", "Full flexibility"],
            fig20_cost_breakdown_sector_industry_heating, base, no_flex, full)
+    run_if(["No flexibility", "Full flexibility"], fig40_flex_scenarios, runs)
+    run_if(["No flexibility", "Full flexibility"], fig41_flex_scenarios_table, runs)
+    run_if(["No flexibility", "Full flexibility"], fig42_flex_decomposition, runs)
 
     # method/
     run_if(["No flexibility"], fig4b_industry_fuel_demand_comparison, runs)

@@ -29,7 +29,7 @@ Ball's existing (Mannhardt) scope vs. genuinely new (industry-heat extension):
     "chemicals"), no further split needed.
 FC_IND_PPP_E (Paper, pulp & printing) is plotted as a single "new" bar (per
 user request) rather than split by its PA/PU/PR second-level sheets -- Paper
-is the industry-heat-extension sector Crystal Ball models, and Pulp/Printing
+is the industry-heat-extension sector ZEN-Europe models, and Pulp/Printing
 are adjacent NACE activities it doesn't, but the bar is colored as a whole
 rather than partially grey.
 FC_IND_IS_E (Iron & steel) is entirely "old" ("steel"). FC_IND_FBT_E (Food,

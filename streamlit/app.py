@@ -1,4 +1,4 @@
-"""ZEN-Garden Crystal Ball — Interactive Model Analysis Dashboard.
+"""ZEN-Europe — Interactive Model Analysis Dashboard.
 
 Run:  streamlit run streamlit/app.py   (from repo root)
   or  streamlit run app.py             (from streamlit/ directory)
@@ -82,7 +82,7 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-st.title("ZEN-Garden Crystal Ball")
+st.title("ZEN-Europe")
 
 # On-screen render resolution. Figures are shown at container width regardless,
 # so a moderate DPI keeps images small and fast; very high DPI (e.g. 450) makes

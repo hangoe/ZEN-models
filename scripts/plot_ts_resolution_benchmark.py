@@ -350,7 +350,7 @@ def fig5_resource_usage_vs_resolution(usage: list[tuple[int, dict, str, str | No
         for x, v in zip(positions, values):
             ax.text(x, v, fmt.format(v), ha="center", va="bottom", fontsize=8)
 
-    fig.suptitle("Crystal Ball ind heat, v9.0, no flexibility, no diffusion -- "
+    fig.suptitle("ZEN-Europe ind heat, v9.0, no flexibility, no diffusion -- "
                   "plain 2020_16a_2a solves vs. MGA batch_bbo runs")
     fig.tight_layout()
     savefig(fig, "fig5_resource_usage_vs_resolution")

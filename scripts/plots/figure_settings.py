@@ -65,7 +65,7 @@ def apply_font_mode() -> None:
 # 6 of the 7 case-study scenarios (MT_report_HG/Sections/03_SI.tex, Table
 # SIScenarios) are the same model version (Crystal_Ball_HG_v7_0), differing
 # only in which flexibility technologies / DSM categorization are included
-# (see parameters.csv). The 7th, the unmodified "Crystal Ball (base)" dataset
+# (see parameters.csv). The 7th, the unmodified "ZEN-Europe (base)" dataset
 # (data/Crystal_Ball, run as bare "Crystal_Ball" with no Crystal_Ball_HG_v7_0
 # prefix — see run_model.py), is the pre-industry-heat-extension reference
 # point: it has no industry heat/DSM/TES sector at all, so it's labeled
@@ -111,7 +111,7 @@ EULER_SCENARIO_LABELS = {
 # corporate design colors (https://ethz.ch/staffnet/en/service/communication/
 # corporate-design/colours.html: blue, petrol, green, bronze, red, purple,
 # grey), in that order. 7th slot (ETH grey) is reserved for the future
-# "Crystal Ball (base)" reference run — grey reads as "the neutral baseline"
+# "ZEN-Europe (base)" reference run — grey reads as "the neutral baseline"
 # against the six saturated extension-scenario colors.
 SCENARIO_PALETTE = ["#215CAF", "#007894", "#627313", "#8E6713", "#B7352D", "#A7117A", "#6F6F6F"]
 
@@ -474,7 +474,7 @@ def _search_var_dict(path: Path, max_depth: int = 2) -> Path | None:
 
 # zen-europe splits every industry-heat technology/carrier per sector
 # (heat_pump_industry_0_100_water_ceramic, heat_industry_0_100_food,
-# fuel_to_kiln_glass, ...), while all plotting code uses the Crystal Ball
+# fuel_to_kiln_glass, ...), while all plotting code uses the ZEN-Europe
 # names without the sector suffix. SectorAggregatedResults strips the suffix
 # and sums, so the same tech lists/colors apply to both model generations.
 _SECTOR_SUFFIX_RE = re.compile(

@@ -81,7 +81,7 @@ def main() -> None:
     ax.set_xlim(minx, maxx)
     ax.set_ylim(miny, maxy)
     ax.set_axis_off()
-    ax.set_title("Crystal Ball nodes by region group", fontsize=13, fontweight="bold")
+    ax.set_title("ZEN-Europe nodes by region group", fontsize=13, fontweight="bold")
 
     handles = [
         plt.Rectangle((0, 0), 1, 1, facecolor=color, edgecolor="#B0B0B0")
