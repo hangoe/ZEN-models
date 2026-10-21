@@ -78,6 +78,8 @@ the zen-europe versions of removed ones in archive/zen_europe/):
                                           shaded by the difference to Full flexibility (per column)
   fig42_flex_decomposition             — fig40's data as steps No flexibility -> TES only / DSM only
                                           -> Full flexibility, per metric
+  fig43_flex_scenarios_table_curtailment — fig41 transposed plus a 2050 curtailment row (derived:
+                                          capacity * max_load - output, see _curtailment_twh)
 
 SI_results/method/ (no results — methodological/context only; removed ones in archive/method/):
   fig2_industry_fuel_demand_comparison (was fig4b) — new-sector heat/fuel demand vs. pre-existing cement/steel fuel mix
@@ -98,12 +100,11 @@ SI_results/method/ (no results — methodological/context only; removed ones in 
                                           directional solves — a mid-exploration SNAPSHOT (solve order
                                           starts with the farthest/most-prominent corner); see fig8 for
                                           the same toy geometry run to full completion
-  fig7_mga_axis_construction (was fig13) — conceptual, non-data schematic of how the NUMBER of
-                                          candidate MGA axes grows as dimensions are crossed, left to
-                                          right: (1) 3 technology-group axes alone; (2) x 4 regions
-                                          (the real north/west/south/east map) = 12 axes; (3) x 3
-                                          cumulative-CAPEX horizons too, all three dimensions crossed
-                                          on one chart = 36 axes
+  fig7_mga_axis_construction (was fig13) — conceptual, non-data schematic of the MGA axes:
+                                          the real north/west/south/east map (left) and the
+                                          region x metric axis matrix (investment cost, mobility /
+                                          heating electrification, cum. emissions), stacked over the
+                                          2030/2040/2050 cumulative-to-year horizons (right)
   fig8_mga_exploration_sequence (was fig14) — companion to fig5: the same toy near-optimal space,
                                           run through ALL 5 directional solves as 5 small-multiple
                                           panels (largest-gap direction first) instead of fig5's
@@ -131,25 +132,15 @@ data/outputs/figures/mga_tests/) so both axes can be labeled generically
 specific technologies the real MGA runs explored.
 
 fig13 (method/fig7), like fig11, is a pure method illustration with no
-solved points — but deliberately does NOT use 2D coordinate frames (an
-earlier version did; per user feedback that read as "the near-optimal-space
-plot" and was confusing, since that's fig11's job, not this figure's).
-Instead it just COUNTS candidate axes as dimensions are crossed: panel 1 is
-3 pictogram boxes (power/hydrogen/carbon technology groups); panel 2 is the
-real north/west/south/east map crossed with a 4x3 grid of colored cells
-(regions x technology groups); panel 3 crosses all three dimensions at once
-on a single region x group x horizon chart (12 curves, 3 markers each = 36
-points/axes). Region identity is always color, technology-group identity is
-always a pictogram (lightning = power, "H2" = hydrogen, "C" = carbon) —
-consistent across all 3 panels. Every count is read directly off this
-repo's real MGA axis configs rather than invented — see the constant block
-above fig13_mga_axis_construction() for exactly which config_mga_axes_*.json
-file each panel's number comes from. Unlike fig11, fig13's map DOES
-pull in a new dependency (geopandas + the cached Natural Earth shapefile in
-data/naturalearth/) per user request for the real geography instead of an
-abstract icon — it falls back to a hand-drawn 4-wedge compass if geopandas
-or the shapefile aren't available, so it still generates unconditionally in
-main() either way.
+solved points: the region map on the left, and on the right one column per
+region x one row per metric (investment cost, mobility electrification,
+heating electrification, cumulative emissions), stacked three deep for the
+2030/2040/2050 cumulative-to-year horizons. Region identity is always color
+(same palette as the map), metric identity a pictogram in each cell. The map
+pulls in geopandas + the cached Natural Earth shapefile in
+data/naturalearth/ — it falls back to a hand-drawn 4-wedge compass if
+geopandas or the shapefile aren't available, so it still generates
+unconditionally in main() either way.
 
 fig8 and fig9 plot real-world INPUT data (JRC-IDEES-2023 subsector
 emissions; Mannhardt's documented 90.0% sector-coverage figure plus UNFCCC CRF
@@ -2546,6 +2537,64 @@ def _fig30_metrics(r: Run) -> dict[str, float]:
     return _FIG30_METRICS_CACHE[key]
 
 
+# Fixed-profile renewables whose unused potential counts as curtailment —
+# FIG30_VRE_TECHS without reservoir_hydro (dispatchable, its unused inflow
+# is reservoir storage/spillage, not curtailment).
+CURTAILMENT_TECHS = ["photovoltaics", "wind_onshore", "wind_offshore", "run-of-river_hydro"]
+
+
+def _curtailment_twh(r: Run, year: int = FIG30_YEAR) -> float:
+    """Renewable curtailment in `year` [TWh]: ZEN-garden has no curtailment
+    variable (shed_demand is unmet DEMAND — 0 in every run, since the
+    electricity price peaks at ~1,300-1,600 EUR/MWh, far below the 10,000
+    EUR/MWh price_shed_demand), so it is derived as available minus actually
+    generated electricity, summed over CURTAILMENT_TECHS and nodes n:
+
+        curtailment_y = sum_{i,n} [ capacity_{i,n,y} * sum_{h in y} max_load_{i,n,h}
+                                    - sum_{h in y} flow_conversion_output_{i,electricity,n,h} ]
+
+    capacity = installed power capacity [GW] (get_total("capacity"),
+    capacity_type "power"); max_load = hourly availability factor [-]
+    (get_full_ts, the representative time steps mapped back onto the year's
+    8760 h), so capacity * sum_h max_load is the available energy [GWh];
+    flow_conversion_output from get_total (already duration-weighted, GWh);
+    GWh -> TWh. Equivalently with the raw time-series-aggregated data:
+    sum_t duration_t * (capacity * max_load_t - output_t) over the 10
+    representative steps — same numbers. With 10 representative steps the
+    VRE peaks are smoothed, so absolute levels are likely underestimates;
+    differences between scenarios are the robust part.
+
+    Values [TWh] (share of available PV/wind/run-of-river energy):
+        Full flexibility   2038: 348 (5.9 %)  2050: 392 (4.7 %)
+        DSM pessimistic    2038: 352 (6.0 %)  2050: 482 (5.8 %)
+        DSM only           2038: 347 (5.9 %)  2050: 460 (5.5 %)
+        TES only           2038: 353 (6.0 %)  2050: 401 (4.8 %)
+        No flexibility     2038: 355 (6.0 %)  2050: 489 (5.8 %)
+        ZEN-Europe (base)  2038: 263 (5.1 %)  2050: 253 (3.6 %)
+    2050 is mostly wind onshore (254-293 TWh) and offshore (104-141), then
+    run-of-river (34-52); PV <= 3.5 TWh. ZEN-Europe (base) has ~17 % less
+    available VRE in 2050 (6,934 vs ~8,300 TWh) and is the only run whose
+    curtailment falls from 2038 to 2050."""
+    key = (id(r.results), "curtailment", year)  # memoized: max_load is a large frame
+    if key in _FIG30_METRICS_CACHE:
+        return _FIG30_METRICS_CACHE[key]
+    max_load = r.results.get_full_ts("max_load", year=year,
+                                     index={"technology": CURTAILMENT_TECHS})
+    cap = r.results.get_total("capacity")
+    cap = cap[cap.index.get_level_values("capacity_type") == "power"].droplevel("capacity_type")
+    available = (cap[year].reindex(max_load.index) * max_load.sum(axis=1)).sum()
+    flow_out = _cached_total(r.results, "flow_conversion_output")
+    generated = flow_out[flow_out.index.get_level_values("technology").isin(CURTAILMENT_TECHS)
+                         & (flow_out.index.get_level_values("carrier") == "electricity")][year].sum()
+    _FIG30_METRICS_CACHE[key] = float(available - generated) / 1000.0
+    return _FIG30_METRICS_CACHE[key]
+
+
+def _fig43_metrics(r: Run) -> dict[str, float]:
+    """_fig30_metrics plus FIG30_YEAR curtailment (_curtailment_twh), for fig43."""
+    return {**_fig30_metrics(r), "curtailment": _curtailment_twh(r)}
+
+
 # fig30 panels in grid order (row-major, 2x2): metric key (_fig30_metrics)
 # -> (title, unit, colourbar label, _fig30_matrix_panel kwargs). Storage is
 # bulk storage only — DSM/TES discharge are 0 in No flexibility, so a matrix
@@ -2689,7 +2738,10 @@ def fig40_flex_scenarios(runs: list[Run]) -> None:
     savefig(fig, "fig40_flex_scenarios")
 
 
-def fig41_flex_scenarios_table(runs: list[Run]) -> None:
+def fig41_flex_scenarios_table(runs: list[Run], panels: dict = FIG40_PANELS,
+                               metrics_fn=_fig30_metrics,
+                               fig_name: str = "fig41_flex_scenarios_table",
+                               transpose: bool = False) -> None:
     """fig40's data as an annotated heatmap table (alternative to fig40, per
     user): scenarios as rows (FIG40_ORDER, No flexibility below a dashed
     line), the FIG40_PANELS metrics as columns. Each cell gives the absolute
@@ -2697,31 +2749,50 @@ def fig41_flex_scenarios_table(runs: list[Run]) -> None:
     %; pp for the heat-pump share), and is shaded by that difference — ETH
     blue below / red above Full flexibility, scaled per column to its
     largest |difference| (cost moves by ~0.1 %, DSM/TES by up to 100 %, so a
-    shared scale would leave most columns white).
+    shared scale would leave most columns white). `panels`/`metrics_fn`/
+    `fig_name` let fig43 reuse it with an extra curtailment metric;
+    `transpose` puts the metrics in rows and the scenarios in columns (No
+    flexibility right of a dashed line), shading then scaled per row.
     -> SI_results/fig41_flex_scenarios_table.svg
     """
     by = {r.label: r for r in runs}
     order = [lbl for lbl in FIG40_ORDER if lbl in by]
-    metrics = {lbl: _fig30_metrics(by[lbl]) for lbl in order}
+    metrics = {lbl: metrics_fn(by[lbl]) for lbl in order}
     base = metrics["Full flexibility"]
     cmap = LinearSegmentedColormap.from_list("fig41_delta", [_ETH_BLUE, "white", _ETH_RED])
     norm = Normalize(vmin=-1, vmax=1)
 
-    fig, ax = plt.subplots(figsize=(15, 5.6))
-    for col, (key, (title, unit, fmt)) in enumerate(FIG40_PANELS.items()):
+    n_metrics, n_scen = len(panels), len(order)
+
+    def xy(i_metric: int, i_scen: int) -> tuple[int, int]:
+        """Lower-left (x, y) of a cell: metrics along x (columns), or along y if transposed."""
+        return (i_scen, i_metric) if transpose else (i_metric, i_scen)
+
+    n_x, n_y = xy(n_metrics, n_scen)
+    fig, ax = plt.subplots(figsize=(2.5 * n_x + (2.5 if transpose else 0), 5.6 if not transpose
+                                    else 1.0 * n_y + 1.2))
+    for i_m, (key, (title, unit, fmt)) in enumerate(panels.items()):
         abs_unit = "%" if key == "hp_share" else unit
-        ax.text(col + 0.5, -0.12, f"{title}\n[{abs_unit}]", ha="center", va="bottom",
-                fontsize=10.5, fontweight="bold")
+        if transpose:
+            # Inside the (white) Full flexibility cell's left margin, nearer its values
+            # (which sit right of centre, x + 0.6, to balance the gaps either side).
+            ax.text(0.15, i_m + 0.5, f"{title}\n[{abs_unit}]", ha="right", va="center",
+                    fontsize=10.5, fontweight="bold")
+        else:
+            ax.text(i_m + 0.5, -0.12, f"{title}\n[{abs_unit}]", ha="center", va="bottom",
+                    fontsize=10.5, fontweight="bold")
         max_abs = max(abs(metrics[lbl][key] - base[key]) for lbl in order) or 1.0
         pct_fmt = "{:.2f}" if key == "cost" else "{:.1f}"
-        for row, lbl in enumerate(order):
+        for i_s, lbl in enumerate(order):
+            x, y = xy(i_m, i_s)
             val = metrics[lbl][key]
             d = val - base[key]
             color = cmap(norm(d / max_abs))
-            ax.add_patch(Rectangle((col, row), 1, 1, facecolor=color, edgecolor="white",
+            ax.add_patch(Rectangle((x, y), 1, 1, facecolor=color, edgecolor="white",
                                    linewidth=2, zorder=1))
             text_color = _text_color_for_bg(color)
-            ax.text(col + 0.5, row + 0.4, fmt.format(val), ha="center", va="center",
+            cx = x + (0.6 if transpose and lbl == "Full flexibility" else 0.5)
+            ax.text(cx, y + 0.4, fmt.format(val), ha="center", va="center",
                     fontsize=12, fontweight="bold", color=text_color)
             if lbl == "Full flexibility":
                 sub = "baseline"
@@ -2729,22 +2800,55 @@ def fig41_flex_scenarios_table(runs: list[Run]) -> None:
                 sign = "+" if d >= 0 else "−"
                 sub = (f"{sign}{fmt.format(abs(d))} {unit} "
                        f"({sign}{pct_fmt.format(abs(d) / base[key] * 100)} %)")
-            ax.text(col + 0.5, row + 0.72, sub, ha="center", va="center", fontsize=9,
+            ax.text(cx, y + 0.72, sub, ha="center", va="center", fontsize=9,
                     style="italic" if lbl == "Full flexibility" else "normal", color=text_color)
-    n_cols = len(FIG40_PANELS)
-    for row, lbl in enumerate(order):
-        ax.text(-0.08, row + 0.5, lbl, ha="right", va="center", fontsize=11)
-    ax.plot([-0.9, n_cols], [len(order) - 1] * 2, color="#1F2A3A", linestyle="--",
-            linewidth=1.2, clip_on=False, zorder=3)
-    ax.set_xlim(0, n_cols)
-    ax.set_ylim(len(order), 0)
+    for i_s, lbl in enumerate(order):
+        if transpose:
+            ax.text(i_s + (0.6 if lbl == "Full flexibility" else 0.5), -0.12, lbl, ha="center",
+                    va="bottom", fontsize=11,
+                    fontweight="bold")
+        else:
+            ax.text(-0.08, i_s + 0.5, lbl, ha="right", va="center", fontsize=11)
+    if transpose:
+        ax.plot([n_scen - 1] * 2, [-0.5, n_metrics], color="#1F2A3A", linestyle="--",
+                linewidth=1.2, clip_on=False, zorder=3)
+    else:
+        ax.plot([-0.9, n_metrics], [n_scen - 1] * 2, color="#1F2A3A", linestyle="--",
+                linewidth=1.2, clip_on=False, zorder=3)
+    ax.set_xlim(0, n_x)
+    ax.set_ylim(n_y, 0)
     ax.axis("off")
     cbar = fig.colorbar(ScalarMappable(norm=norm, cmap=cmap), ax=ax, fraction=0.025, pad=0.02,
                         ticks=[-1, 0, 1])
     cbar.ax.set_yticklabels(["largest\ndecrease", "same as\nFull flex.", "largest\nincrease"],
                             fontsize=9)
-    cbar.set_label("Difference to Full flexibility (scaled per column)", fontsize=10)
-    savefig(fig, "fig41_flex_scenarios_table")
+    cbar.set_label(f"Difference to Full flexibility (scaled per {'row' if transpose else 'column'})",
+                   fontsize=10)
+    savefig(fig, fig_name)
+
+
+# fig41's columns plus curtailment (_curtailment_twh).
+FIG43_PANELS = {**FIG40_PANELS, "curtailment": (f"Curtailment {FIG30_YEAR}", "TWh", "{:,.0f}")}
+
+
+def fig43_flex_scenarios_table_curtailment(runs: list[Run]) -> None:
+    """fig41 transposed (metrics as rows, scenarios as columns — taller, less
+    wide) with a 7th metric: FIG30_YEAR renewable curtailment [TWh] — see
+    _curtailment_twh for how it is computed (available PV/wind/run-of-river
+    energy capacity * max_load minus flow_conversion_output; ZEN-garden has
+    no curtailment variable and shed_demand is 0 in every run).
+
+    ZEN-Europe (base) on the same metrics, for reference (not plotted — it
+    has no industry-heat sectors, so it is not a flexibility scenario):
+    discounted total cost 24,480 bn EUR (Full flexibility 26,257), VRE
+    capacity 2050 3,106 GW (3,735), bulk storage discharge 2050 249 TWh
+    (264), curtailment 2050 253 TWh (392) / 3.6 % of available VRE energy
+    (4.7 %), 2038 263 TWh (348); heat-pump share, DSM and TES discharge do
+    not apply (no industry heat).
+    -> SI_results/fig43_flex_scenarios_table_curtailment.svg
+    """
+    fig41_flex_scenarios_table(runs, FIG43_PANELS, _fig43_metrics,
+                               "fig43_flex_scenarios_table_curtailment", transpose=True)
 
 
 def fig42_flex_decomposition(runs: list[Run]) -> None:
@@ -3771,34 +3875,22 @@ def fig11_mga_method() -> None:
     savefig(fig, "fig5_mga_method", subdir="method")
 
 
-# ── 13: MGA axis-count construction (no data) ───────────────────────────────
-# Purely illustrative, like fig11/fig12 — no solved points, hand-picked
-# numbers throughout. Each panel just COUNTS candidate axes as dimensions
-# are crossed: (1) 3 technology-group axes alone; (2) x 4 regions (the real
-# north/west/south/east geography, drawn the same way
+# ── 13: MGA axis construction (no data) ─────────────────────────────────────
+# Purely illustrative, like fig11/fig12 — no solved points. Left: the real
+# north/west/south/east geography (drawn the same way
 # plot_country_groups_map.py / fig_country_groups_map.svg in
-# data/outputs/figures/mga/ does — same Natural Earth polygons,
-# same region split, same colors — rather than embedding that SVG file
-# directly, which would need a working SVG rasterizer this environment
-# doesn't have); (3) x 3 cumulative-CAPEX horizons too, all three dimensions
-# shown together on one region x group x horizon chart (this work's full
-# 3-way crossing, panel 3 has no separate map — just that one chart).
-#
-# Region/group identity is encoded consistently across all 3 panels so the
-# same visual grammar carries through: COLOR = region (_MGA_AXIS_REGION_
-# COLOR, same order as REGIONS/REGION_COLOR in mga_capex_periods_common.py),
-# PICTOGRAM = technology group (lightning bolt = power, "H2" = hydrogen,
-# "C" = carbon — the same 3 groups as config_mga_axes_capex.json's
-# technology_groups). Panel 1 has no region yet, so its 3 boxes are drawn
-# neutral-grey with just the pictogram identity panels 2-3 reuse.
+# data/outputs/figures/mga/ does — same Natural Earth polygons, same region
+# split, same colors). Right: the axis matrix — one column per region, one
+# row per metric (investment cost, mobility electrification, heating
+# electrification, cumulative emissions), stacked three deep for the
+# 2030/2040/2050 cumulative-to-year horizons. COLOR = region throughout
+# (_MGA_AXIS_REGION_COLOR, same order as REGIONS/REGION_COLOR in
+# mga_capex_periods_common.py); each cell carries its metric's pictogram.
 #
 # The map needs geopandas + the cached Natural Earth shapefile (data/
-# naturalearth/, already downloaded by plot_country_groups_map.py) — a new
-# dependency for this otherwise data-free figure, added deliberately per
-# user request for the real geography instead of an abstract icon. Falls
-# back to a simple 4-wedge compass (this figure's previous approach) if
-# geopandas/the shapefile aren't available, so fig13 still generates
-# unconditionally in main() like fig11/fig12 even without them.
+# naturalearth/, already downloaded by plot_country_groups_map.py). Falls
+# back to a simple 4-wedge compass if geopandas/the shapefile aren't
+# available, so fig13 still generates unconditionally in main().
 _MGA_AXIS_REGIONS = ["north", "west", "south", "east"]
 _MGA_AXIS_REGION_COLOR = dict(zip(_MGA_AXIS_REGIONS, SCENARIO_PALETTE))
 # Same node -> region split as config_mga_axes_capex_cum.json's node_capex_cumulative axes.
@@ -3812,28 +3904,14 @@ _MGA_AXIS_ISO_OVERRIDES = {"EL": "GR", "UK": "GB"}  # Natural Earth's ISO_A2_EH 
 _MGA_AXIS_EUROPE_EXTENT = {"lon": (-25, 45), "lat": (34, 72)}
 _MGA_AXIS_NATURALEARTH_SHP = REPO_ROOT / "data" / "naturalearth" / "ne_50m_admin_0_countries.shp"
 
-_MGA_AXIS_GROUPS = ["power", "hydrogen", "carbon"]
-_MGA_AXIS_GROUP_LABEL = {"power": "Power", "hydrogen": "H2", "carbon": "Carbon"}
-
-
-def _mga_lightning_marker() -> MplPath:
-    """Lightning-bolt Path marker for the 'power' technology group."""
-    verts = [(0.15, 1.0), (-0.55, 0.05), (-0.05, 0.05), (-0.35, -1.0),
-              (0.55, -0.05), (0.0, -0.05), (0.15, 1.0)]
-    codes = [MplPath.MOVETO] + [MplPath.LINETO] * 5 + [MplPath.CLOSEPOLY]
-    return MplPath(verts, codes)
-
-
-# marker = lightning-bolt Path for power, mathtext letter markers ("$H_2$"/
-# "$C$") for hydrogen/carbon — matplotlib renders a "$...$" string marker as
-# that mathtext's own shape, so these read as crisp letters, not custom paths.
-_MGA_AXIS_GROUP_MARKER = {"power": _mga_lightning_marker(), "hydrogen": r"$H_2$", "carbon": "$C$"}
-_MGA_AXIS_GROUP_LINESTYLE = {"power": "-", "hydrogen": "--", "carbon": ":"}
-
-
-def _mga_group_icon(ax, cx: float, cy: float, group: str, size: float, color: str) -> None:
-    ax.scatter([cx], [cy], marker=_MGA_AXIS_GROUP_MARKER[group], s=size, color=color,
-               linewidth=1.2, zorder=4, clip_on=False)
+# (row label, cell pictogram) top to bottom; "pylon" is drawn by _mga_pylon_icon.
+_MGA_AXIS_METRICS = [
+    ("% investment\ncost", "€"),
+    ("% Mobility\nelectrification", "pylon"),
+    ("% Heating\nelectrification", "Heat"),
+    ("% cum.\nemissions", "C"),
+]
+_MGA_AXIS_YEARS = [2030, 2040, 2050]
 
 
 def _mga_region_compass(ax, cx: float, cy: float, r: float) -> None:
@@ -3880,142 +3958,97 @@ def _mga_region_map(ax, x0: float, y0: float, w: float, h: float) -> bool:
         # where a plain centroid can land in the sea or a neighboring gap.
         label_point = sub.geometry.union_all().representative_point()
         map_ax.text(label_point.x, label_point.y, region[0].upper(),
-                     fontsize=8, ha="center", va="center", color="white", fontweight="bold")
+                     fontsize=9, ha="center", va="center", color="white", fontweight="bold")
     map_ax.set_xlim(minx, maxx)
     map_ax.set_ylim(miny, maxy)
     map_ax.set_axis_off()
     return True
 
 
-def _mga_axis_count(ax, x: float, y: float, text: str) -> None:
-    ax.text(x, y, text, fontsize=13.5, fontweight="bold", color=_ETH_BLUE, ha="center", va="center")
+def _mga_pylon_icon(ax, cx: float, cy: float, h: float, color: str) -> None:
+    """Small transmission-tower pictogram (mobility electrification row)."""
+    top, bot = cy + h / 2, cy - h / 2
+    leg = 0.32 * h
+    kw = dict(color=color, linewidth=1.3, solid_capstyle="round", zorder=5)
+    ax.plot([cx - leg, cx, cx + leg], [bot, top, bot], **kw)
+    for frac, half in ((0.25, 0.30 * h), (0.48, 0.38 * h)):
+        y = top - frac * h
+        ax.plot([cx - half, cx + half], [y, y], **kw)
+    # lattice: X-bracing between the arms and the base
+    ys = [top - 0.48 * h, top - 0.74 * h, bot]
+    for ya, yb in zip(ys[:-1], ys[1:]):
+        wa = leg * (top - ya) / h
+        wb = leg * (top - yb) / h
+        ax.plot([cx - wa, cx + wb], [ya, yb], **kw)
+        ax.plot([cx + wa, cx - wb], [ya, yb], **kw)
 
 
 def fig13_mga_axis_construction() -> None:
-    """Conceptual, non-data schematic of how the NUMBER of candidate MGA
-    axes grows as dimensions are crossed: 3 technology-group axes alone (1)
-    -> x 4 regions (2, the common spatial extension) -> x 3 cumulative-to-
-    year horizons too (3, this work's full 3-way crossing). See the
-    module-level comment above for the visual grammar and data sources.
+    """Conceptual, non-data schematic of this work's MGA axes: the region
+    map (left) and the region x metric axis matrix, stacked over the three
+    cumulative-to-year horizons (right). See the module-level comment above
+    for the visual grammar and data sources.
     """
-    fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(16, 6))
-    for ax in (ax1, ax2, ax3):
-        ax.set_xlim(0, 10)
-        ax.set_ylim(0, 10)
-        ax.axis("off")
+    fig, ax = plt.subplots(figsize=(14, 5.6))
+    ax.set_xlim(0, 25)
+    ax.set_ylim(0, 10)
+    ax.set_aspect("equal")
+    ax.axis("off")
 
-    # ── 1: technology-group axes ──────────────────────────────────────────
-    ax1.set_title("1. Technology (Group) Axes", fontsize=11.5, fontweight="bold")
-    for i, group in enumerate(_MGA_AXIS_GROUPS):
-        cx = 1.9 + i * 3.1
-        ax1.add_patch(FancyBboxPatch((cx - 1.25, 4.9), 2.5, 3.1, boxstyle="round,pad=0.02,rounding_size=0.1",
-                                      facecolor=eth_tint(_ETH_GREY, 0.9), edgecolor=_ETH_GREY, linewidth=1.2, zorder=2))
-        _mga_group_icon(ax1, cx, 6.9, group, 1500, "#333333")
-        ax1.text(cx, 5.4, _MGA_AXIS_GROUP_LABEL[group], fontsize=10, fontweight="bold", ha="center", va="center")
-    _mga_axis_count(ax1, 5, 2.6, "3 axes")
-    ax1.text(5, 1.55, "one axis per technology group",
-              fontsize=8.3, style="italic", color="#555555", ha="center", va="top")
+    # ── left: region map ────────────────────────────────────────────────
+    if not _mga_region_map(ax, 0.0, 0.04, 0.33, 0.92):
+        _mga_region_compass(ax, 4.0, 5.0, 3.2)
 
-    # ── 2: + regional axes — crossed with 4 regions ─────────────────────
-    ax2.set_title("2. + Regional Axes", fontsize=11.5, fontweight="bold")
-    if not _mga_region_map(ax2, 0.02, 0.32, 0.42, 0.60):
-        _mga_region_compass(ax2, 2.1, 6.9, 1.9)
-    # Grid of region x group cells: each cell IS one candidate axis, colored
-    # by region with that row's group pictogram drawn directly inside it
-    # (white, for contrast) — no separate row-header icon/text and no "x"
-    # symbol, since the grid itself already reads as "regions crossed with
-    # groups" without needing either.
-    grid_x0, grid_y0, cell_w, cell_h = 5.1, 5.35, 1.1, 1.15
-    for row, group in enumerate(_MGA_AXIS_GROUPS):
-        gy = grid_y0 + (len(_MGA_AXIS_GROUPS) - 1 - row) * cell_h
-        for col, region in enumerate(_MGA_AXIS_REGIONS):
-            gx = grid_x0 + col * cell_w
-            ax2.add_patch(Rectangle((gx, gy), cell_w * 0.85, cell_h * 0.85,
-                                     facecolor=_MGA_AXIS_REGION_COLOR[region], edgecolor="white",
-                                     linewidth=0.8, zorder=3))
-            _mga_group_icon(ax2, gx + cell_w * 0.425, gy + cell_h * 0.425, group, 220, "white")
-    for col, region in enumerate(_MGA_AXIS_REGIONS):
-        ax2.text(grid_x0 + col * cell_w + cell_w * 0.425, grid_y0 - 0.25, region[0].upper(),
-                  fontsize=7.5, ha="center", va="top", fontweight="bold", color=_MGA_AXIS_REGION_COLOR[region])
-    _mga_axis_count(ax2, 5, 2.6, "4 $\\times$ 3 = 12 axes")
-    ax2.text(5, 1.55, "one axis per (region, technology group)",
-              fontsize=8.3, style="italic", color="#555555", ha="center", va="top")
+    # ── right: axis matrix ──────────────────────────────────────────────
+    label_x0, label_w = 8.4, 3.0
+    plane_x0, plane_w = 11.8, 9.6
+    plane_y0, plane_h = 1.5, 6.4
+    depth = 0.45  # offset of each later horizon's plane behind the previous one
+    col_w, col_gap = 2.0, (plane_w - 4 * 2.0) / 5
+    rows_top = plane_y0 + plane_h - 0.25
+    row_h = (rows_top - plane_y0 - 0.65) / len(_MGA_AXIS_METRICS)  # leaves room for the year label
 
-    # ── 3: + temporal axes (this work) — the full 3-way crossing ─────────
-    # Region x group x horizon, all on one chart (no separate map here —
-    # region identity is carried by line/marker color instead): 4 regions x
-    # 3 groups = 12 curves, each sampled (marker) at the 3 config_mga_axes_
-    # capex_cum.json until_years -> 4 x 3 x 3 = 36 points/axes total.
-    ax3.set_title("3. + Temporal Axes (this work)", fontsize=11.5, fontweight="bold")
-    cx0, cy0, cx1, cy1 = 1.3, 3.9, 9.5, 9.1
-    ax3.annotate("", xy=(cx1, cy0), xytext=(cx0, cy0),
-                 arrowprops=dict(arrowstyle="-|>", color="black", linewidth=1.1))
-    ax3.annotate("", xy=(cx0, cy1), xytext=(cx0, cy0),
-                 arrowprops=dict(arrowstyle="-|>", color="black", linewidth=1.1))
-    ax3.text((cx0 + cx1) / 2, cy0 - 0.55, "year", fontsize=7.5, color="#555555", ha="center", va="top")
-    ax3.text(cx0 - 0.45, (cy0 + cy1) / 2, "cumulative CAPEX", fontsize=7.5, color="#555555",
-              ha="center", va="center", rotation=90)
-    until_years = [2030, 2040, 2050]
-    year_x = {yr: cx0 + (yr - 2020) / 30 * (cx1 - cx0) for yr in (2020, *until_years)}
-    for yr in until_years:
-        ax3.plot([year_x[yr], year_x[yr]], [cy0, cy1 - 0.1], color="#B0B0B0", linestyle=":",
-                  linewidth=0.9, zorder=1)
-        ax3.text(year_x[yr], cy0 - 0.15, str(yr), fontsize=6.5, ha="center", va="top", color="#555555")
+    # Back planes first (2050 farthest back), each labelled bottom-left.
+    for i, year in reversed(list(enumerate(_MGA_AXIS_YEARS))):
+        px, py = plane_x0 + i * depth * 1.6, plane_y0 - i * depth
+        ax.add_patch(Rectangle((px, py), plane_w, plane_h, facecolor=eth_tint(_ETH_GREY, 0.8),
+                                edgecolor="black", linewidth=1.0, zorder=1 + (2 - i) * 0.1))
+        ax.text(px + 0.12, py + 0.05, str(year), fontsize=11, color="#808080",
+                ha="left", va="bottom", zorder=1.5)
 
-    # Real trends, hand-picked (not solved): total 2050 cumulative investment
-    # is highest in west, similar-but-not-identical in north/south, lowest
-    # in east — so regions clearly differ by 2050 rather than converging.
-    # Within each region, power ramps up earliest (already cheap today),
-    # hydrogen mid-late, carbon (DAC/CCS) latest and slowest to scale — same
-    # story fig6_diffusion_mechanisms/fig9_heat_supply_trajectory tell for
-    # this project's actual technology diffusion.
-    region_total_2050 = {"west": 10.0, "north": 6.0, "south": 5.0, "east": 3.0}
-    group_share = {"power": 0.5, "hydrogen": 0.3, "carbon": 0.2}
-    group_growth_k = {"power": 4.0, "hydrogen": 2.2, "carbon": 1.1}
-    # Scale to the tallest SINGLE (region, group) curve (west's power share),
-    # not the tallest region TOTAL — the latter is never actually reached by
-    # any one line (each region's total is split across 3 curves), which
-    # left every curve stuck in the chart's lower half.
-    max_series_final = max(region_total_2050[r] * group_share[g]
-                            for r in _MGA_AXIS_REGIONS for g in _MGA_AXIS_GROUPS)
-    y_scale = (cy1 - cy0 - 0.3) / max_series_final
-    # Only the 4 actual points (2020 start + the 3 until_years) — ax.plot
-    # already draws straight segments between consecutive points, so NOT
-    # densely sampling t is what keeps these as literal linear segments
-    # rather than a smoothed/interpolated curve.
-    sample_years = [2020, *until_years]
-    for region in _MGA_AXIS_REGIONS:
-        for group in _MGA_AXIS_GROUPS:
-            final = region_total_2050[region] * group_share[group]
-            k = group_growth_k[group]
-            xs, ys = [], []
-            for yr in sample_years:
-                ti = (yr - 2020) / 30
-                yi = cy0 + 0.10 + final * y_scale * (1 - np.exp(-k * ti)) / (1 - np.exp(-k))
-                xs.append(year_x[yr])
-                ys.append(yi)
-            ax3.plot(xs, ys, color=_MGA_AXIS_REGION_COLOR[region], linestyle=_MGA_AXIS_GROUP_LINESTYLE[group],
-                      linewidth=1.4, alpha=0.9, zorder=2)
-            ax3.scatter(xs[1:], ys[1:], marker=_MGA_AXIS_GROUP_MARKER[group], s=75,
-                        color=_MGA_AXIS_REGION_COLOR[region], edgecolor="black", linewidth=0.4, zorder=4)
+    for c, region in enumerate(_MGA_AXIS_REGIONS):
+        color = _MGA_AXIS_REGION_COLOR[region]
+        cx0 = plane_x0 + col_gap + c * (col_w + col_gap)
+        cxm = cx0 + col_w / 2
+        # region column background
+        ax.add_patch(Rectangle((cx0, rows_top - len(_MGA_AXIS_METRICS) * row_h - 0.05), col_w,
+                                len(_MGA_AXIS_METRICS) * row_h + 0.15, facecolor=eth_tint(color, 0.85),
+                                edgecolor="#333333", linewidth=1.0, zorder=2))
+        # region header above the stack
+        ax.add_patch(FancyBboxPatch((cxm - 0.8, plane_y0 + plane_h + 0.35), 1.6, 1.0,
+                                     boxstyle="round,pad=0.02,rounding_size=0.18",
+                                     facecolor=color, edgecolor="#333333", linewidth=1.0, zorder=3))
+        ax.text(cxm, plane_y0 + plane_h + 0.85, region.capitalize(), fontsize=12.5, color="white",
+                 ha="center", va="center", zorder=4)
+        for r, (_, icon) in enumerate(_MGA_AXIS_METRICS):
+            cy = rows_top - (r + 0.5) * row_h
+            ax.add_patch(FancyBboxPatch((cxm - 0.8, cy - row_h * 0.38), 1.6, row_h * 0.76,
+                                         boxstyle="round,pad=0.02,rounding_size=0.18",
+                                         facecolor=color, edgecolor="#333333", linewidth=1.0, zorder=3))
+            if icon == "pylon":
+                _mga_pylon_icon(ax, cxm, cy, row_h * 0.5, "white")
+            else:
+                ax.text(cxm, cy, icon, fontsize=13, color="white", ha="center", va="center", zorder=5)
 
-    # One combined legend (region = color, group = marker/linestyle), 2
-    # columns, single opaque box — two separate legend boxes here read as
-    # cluttered; one box top-left, inside the chart, does not.
-    region_handles = [Line2D([0], [0], color=_MGA_AXIS_REGION_COLOR[r], lw=2.5, label=r.capitalize())
-                       for r in _MGA_AXIS_REGIONS]
-    group_handles = [Line2D([0], [0], color="black", lw=1.2, linestyle=_MGA_AXIS_GROUP_LINESTYLE[g],
-                             marker=_MGA_AXIS_GROUP_MARKER[g], markersize=8,
-                             label=_MGA_AXIS_GROUP_LABEL[g]) for g in _MGA_AXIS_GROUPS]
-    ax3.legend(handles=region_handles + group_handles, loc="upper left", fontsize=7, frameon=True,
-               facecolor="white", framealpha=0.92, edgecolor="none", ncol=2, columnspacing=1.2,
-               handletextpad=0.6, bbox_to_anchor=(0.01, 0.99))
+    # metric row labels left of the stack
+    for r, (label, _) in enumerate(_MGA_AXIS_METRICS):
+        cy = rows_top - (r + 0.5) * row_h
+        ax.add_patch(FancyBboxPatch((label_x0, cy - row_h * 0.38), label_w, row_h * 0.76,
+                                     boxstyle="round,pad=0.02,rounding_size=0.18",
+                                     facecolor=_ETH_GREY, edgecolor="#333333", linewidth=1.0, zorder=3))
+        ax.text(label_x0 + label_w / 2, cy, label, fontsize=10.5, color="white", ha="center",
+                 va="center", linespacing=1.15, zorder=4)
 
-    _mga_axis_count(ax3, 5, 2.6, "4 $\\times$ 3 $\\times$ 3 = 36 axes")
-    ax3.text(5, 1.55, "one axis per (region, technology group, cumulative-to-year)",
-              fontsize=8.3, style="italic", color="#555555", ha="center", va="top")
-
-    fig.tight_layout(rect=[0, 0.02, 1, 0.97])
     savefig(fig, "fig7_mga_axis_construction", subdir="method")
 
 
@@ -4407,6 +4440,7 @@ def main() -> None:
     run_if(["No flexibility", "Full flexibility"], fig40_flex_scenarios, runs)
     run_if(["No flexibility", "Full flexibility"], fig41_flex_scenarios_table, runs)
     run_if(["No flexibility", "Full flexibility"], fig42_flex_decomposition, runs)
+    run_if(["No flexibility", "Full flexibility"], fig43_flex_scenarios_table_curtailment, runs)
 
     # method/
     run_if(["No flexibility"], fig4b_industry_fuel_demand_comparison, runs)
