@@ -7,3 +7,5 @@ task_id,my_dataset,my_comment,conduct_time_series_aggregation,aggregated_time_st
 5,zen_europe_ind_heat_v1_TES_only,2022_8a_4a_interval_10ts,,,,,,,2,BarHomogeneous=0,,,
 6,zen_europe_ind_heat_v1_DSM_only,2022_8a_4a_interval_10ts,,,,,,,2,BarHomogeneous=0,,,
 7,zen_europe_ind_heat_v1_DSM_pessimistic,2022_8a_4a_interval_10ts,,,,,,,2,BarHomogeneous=0,,,
+8,zen_europe_ind_heat_v1_dsm_no_cost,2022_8a_4a_interval_10ts,,,,,,,2,BarHomogeneous=0,,,
+9,zen_europe_ind_heat_v1_full_flexibility,2022_8a_4a_interval_20ts,,20,,,,,2,BarHomogeneous=0,,,
