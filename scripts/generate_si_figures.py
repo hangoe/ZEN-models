@@ -69,6 +69,8 @@ the zen-europe versions of removed ones in archive/zen_europe/):
                                           discharge), cells shaded by value, with arrows from the
                                           cheapest cell (Full flexibility, 3 temp levels) giving each
                                           other cell's extra cost in % and bn EUR
+  fig31_matrix_tsa                     — fig30 with 10 / 20 representative time steps as rows instead
+                                          of temperature resolution, ETH green cells
   fig20_cost_breakdown_sector_industry_heating — total system cost drilled down sector ->
                                           industries -> low-temperature heat
   fig40_flex_scenarios                 — flexibility scenarios (DSM pessimistic/DSM only/TES only/
@@ -80,6 +82,13 @@ the zen-europe versions of removed ones in archive/zen_europe/):
                                           -> Full flexibility, per metric
   fig43_flex_scenarios_table_curtailment — fig41 transposed plus a 2050 curtailment row (derived:
                                           capacity * max_load - output, see _curtailment_twh)
+  fig50_dsm_no_cost_vs_full_flex       — Full flexibility vs. DSM no cost (336 h) on fig43's metrics
+                                          + cost excl. DSM storage cost; difference column shaded by %
+  fig51_capacity_and_storage_dsm_no_cost_vs_full_flex — fig12 with Full flexibility as the absolute
+                                          stack and a floating Δ DSM no cost (336 h) bar per year
+  fig60_full_flex_20ts_vs_10ts         — fig50's table for Full flexibility 10 ts vs. 20 ts
+                                          (fig43's metrics)
+  fig61_capacity_and_storage_full_flex_20ts_vs_10ts — fig51 for Full flexibility 10 ts vs. 20 ts
 
 SI_results/method/ (no results — methodological/context only; removed ones in archive/method/):
   fig2_industry_fuel_demand_comparison (was fig4b) — new-sector heat/fuel demand vs. pre-existing cement/steel fuel mix
@@ -329,6 +338,24 @@ NO_FLEX_SINGLE_TEMP_SCENARIO = (
     "zen_europe_ind_heat_v1_no_flexibility_single_temp_2022_8a_4a_interval_10ts",
     "No flexibility (single temp)")
 
+# fig50 only: Full flexibility with all 10 *_DSM storage techs made (nearly)
+# free (opex_specific_variable/capex_specific_storage energy 0.001) AND their
+# energy_to_power_ratio_max raised to 336 h (was 2/48 h for 7 of them) —
+# parameters.csv row 8. Loaded separately (like NO_FLEX_SINGLE_TEMP_SCENARIO)
+# so it doesn't enter the flexibility-scenario figures or shift palette slots.
+DSM_NO_COST_SCENARIO = ("zen_europe_ind_heat_v1_dsm_no_cost_2022_8a_4a_interval_10ts",
+                        "DSM no cost (336 h)")
+
+# fig31/fig60/fig61 only: Full flexibility / No flexibility with 20 instead of
+# 10 representative time steps per year (parameters.csv row 9 for Full
+# flexibility). Loaded separately like DSM_NO_COST_SCENARIO. If the No
+# flexibility 20 ts run is missing, fig31 falls back to the 10 ts No
+# flexibility run as a marked placeholder (see main()).
+FULL_FLEX_20TS_SCENARIO = ("zen_europe_ind_heat_v1_full_flexibility_2022_8a_4a_interval_20ts",
+                           "Full flexibility (20 ts)")
+NO_FLEX_20TS_SCENARIO = ("zen_europe_ind_heat_v1_no_flexibility_2022_8a_4a_interval_20ts",
+                         "No flexibility (20 ts)")
+
 
 def load_scenarios() -> list[Run]:
     """Skips (rather than raising on) any scenario whose euler run hasn't
@@ -371,6 +398,32 @@ def load_no_flex_single_temp_scenario() -> Run | None:
     # share vs. singletemp-or-not), never r.color.
     return Run(name=folder, label=label, mode="euler", results=results,
                color=SCENARIO_PALETTE[0])
+
+
+def load_dsm_no_cost_scenario() -> Run | None:
+    """Returns None (rather than raising) if the run hasn't landed yet. Not
+    in SCENARIOS/load_scenarios() — see DSM_NO_COST_SCENARIO."""
+    folder, label = DSM_NO_COST_SCENARIO
+    try:
+        results = load_results(EULER_ROOT, folder)
+    except FileNotFoundError:
+        return None
+    # Color unused: fig50 is a table with its own shading.
+    return Run(name=folder, label=label, mode="euler", results=results,
+               color=SCENARIO_PALETTE[1])
+
+
+def load_extra_scenario(scenario: tuple[str, str]) -> Run | None:
+    """Like load_dsm_no_cost_scenario for any (folder, label) outside
+    SCENARIOS. Returns None if the run hasn't landed yet."""
+    folder, label = scenario
+    try:
+        results = load_results(EULER_ROOT, folder)
+    except FileNotFoundError:
+        return None
+    # Color unused: fig31/fig60 shade by value, fig61 by technology.
+    return Run(name=folder, label=label, mode="euler", results=results,
+               color=SCENARIO_PALETTE[1])
 
 
 def _snap_years(wanted: list[int], available: list[int]) -> list[int]:
@@ -2397,7 +2450,12 @@ FIG30_VRE_TECHS = ["photovoltaics", "wind_onshore", "wind_offshore",
 def _fig30_matrix_panel(fig: plt.Figure, ax: plt.Axes, values: dict[tuple[int, int], float],
                         title: str, unit: str, cbar_label: str, row_labels: bool = True,
                         value_fmt: str = "{:,.0f}", delta_fmt: str = "{:,.1f}",
-                        delta_unit: str | None = None):
+                        delta_unit: str | None = None,
+                        ramp: tuple[str, str, str] = (_eth_tint(_ETH_BLUE, 0.85), _ETH_BLUE,
+                                                      "#0F2A52"),
+                        col_names: tuple[str, str] = ("Full flexibility", "No flexibility"),
+                        row_names: tuple[str, str] = ("3 temp. levels", "Single temp. level"),
+                        placeholders: frozenset = frozenset()):
     """One 2x2 flexibility x temperature-resolution matrix of fig30: `values`
     keyed by (row, col) — row 0 = 3 temp levels (top), col 0 = Full
     flexibility (left). Cells shaded by value (light -> dark blue,
@@ -2409,7 +2467,9 @@ def _fig30_matrix_panel(fig: plt.Figure, ax: plt.Axes, values: dict[tuple[int, i
     absolute difference only (e.g. "pp" for a share given in "%"). Returns
     the colourbar so the caller can
     centre `title` over cells + colourbar once the layout is final — the
-    title itself is NOT drawn here."""
+    title itself is NOT drawn here. `ramp` (light, mid, dark) sets the cell
+    colours; `col_names`/`row_names` the matrix labels; cells in
+    `placeholders` are hatched and marked "placeholder" (fig31)."""
     base_rc = (0, 0)
     base = values[base_rc]
 
@@ -2423,15 +2483,14 @@ def _fig30_matrix_panel(fig: plt.Figure, ax: plt.Axes, values: dict[tuple[int, i
 
     # Cost -> continuous colour fade, normalised between the cheapest (light
     # ETH blue) and most expensive (dark ETH blue) cell; a colourbar documents it.
-    cmap = LinearSegmentedColormap.from_list(
-        "fig30_cost", [_eth_tint(_ETH_BLUE, 0.85), _ETH_BLUE, "#0F2A52"])
+    cmap = LinearSegmentedColormap.from_list("fig30_cost", list(ramp))
     norm = Normalize(vmin=min(values.values()), vmax=max(values.values()))
 
     for rc, c in values.items():
         x0, y0 = corner(rc)
         t = norm(c)
         ax.add_patch(Rectangle((x0, y0), size, size, facecolor=cmap(t), edgecolor="#1F2A3A",
-                               linewidth=1.2, zorder=1))
+                               linewidth=1.2, zorder=1, hatch="//" if rc in placeholders else None))
         cx, cy = center(rc)
         # Value + its change vs. the baseline sit at each cell's outer
         # (top/bottom) edge, leaving the middle for the arrows.
@@ -2453,6 +2512,10 @@ def _fig30_matrix_panel(fig: plt.Figure, ax: plt.Axes, values: dict[tuple[int, i
         ax.text(cx, ty - 0.12, sub, ha="center", va="center", fontsize=11.5,
                 style="italic" if rc == base_rc else "normal",
                 fontweight="normal" if rc == base_rc else "bold", color=text_color, zorder=4)
+        if rc in placeholders:
+            ax.text(cx, y0 + 0.5 * size, "placeholder", ha="center", va="center", fontsize=11,
+                    style="italic", color=text_color, zorder=4,
+                    bbox=dict(facecolor=cmap(t), edgecolor="none", pad=2))
 
     # ETH bronze: warm complement to the blue cell ramp, so the arrows stand
     # out equally on the lightest and darkest cells.
@@ -2484,10 +2547,10 @@ def _fig30_matrix_panel(fig: plt.Figure, ax: plt.Axes, values: dict[tuple[int, i
                                 facecolor=arrow_color, edgecolor="white", linewidth=1.2, zorder=3))
 
     top_y = 2 * size + gap
-    for col, label in enumerate(["Full flexibility", "No flexibility"]):
+    for col, label in enumerate(col_names):
         ax.text(col * (size + gap) + size / 2, top_y + 0.06, label, ha="center", va="bottom",
                 fontsize=11, color="black")
-    for row, label in enumerate(["3 temp. levels", "Single temp. level"] if row_labels else []):
+    for row, label in enumerate(row_names if row_labels else []):
         ax.text(-0.06, (1 - row) * (size + gap) + size / 2, label, ha="right", va="center",
                 rotation=90, fontsize=11, color="black")
 
@@ -2639,6 +2702,31 @@ def fig30_matrix(no_flex_run: Run, no_flex_single_run: Run, full_run: Run,
     """
     cells = {(0, 0): full_run, (0, 1): no_flex_run,
              (1, 0): single_temp_run, (1, 1): no_flex_single_run}
+    _matrix_figure(cells, "fig30_matrix")
+
+
+def fig31_matrix_tsa(no_flex_run: Run, no_flex_20ts_run: Run, full_run: Run,
+                     full_20ts_run: Run, no_flex_20ts_placeholder: bool = False) -> None:
+    """fig30 with the time-series aggregation as the second dimension: rows
+    10 / 20 representative time steps per year instead of 3 / single
+    temperature level, same baseline (Full flexibility, 10 ts), panels and
+    metrics; ETH green instead of blue cells to tell it apart from fig30.
+    `no_flex_20ts_placeholder` hatches the No flexibility 20 ts cell and
+    marks it "placeholder" — set while that run is still on Euler and
+    `no_flex_20ts_run` is the 10 ts run standing in for it.
+    -> SI_results/fig31_matrix_tsa.svg
+    """
+    cells = {(0, 0): full_run, (0, 1): no_flex_run,
+             (1, 0): full_20ts_run, (1, 1): no_flex_20ts_run}
+    _matrix_figure(cells, "fig31_matrix_tsa",
+                   ramp=(_eth_tint(_ETH_GREEN, 0.85), _ETH_GREEN, "#2F3709"),
+                   row_names=("10 time steps", "20 time steps"),
+                   placeholders=frozenset({(1, 1)} if no_flex_20ts_placeholder else ()))
+
+
+def _matrix_figure(cells: dict[tuple[int, int], Run], fig_name: str, **panel_kw) -> None:
+    """fig30's body for any 2x2 `cells` (row, col) -> run, (0, 0) the
+    baseline; `panel_kw` goes to every _fig30_matrix_panel."""
     metrics = {rc: _fig30_metrics(r) for rc, r in cells.items()}
     vals = {k: {rc: m[k] for rc, m in metrics.items()} for k in FIG30_PANELS}
 
@@ -2646,7 +2734,7 @@ def fig30_matrix(no_flex_run: Run, no_flex_single_run: Run, full_run: Run,
     fig, axes = plt.subplots(2, 2, figsize=(15, 14))
     panels = [(vals[k], *FIG30_PANELS[k]) for k in FIG30_PANELS]
     cbars = [_fig30_matrix_panel(fig, ax, vals, title, unit, cbar_label, row_labels=(i % 2 == 0),
-                                 **kw)
+                                 **kw, **panel_kw)
              for i, (ax, (vals, title, unit, cbar_label, kw)) in enumerate(zip(axes.flat, panels))]
     fig.subplots_adjust(hspace=0.1, wspace=0.12)
     # Centre each title over its cells + colourbar (incl. its label) — only
@@ -2666,7 +2754,11 @@ def fig30_matrix(no_flex_run: Run, no_flex_single_run: Run, full_run: Run,
         fig.text(0.5, bottom - 0.012, "Arrow width is proportional to the size of the change relative to "
                  "the largest change within each panel.", ha="center", va="top", fontsize=10,
                  style="italic", color="black")
-    savefig(fig, "fig30_matrix")
+    if panel_kw.get("placeholders"):
+        fig.text(0.5, bottom - 0.012, "Hatched cell: placeholder — shows the 10 time step run "
+                 "until the 20 time step run is available.", ha="center", va="top", fontsize=10,
+                 style="italic", color="black")
+    savefig(fig, fig_name)
 
 
 # fig40 panels — fig30's 4 plus DSM and TES discharge: key -> (title, Δ unit,
@@ -2849,6 +2941,121 @@ def fig43_flex_scenarios_table_curtailment(runs: list[Run]) -> None:
     """
     fig41_flex_scenarios_table(runs, FIG43_PANELS, _fig43_metrics,
                                "fig43_flex_scenarios_table_curtailment", transpose=True)
+
+
+def _dsm_storage_cost_bn(r: Run) -> float:
+    """Horizon-total discounted cost of the *_DSM storage techs [bn EUR]:
+    cost_capex_yearly + cost_opex_yearly of every technology ending in
+    "_DSM", per year, times _discount_factors (net_present_cost /
+    cost_total, so discounted exactly like _discounted_total_cost_bn),
+    MEUR -> bn EUR. Full flexibility ~1,281 MEUR undiscounted opex + ~5 capex;
+    DSM no cost ~0.6."""
+    years = get_available_years(r.results)
+    total = pd.Series(0.0, index=years)
+    for var in ("cost_capex_yearly", "cost_opex_yearly"):
+        df = r.results.get_total(var)
+        per_year = df[df.index.get_level_values("technology").str.endswith("_DSM")].sum()
+        per_year.index = per_year.index.astype(int)
+        total = total.add(per_year.reindex(years).fillna(0.0))
+    return float((total * _discount_factors(r.results, years)).sum()) / 1000
+
+
+def _fig50_metrics(r: Run) -> dict[str, float]:
+    """_fig43_metrics plus total cost without the DSM storage techs' own cost."""
+    m = _fig43_metrics(r)
+    return {"cost": m["cost"], "cost_ex_dsm": m["cost"] - _dsm_storage_cost_bn(r),
+            **{k: v for k, v in m.items() if k != "cost"}}
+
+
+# fig43's rows with "cost excl. DSM storage cost" right under total cost.
+FIG50_ROWS = {"cost": FIG43_PANELS["cost"],
+              "cost_ex_dsm": ("Total costs excl. DSM storage cost", "bn €", "{:,.0f}"),
+              **{k: v for k, v in FIG43_PANELS.items() if k != "cost"}}
+FIG50_PCT_CAP = 50.0  # shading saturates at ±50 % change
+
+
+def fig50_dsm_no_cost_vs_full_flex(full_run: Run, no_cost_run: Run) -> None:
+    """Full flexibility vs. DSM no cost (336 h) on fig43's metrics plus total
+    cost excluding the DSM storage techs' own cost (_dsm_storage_cost_bn —
+    separates the mechanical drop from making DSM free from the rest of the
+    system getting cheaper). Table with metrics as rows and three columns:
+    both runs' absolute values (white) and the difference (absolute, pp for
+    the heat-pump share, and %), shaded ETH blue (decrease) / red
+    (increase) by the % change on ONE shared scale saturating at
+    ±FIG50_PCT_CAP — unlike fig43's per-row scaling, which with a single
+    comparison would colour every non-zero cell fully.
+    Note the two runs differ in DSM cost AND DSM energy_to_power_ratio_max
+    (2/48 h -> 336 h for ammonia, ceramic, clinker, food, glass, olefin,
+    primary steel; methanol/paper/secondary steel already 336 h) — all other
+    inputs and settings identical (checked 2026-10-22).
+    -> SI_results/fig50_dsm_no_cost_vs_full_flex.svg
+    """
+    _comparison_table(full_run, no_cost_run, FIG50_ROWS, _fig50_metrics,
+                      "DSM no cost: DSM storage cost ≈ 0 and max. energy-to-power ratio 336 h for "
+                      "all DSM technologies\n(Full flexibility: 2–48 h for 7 of 10).",
+                      "fig50_dsm_no_cost_vs_full_flex")
+
+
+def fig60_full_flex_20ts_vs_10ts(full_run: Run, full_20ts_run: Run) -> None:
+    """fig50's table for Full flexibility with 10 (baseline) vs. 20
+    representative time steps per year, on fig43's metrics (no "excl. DSM
+    storage cost" row — both runs have the same DSM cost).
+    -> SI_results/fig60_full_flex_20ts_vs_10ts.svg
+    """
+    _comparison_table(full_run, full_20ts_run, FIG43_PANELS, _fig43_metrics,
+                      "20 ts: 20 instead of 10 representative time steps per year; all other "
+                      "inputs identical.", "fig60_full_flex_20ts_vs_10ts",
+                      base_label="Full flexibility (10 ts)")
+
+
+def _comparison_table(base_run: Run, other_run: Run, rows: dict, metrics_fn, footnote: str,
+                      fig_name: str, base_label: str = "Full flexibility") -> None:
+    """fig50's body for any run pair: `rows` key -> (title, unit, format) of
+    `metrics_fn`'s metrics; `base_run` is the baseline column."""
+    m_base, m_other = metrics_fn(base_run), metrics_fn(other_run)
+    cmap = LinearSegmentedColormap.from_list("fig50_delta", [_ETH_BLUE, "white", _ETH_RED])
+    norm = Normalize(vmin=-FIG50_PCT_CAP, vmax=FIG50_PCT_CAP)
+    # Column x-extents: two value columns, a wider difference column.
+    cols = [(0.0, 1.0), (1.0, 2.0), (2.0, 3.5)]
+    n_rows = len(rows)
+
+    fig, ax = plt.subplots(figsize=(9.5, 0.75 * n_rows + 1.4))
+    for (x0, x1), head in zip(cols, [base_label, other_run.label, "Difference"]):
+        ax.text((x0 + x1) / 2, -0.12, head, ha="center", va="bottom", fontsize=11,
+                fontweight="bold")
+    for i, (key, (title, unit, fmt)) in enumerate(rows.items()):
+        abs_unit = "%" if key == "hp_share" else unit
+        ax.text(-0.08, i + 0.5, f"{title}\n[{abs_unit}]", ha="right", va="center",
+                fontsize=10.5, fontweight="bold")
+        base, val = m_base[key], m_other[key]
+        d = val - base
+        pct = d / base * 100 if base else 0.0
+        for (x0, x1), v in zip(cols[:2], (base, val)):
+            ax.add_patch(Rectangle((x0, i), x1 - x0, 1, facecolor="white", edgecolor="#D0D0D0",
+                                   linewidth=1, zorder=1))
+            ax.text((x0 + x1) / 2, i + 0.5, fmt.format(v), ha="center", va="center", fontsize=12,
+                    fontweight="bold")
+        x0, x1 = cols[2]
+        color = cmap(norm(np.clip(pct, -FIG50_PCT_CAP, FIG50_PCT_CAP)))
+        ax.add_patch(Rectangle((x0, i), x1 - x0, 1, facecolor=color, edgecolor="#D0D0D0",
+                               linewidth=1, zorder=1))
+        sign = "+" if d >= 0 else "−"
+        pct_fmt = "{:.2f}" if key.startswith("cost") else "{:.1f}"
+        ax.text((x0 + x1) / 2, i + 0.5,
+                f"{sign}{fmt.format(abs(d))} {unit}  ({sign}{pct_fmt.format(abs(pct))} %)",
+                ha="center", va="center", fontsize=11, fontweight="bold",
+                color=_text_color_for_bg(color))
+    ax.set_xlim(0, cols[-1][1])
+    ax.set_ylim(n_rows, 0)
+    ax.axis("off")
+    cbar = fig.colorbar(ScalarMappable(norm=norm, cmap=cmap), ax=ax, fraction=0.03, pad=0.02,
+                        ticks=[-FIG50_PCT_CAP, 0, FIG50_PCT_CAP])
+    cbar.ax.set_yticklabels([f"≤ −{FIG50_PCT_CAP:.0f} %", "0 %", f"≥ +{FIG50_PCT_CAP:.0f} %"],
+                            fontsize=9)
+    cbar.set_label(f"Change vs. {base_label}", fontsize=10)
+    ax.text(cols[-1][1] / 2, n_rows + 0.15, footnote, ha="center", va="top", fontsize=9,
+            style="italic")
+    savefig(fig, fig_name)
 
 
 def fig42_flex_decomposition(runs: list[Run]) -> None:
@@ -3511,15 +3718,18 @@ def get_dsm_energy_equivalent(r, dsm_techs: list[str], years: list[int]) -> pd.D
 DELTA_LABEL = r"$\Delta$ No flexibility"
 
 
-def _base_and_delta_df(base_series: pd.Series, no_flex_series: pd.Series) -> pd.DataFrame:
+def _base_and_delta_df(base_series: pd.Series, no_flex_series: pd.Series,
+                       base_label: str = BASE_SCENARIO[1],
+                       delta_label: str = DELTA_LABEL) -> pd.DataFrame:
     """[ZEN-Europe (base) absolute, Δ No flexibility minus base — signed,
     both directions] — index is the union of both series' technologies,
     missing entries filled with 0 before subtracting so a tech present in
-    only one run still gets a correct (not NaN) delta."""
+    only one run still gets a correct (not NaN) delta. `base_label`/
+    `delta_label` name the columns for other run pairs (fig51)."""
     all_idx = base_series.index.union(no_flex_series.index)
     base = base_series.reindex(all_idx, fill_value=0.0)
     no_flex = no_flex_series.reindex(all_idx, fill_value=0.0)
-    return pd.DataFrame({BASE_SCENARIO[1]: base, DELTA_LABEL: no_flex - base})
+    return pd.DataFrame({base_label: base, delta_label: no_flex - base})
 
 
 def _plot_base_and_floating_delta(
@@ -3628,6 +3838,35 @@ def fig12_capacity_and_storage_base_and_delta(base_run: Run, no_flex_run: Run) -
     dropped per user request — only No flexibility vs. base is compared.
     -> SI_results/fig12_capacity_and_storage_base_and_delta.svg
     """
+    _capacity_and_storage_base_and_delta(base_run, no_flex_run, BASE_SCENARIO[1], DELTA_LABEL,
+                                         "fig12_capacity_and_storage_base_and_delta")
+
+
+def fig51_capacity_and_storage_dsm_no_cost_vs_full_flex(full_run: Run, no_cost_run: Run) -> None:
+    """fig12 for Full flexibility (absolute stack) vs. DSM no cost (336 h)
+    (floating Δ bar) — same panels, years and tech scope as fig12; see
+    fig50 for what the DSM no cost run changes.
+    -> SI_results/fig51_capacity_and_storage_dsm_no_cost_vs_full_flex.svg
+    """
+    _capacity_and_storage_base_and_delta(full_run, no_cost_run, full_run.label,
+                                         rf"$\Delta$ {no_cost_run.label}",
+                                         "fig51_capacity_and_storage_dsm_no_cost_vs_full_flex")
+
+
+def fig61_capacity_and_storage_full_flex_20ts_vs_10ts(full_run: Run, full_20ts_run: Run) -> None:
+    """fig51 for Full flexibility with 10 (absolute stack) vs. 20 (floating
+    Δ bar) representative time steps per year.
+    -> SI_results/fig61_capacity_and_storage_full_flex_20ts_vs_10ts.svg
+    """
+    _capacity_and_storage_base_and_delta(full_run, full_20ts_run, "Full flexibility (10 ts)",
+                                         rf"$\Delta$ {full_20ts_run.label}",
+                                         "fig61_capacity_and_storage_full_flex_20ts_vs_10ts")
+
+
+def _capacity_and_storage_base_and_delta(base_run: Run, no_flex_run: Run, base_label: str,
+                                         delta_label: str, fig_name: str) -> None:
+    """fig12's body for any run pair: `base_run` as the absolute stack
+    (`base_label`), `no_flex_run` as the floating delta (`delta_label`)."""
     empty = pd.Series(dtype=float)
     base_cap = get_capacity(base_run.results, POWER_GEN_TECHS, "power")
     nf_cap = get_capacity(no_flex_run.results, POWER_GEN_TECHS, "power")
@@ -3645,8 +3884,10 @@ def fig12_capacity_and_storage_base_and_delta(base_run: Run, no_flex_run: Run) -
     disch_by_year: dict[int, pd.DataFrame] = {}
     for year in SNAPSHOT_YEARS_POWER:
         gen_by_year[year] = _stack_ordered(
-            _base_and_delta_df(base_cap.get(year, empty), nf_cap.get(year, empty)), POWER_GEN_STACK_ORDER)
-        disch_by_year[year] = _base_and_delta_df(base_dis.get(year, empty), nf_dis.get(year, empty)) \
+            _base_and_delta_df(base_cap.get(year, empty), nf_cap.get(year, empty),
+                               base_label, delta_label), POWER_GEN_STACK_ORDER)
+        disch_by_year[year] = _base_and_delta_df(base_dis.get(year, empty), nf_dis.get(year, empty),
+                                                 base_label, delta_label) \
             .reindex(STORAGE_STACK_ORDER).fillna(0.0)
 
     fig, axes = plt.subplots(1, 2, figsize=(16, 6))
@@ -3656,7 +3897,7 @@ def fig12_capacity_and_storage_base_and_delta(base_run: Run, no_flex_run: Run) -
         _plot_base_and_floating_delta(disch_by_year, "Storage Annual Energy Discharged", "TWh", axes[1],
                                       color_map=STORAGE_COLOR_MAP, hatch_map={}, decimals=1)
     fig.tight_layout()
-    savefig(fig, "fig12_capacity_and_storage_base_and_delta")
+    savefig(fig, fig_name)
 
 
 # ── 11: MGA method schematic (no data) ──────────────────────────────────────
@@ -4394,6 +4635,11 @@ def main() -> None:
     base = load_base_scenario()
     print(f"Loading {NO_FLEX_SINGLE_TEMP_SCENARIO[1]!r} scenario...")
     no_flex_single = load_no_flex_single_temp_scenario()
+    print(f"Loading {DSM_NO_COST_SCENARIO[1]!r} scenario...")
+    dsm_no_cost = load_dsm_no_cost_scenario()
+    print(f"Loading 20 ts scenarios...")
+    full_20ts = load_extra_scenario(FULL_FLEX_20TS_SCENARIO)
+    no_flex_20ts = load_extra_scenario(NO_FLEX_20TS_SCENARIO)
 
     by = {r.label: r for r in runs}
     no_flex = by.get("No flexibility")
@@ -4402,7 +4648,9 @@ def main() -> None:
     dsm_pess = by.get("DSM pessimistic")
     available = {"base": base, "No flexibility": no_flex, "Full flexibility": full,
                  "Single temperature level": single_temp, "DSM pessimistic": dsm_pess,
-                 NO_FLEX_SINGLE_TEMP_SCENARIO[1]: no_flex_single}
+                 NO_FLEX_SINGLE_TEMP_SCENARIO[1]: no_flex_single,
+                 DSM_NO_COST_SCENARIO[1]: dsm_no_cost,
+                 FULL_FLEX_20TS_SCENARIO[1]: full_20ts}
 
     def run_if(needs: list[str], fn, *args) -> None:
         """Call fn(*args) if every scenario in `needs` is loaded, else print a skip line."""
@@ -4441,6 +4689,17 @@ def main() -> None:
     run_if(["No flexibility", "Full flexibility"], fig41_flex_scenarios_table, runs)
     run_if(["No flexibility", "Full flexibility"], fig42_flex_decomposition, runs)
     run_if(["No flexibility", "Full flexibility"], fig43_flex_scenarios_table_curtailment, runs)
+    run_if(["Full flexibility", DSM_NO_COST_SCENARIO[1]], fig50_dsm_no_cost_vs_full_flex,
+           full, dsm_no_cost)
+    run_if(["Full flexibility", DSM_NO_COST_SCENARIO[1]],
+           fig51_capacity_and_storage_dsm_no_cost_vs_full_flex, full, dsm_no_cost)
+    # No flexibility 20 ts missing -> 10 ts run as a marked placeholder.
+    run_if(["No flexibility", "Full flexibility", FULL_FLEX_20TS_SCENARIO[1]], fig31_matrix_tsa,
+           no_flex, no_flex_20ts or no_flex, full, full_20ts, no_flex_20ts is None)
+    run_if(["Full flexibility", FULL_FLEX_20TS_SCENARIO[1]], fig60_full_flex_20ts_vs_10ts,
+           full, full_20ts)
+    run_if(["Full flexibility", FULL_FLEX_20TS_SCENARIO[1]],
+           fig61_capacity_and_storage_full_flex_20ts_vs_10ts, full, full_20ts)
 
     # method/
     run_if(["No flexibility"], fig4b_industry_fuel_demand_comparison, runs)
