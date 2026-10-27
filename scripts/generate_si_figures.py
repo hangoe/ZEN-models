@@ -1413,9 +1413,11 @@ HEAT_DEMAND_BAND_LABELS = {"0_100": "0-100 °C", "100_150": "100-150 °C", "150_
 HEAT_BAND_COLORS = {"0_100": _eth_tint(_ETH_RED, 0.6), "100_150": _eth_tint(_ETH_RED, 0.3), "150_200": _ETH_RED}
 FUEL_CARRIER_COLORS = {"natural_gas": _ETH_TURQUOISE, "hard_coal": _ETH_GREY, "oil": _ETH_BRONZE,
                        "biomass": _ETH_GREEN, "waste": _eth_tint(_ETH_GREEN, 0.5), "hydrogen": _ETH_PURPLE,
+                       "naphtha": _eth_tint(_ETH_BRONZE, 0.5), "methanol": _eth_tint(_ETH_PURPLE, 0.5),
                        "fuel_to_process": _eth_tint(_ETH_GREY, 0.6)}
 FUEL_CARRIER_LABELS = {"natural_gas": "Natural gas", "hard_coal": "Hard coal", "oil": "Oil", "biomass": "Biomass",
-                       "waste": "Waste", "hydrogen": "Hydrogen", "fuel_to_process": "Natural gas\n(fuel shift possible)"}
+                       "waste": "Waste", "hydrogen": "Hydrogen", "naphtha": "Naphtha", "methanol": "Methanol",
+                       "fuel_to_process": "Natural gas\n(fuel shift possible)"}
 
 # fuel_to_kiln (glass/ceramic, ZEN-creator commit 1687533) and fuel_for_cement
 # (cement_kiln's own input_carrier) are both intermediate, blended-fuel hub
@@ -1517,6 +1519,12 @@ FIG4B_SECTOR_GROUPS = [
     ("Cement (clinker)", ["cement_kiln"], _consolidate_series),
     ("Primary steel (BF-BOF/DRI)", ["BF_BOF", "NG_DRI", "H2_DRI"], _merge_dri_fuel),
     ("Secondary steel (EAF)", ["EAF"], None),
+    # Chemicals: real per-carrier inputs (no blending hub, no merge). The
+    # carbon feedstock of methanol_from_hydrogen isn't an energy carrier and
+    # is dropped by the segment list in fig4b.
+    ("Ammonia (Haber-Bosch)", ["haber_bosch"], None),
+    ("Methanol", ["methanol_from_natural_gas", "methanol_from_hydrogen", "methanol_from_biomass"], None),
+    ("Olefins", ["olefin_from_naphtha", "olefin_from_methanol"], None),
 ]
 
 
@@ -1544,7 +1552,8 @@ def _tech_fuel_by_carrier(r, techs: list[str], year: int) -> pd.Series:
 
 def fig4b_industry_fuel_demand_comparison(runs: list[Run]) -> None:
     """Solved energy input by carrier for the four industry-heat sectors
-    (glass/ceramic/paper/food) next to the pre-existing cement/steel sectors,
+    (glass/ceramic/paper/food) next to the pre-existing cement/steel/chemical
+    (ammonia/methanol/olefins) sectors,
     so the new sectors' scale can be read against sectors already in the
     model. Every bar is the SAME source: the "No flexibility" ZEN-europe run's
     flow_conversion_input in its first modeled year (2022), as average GW.
@@ -1576,7 +1585,7 @@ def fig4b_industry_fuel_demand_comparison(runs: list[Run]) -> None:
     totals = np.array([sum(v.get(c, 0.0) for c, _ in present) for _, v in rows])
     min_label = 0.035 * totals.max()
 
-    fig, ax = plt.subplots(figsize=(11, 5.6))
+    fig, ax = plt.subplots(figsize=(11, 7.0))
     left = np.zeros(len(rows))
     for carrier, color in present:
         vals = np.array([v.get(carrier, 0.0) for _, v in rows])
@@ -1622,8 +1631,9 @@ def fig4b_industry_fuel_demand_comparison(runs: list[Run]) -> None:
     handles += [Patch(facecolor=FUEL_CARRIER_COLORS[c], label=FUEL_CARRIER_LABELS[c])
                 for c in FUEL_CARRIER_COLORS if c in present_carriers]
     handles += [header(""), Patch(facecolor=_ELECTRICITY_COLOR, label=_ELECTRICITY_LABEL)]
+    # Anchored above the axes so the legend clears the long primary-steel bar.
     leg = ax.legend(handles=handles, fontsize=8.5, frameon=False, loc="upper right",
-                    handlelength=1.4, handleheight=1.0, labelspacing=0.35)
+                    bbox_to_anchor=(1.0, 1.1), handlelength=1.4, handleheight=1.0, labelspacing=0.35)
     for t in leg.get_texts():
         if t.get_text() in headers:
             t.set_fontweight("bold")
@@ -2492,28 +2502,31 @@ def _fig30_matrix_panel(fig: plt.Figure, ax: plt.Axes, values: dict[tuple[int, i
         ax.add_patch(Rectangle((x0, y0), size, size, facecolor=cmap(t), edgecolor="#1F2A3A",
                                linewidth=1.2, zorder=1, hatch="//" if rc in placeholders else None))
         cx, cy = center(rc)
-        # Value + its change vs. the baseline sit at each cell's outer
-        # (top/bottom) edge, leaving the middle for the arrows.
-        ty = y0 + (0.82 if rc[0] == 0 else 0.3) * size
         # Pick by the cell colour's relative luminance (WCAG cross-over 0.179),
         # not by t: mid-ramp blues are already dark enough to need white.
         r_, g_, b_ = (v / 12.92 if v <= 0.04045 else ((v + 0.055) / 1.055) ** 2.4
                       for v in cmap(t)[:3])
         text_color = "white" if 0.2126 * r_ + 0.7152 * g_ + 0.0722 * b_ < 0.179 else "black"
-        ax.text(cx, ty, f"{value_fmt.format(c)} {unit}", ha="center", va="center", fontsize=11,
-                color=text_color, zorder=4)
+        # Two rows at each cell's outer (top/bottom) edge, as before the arrows
+        # were switched off: value + (absolute change), then the relative
+        # change in % (larger). The baseline cell gets "baseline" instead.
+        ty = y0 + (0.8 if rc[0] == 0 else 0.34) * size
+        dy = 0.15 * size
         if rc == base_rc:
-            sub = "baseline"
+            ax.text(cx, ty, f"{value_fmt.format(c)} {unit}", ha="center", va="center",
+                    fontsize=11, color=text_color, zorder=4)
+            ax.text(cx, ty - dy, "baseline", ha="center", va="center", fontsize=11.5,
+                    style="italic", color=text_color, zorder=4)
         else:
             delta = c - base
             sign = "+" if delta >= 0 else "−"
-            sub = (f"{sign}{delta_fmt.format(abs(delta))} {delta_unit or unit}  "
-                   f"({sign}{abs(delta) / base * 100:.2f} %)")
-        ax.text(cx, ty - 0.12, sub, ha="center", va="center", fontsize=11.5,
-                style="italic" if rc == base_rc else "normal",
-                fontweight="normal" if rc == base_rc else "bold", color=text_color, zorder=4)
+            ax.text(cx, ty, f"{value_fmt.format(c)} {unit}  "
+                    f"({sign}{delta_fmt.format(abs(delta))} {delta_unit or unit})",
+                    ha="center", va="center", fontsize=11, color=text_color, zorder=4)
+            ax.text(cx, ty - dy, f"{sign}{abs(delta) / base * 100:.2f} %", ha="center",
+                    va="center", fontsize=14, fontweight="bold", color=text_color, zorder=4)
         if rc in placeholders:
-            ax.text(cx, y0 + 0.5 * size, "placeholder", ha="center", va="center", fontsize=11,
+            ax.text(cx, y0 + 0.5 * size, "placeholder", ha="center", va="center", fontsize=10,
                     style="italic", color=text_color, zorder=4,
                     bbox=dict(facecolor=cmap(t), edgecolor="none", pad=2))
 
