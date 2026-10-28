@@ -100,6 +100,17 @@
 #   sbatch --array=14 --time=02:00:00 --cpus-per-task=8 --mem-per-cpu=6G submit_euler_mga.sh
 #   sbatch --array=15 --time=4-00:00:00 --cpus-per-task=32 --mem-per-cpu=5G submit_euler_mga.sh
 #
+# task_id 16-17 added 2026-10-28, supersede 15: task_id 14 showed the
+# heating ratio axes reach 2.8-53x, because DAC consumes heat from the shared
+# heat carrier (its CO2 recycled via methanation/FT/methanol). The axes yaml
+# now covers industrial heat only (industry_heat_electrification), and the
+# rows use the *_export0 dataset copy (availability_export_yearly = 0 for the
+# heat_industry_* carriers and glass/paper/ceramic/food). Same 33 axes.
+#   task_id 16 = test, batch4, max_iterations=1.
+#   task_id 17 = the full run, batch16 (task_id 14 peaked at ~40 GiB on 8 cpus).
+#   sbatch --array=16 --time=02:00:00 --cpus-per-task=8 --mem-per-cpu=6G submit_euler_mga.sh
+#   sbatch --array=17 --time=4-00:00:00 --cpus-per-task=32 --mem-per-cpu=5G submit_euler_mga.sh
+#
 # Requires the MGA install step in setup_euler_env.sh to have been run once
 # (clones + installs ZEN-garden-plugins and near_optimal_tools/pyoNearOpt,
 # incl. the "bbo" extra needed by batch bbo mode).

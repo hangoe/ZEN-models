@@ -2,7 +2,11 @@
 # electric share of the energy actually delivered (flow_conversion_output),
 # so idle capacity bought with the cost slack does not move the axes.
 # Road covers passenger cars only (trucks output truck_mileage, a different
-# unit). 2030/2050 only: 4x2 capex + 4x2x2 output ratio + 4x2 emissions
+# unit). Heating covers industrial heat only (heat_industry_* carriers, no
+# endogenous sink like DAC on the shared heat carrier); the pass-through
+# heat_industry_temp_conversion_* techs are excluded to avoid double counting.
+# Use with the *_export0 dataset (no export of industrial heat or products).
+# 2030/2050 only: 4x2 capex + 4x2x2 output ratio + 4x2 emissions
 # + cost = 33 axes.
 node_capex_cumulative:
   nodes:
@@ -22,34 +26,41 @@ node_output_ratio:
   - passenger_road_electrification:
       numerator: [BEV]
       denominator: [BEV, ICE_petrol, ICE_diesel]
-  - heating_electrification:
-      numerator: [electrode_boiler, heat_pump, electrode_boiler_DH, heat_pump_DH, electrode_boiler_industry_glass,
-        electrode_boiler_industry_ceramic, electrode_boiler_industry_paper, electrode_boiler_industry_food,
-        heat_pump_industry_0_100_water_glass, heat_pump_industry_0_100_water_ceramic, heat_pump_industry_0_100_water_paper,
-        heat_pump_industry_0_100_water_food, heat_pump_industry_0_100_waste_heat_glass, heat_pump_industry_0_100_waste_heat_ceramic,
-        heat_pump_industry_0_100_waste_heat_paper, heat_pump_industry_0_100_waste_heat_food, heat_pump_industry_100_150_water_glass,
-        heat_pump_industry_100_150_water_ceramic, heat_pump_industry_100_150_water_paper, heat_pump_industry_100_150_water_food,
-        heat_pump_industry_100_150_waste_heat_glass, heat_pump_industry_100_150_waste_heat_ceramic, heat_pump_industry_100_150_waste_heat_paper,
-        heat_pump_industry_100_150_waste_heat_food, heat_pump_industry_150_200_water_glass, heat_pump_industry_150_200_water_ceramic,
-        heat_pump_industry_150_200_water_paper, heat_pump_industry_150_200_water_food, heat_pump_industry_150_200_waste_heat_glass,
-        heat_pump_industry_150_200_waste_heat_ceramic, heat_pump_industry_150_200_waste_heat_paper, heat_pump_industry_150_200_waste_heat_food]
-      denominator: [electrode_boiler, heat_pump, natural_gas_boiler, oil_boiler, biomass_boiler, electrode_boiler_DH,
-        heat_pump_DH, natural_gas_boiler_DH, oil_boiler_DH, biomass_boiler_DH, hard_coal_boiler_DH, waste_boiler_DH,
-        electrode_boiler_industry_glass, electrode_boiler_industry_ceramic, electrode_boiler_industry_paper,
-        electrode_boiler_industry_food, heat_pump_industry_0_100_water_glass, heat_pump_industry_0_100_water_ceramic,
-        heat_pump_industry_0_100_water_paper, heat_pump_industry_0_100_water_food, heat_pump_industry_0_100_waste_heat_glass,
-        heat_pump_industry_0_100_waste_heat_ceramic, heat_pump_industry_0_100_waste_heat_paper, heat_pump_industry_0_100_waste_heat_food,
-        heat_pump_industry_100_150_water_glass, heat_pump_industry_100_150_water_ceramic, heat_pump_industry_100_150_water_paper,
-        heat_pump_industry_100_150_water_food, heat_pump_industry_100_150_waste_heat_glass, heat_pump_industry_100_150_waste_heat_ceramic,
-        heat_pump_industry_100_150_waste_heat_paper, heat_pump_industry_100_150_waste_heat_food, heat_pump_industry_150_200_water_glass,
-        heat_pump_industry_150_200_water_ceramic, heat_pump_industry_150_200_water_paper, heat_pump_industry_150_200_water_food,
-        heat_pump_industry_150_200_waste_heat_glass, heat_pump_industry_150_200_waste_heat_ceramic, heat_pump_industry_150_200_waste_heat_paper,
-        heat_pump_industry_150_200_waste_heat_food, natural_gas_boiler_industry_glass, natural_gas_boiler_industry_ceramic,
-        natural_gas_boiler_industry_paper, natural_gas_boiler_industry_food, oil_boiler_industry_glass,
-        oil_boiler_industry_ceramic, oil_boiler_industry_paper, oil_boiler_industry_food, biomass_boiler_industry_glass,
-        biomass_boiler_industry_ceramic, biomass_boiler_industry_paper, biomass_boiler_industry_food,
-        coal_boiler_industry_glass, coal_boiler_industry_ceramic, coal_boiler_industry_paper, coal_boiler_industry_food,
-        waste_boiler_industry_glass, waste_boiler_industry_ceramic, waste_boiler_industry_paper, waste_boiler_industry_food]
+  - industry_heat_electrification:
+      numerator: [electrode_boiler_industry_glass, electrode_boiler_industry_ceramic,
+        electrode_boiler_industry_paper, electrode_boiler_industry_food, heat_pump_industry_0_100_water_glass,
+        heat_pump_industry_0_100_water_ceramic, heat_pump_industry_0_100_water_paper,
+        heat_pump_industry_0_100_water_food, heat_pump_industry_0_100_waste_heat_glass,
+        heat_pump_industry_0_100_waste_heat_ceramic, heat_pump_industry_0_100_waste_heat_paper,
+        heat_pump_industry_0_100_waste_heat_food, heat_pump_industry_100_150_water_glass,
+        heat_pump_industry_100_150_water_ceramic, heat_pump_industry_100_150_water_paper,
+        heat_pump_industry_100_150_water_food, heat_pump_industry_100_150_waste_heat_glass,
+        heat_pump_industry_100_150_waste_heat_ceramic, heat_pump_industry_100_150_waste_heat_paper,
+        heat_pump_industry_100_150_waste_heat_food, heat_pump_industry_150_200_water_glass,
+        heat_pump_industry_150_200_water_ceramic, heat_pump_industry_150_200_water_paper,
+        heat_pump_industry_150_200_water_food, heat_pump_industry_150_200_waste_heat_glass,
+        heat_pump_industry_150_200_waste_heat_ceramic, heat_pump_industry_150_200_waste_heat_paper,
+        heat_pump_industry_150_200_waste_heat_food]
+      denominator: [electrode_boiler_industry_glass, electrode_boiler_industry_ceramic,
+        electrode_boiler_industry_paper, electrode_boiler_industry_food, heat_pump_industry_0_100_water_glass,
+        heat_pump_industry_0_100_water_ceramic, heat_pump_industry_0_100_water_paper,
+        heat_pump_industry_0_100_water_food, heat_pump_industry_0_100_waste_heat_glass,
+        heat_pump_industry_0_100_waste_heat_ceramic, heat_pump_industry_0_100_waste_heat_paper,
+        heat_pump_industry_0_100_waste_heat_food, heat_pump_industry_100_150_water_glass,
+        heat_pump_industry_100_150_water_ceramic, heat_pump_industry_100_150_water_paper,
+        heat_pump_industry_100_150_water_food, heat_pump_industry_100_150_waste_heat_glass,
+        heat_pump_industry_100_150_waste_heat_ceramic, heat_pump_industry_100_150_waste_heat_paper,
+        heat_pump_industry_100_150_waste_heat_food, heat_pump_industry_150_200_water_glass,
+        heat_pump_industry_150_200_water_ceramic, heat_pump_industry_150_200_water_paper,
+        heat_pump_industry_150_200_water_food, heat_pump_industry_150_200_waste_heat_glass,
+        heat_pump_industry_150_200_waste_heat_ceramic, heat_pump_industry_150_200_waste_heat_paper,
+        heat_pump_industry_150_200_waste_heat_food, natural_gas_boiler_industry_glass,
+        natural_gas_boiler_industry_ceramic, natural_gas_boiler_industry_paper, natural_gas_boiler_industry_food,
+        oil_boiler_industry_glass, oil_boiler_industry_ceramic, oil_boiler_industry_paper, oil_boiler_industry_food,
+        biomass_boiler_industry_glass, biomass_boiler_industry_ceramic, biomass_boiler_industry_paper,
+        biomass_boiler_industry_food, coal_boiler_industry_glass, coal_boiler_industry_ceramic,
+        coal_boiler_industry_paper, coal_boiler_industry_food, waste_boiler_industry_glass,
+        waste_boiler_industry_ceramic, waste_boiler_industry_paper, waste_boiler_industry_food]
 node_carbon_emissions_cumulative:
   nodes:
   - north_co2: [DK, EE, FI, IE, LT, LV, 'NO', SE, UK]
