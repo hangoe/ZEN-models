@@ -13,3 +13,6 @@ data/outputs/euler_outputs/**/duals.nc
 
 # local run staging (run_model.py --run_on local)
 _runs/
+
+# NetCDF model outputs (too large for GitHub)
+*.nc
