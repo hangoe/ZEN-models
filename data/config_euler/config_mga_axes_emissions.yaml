@@ -1,0 +1,12 @@
+# Emissions-only subset of config_mga_axes_total.yaml (same 4 regions x 3
+# until_years = 12 node_carbon_emissions_cumulative axes + cost), used by the
+# first, cheapest Euler test row (parameters_mga.csv task 10) to check the
+# emissions axes on the full model before running all 48 axes.
+node_carbon_emissions_cumulative:
+  nodes:
+  - north_co2: [DK, EE, FI, IE, LT, LV, 'NO', SE, UK]
+  - west_co2: [AT, BE, CH, DE, FR, LU, NL]
+  - south_co2: [ES, EL, HR, IT, PT, SI]
+  - east_co2: [BG, CZ, HU, PL, RO, SK]
+  until_years: [2030, 2040, 2050]
+include_cost: true

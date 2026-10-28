@@ -67,6 +67,25 @@
 #               per batch -- treat --time as unverified too, not just
 #               --mem-per-cpu/--cpus-per-task.
 #
+# task_id 10-13 added 2026-10-28: a stepwise retry of task_id 7 after its
+# Euler failure, switched from per_axes to normalisation=minmax (per_axes
+# divided capex axes by 15e12 although costs are in model units, ~1e6x too
+# small; ratio axes reached ~150x their reference 1; emissions axes went
+# negative). Same 8a/4a/1ts model, tol 0.1, eps 0.07, solver_threads=2.
+# Each row is only worth submitting once the previous one finished cleanly:
+#   task_id 10 = emissions-only axes (config_mga_axes_emissions.yaml, 12 axes
+#               + cost), batch4, max_iterations=1: bound LPs + 1 batch.
+#   task_id 11 = all 48 axes (config_mga_axes_total.yaml), batch4,
+#               max_iterations=1.
+#   task_id 12 = all 48 axes, batch16 (task_id 7's shape), max_iterations=3.
+#   task_id 13 = the full run: task_id 7 with minmax.
+# Profiles (untested guesses, refine from `sacct -j <jobid> --format=
+# JobID,Elapsed,MaxRSS,State` of the previous row):
+#   sbatch --array=10 --time=1-00:00:00 --cpus-per-task=8 --mem-per-cpu=16G submit_euler_mga.sh
+#   sbatch --array=11 --time=3-00:00:00 --cpus-per-task=8 --mem-per-cpu=16G submit_euler_mga.sh
+#   sbatch --array=12 --time=3-00:00:00 --cpus-per-task=32 --mem-per-cpu=6G submit_euler_mga.sh
+#   sbatch --array=13 --cpus-per-task=32 --mem-per-cpu=6G submit_euler_mga.sh
+#
 # Requires the MGA install step in setup_euler_env.sh to have been run once
 # (clones + installs ZEN-garden-plugins and near_optimal_tools/pyoNearOpt,
 # incl. the "bbo" extra needed by batch bbo mode).
