@@ -1,0 +1,40 @@
+# Tiny local smoke test of batch mode (see parameters_mga.csv task 9):
+# config_mga_batch_bbo.yaml with 5 iterations, fewer samples/evaluations
+# and 2 Gurobi threads per worker.
+analysis:
+  dataset: snapshot
+solver:
+  name: gurobi
+  solver_options:
+    Method: 2
+    NodeMethod: 2
+    BarHomogeneous: 1
+    DualReductions: 0
+    Threads: 2
+    Crossover: 0
+    ScaleFlag: 2
+    BarOrder: 0
+    BarIterLimit: 3000
+  save_duals: true
+  use_scaling: false
+  run_diagnostics: true
+  scaling_include_rhs: true
+plugins:
+  mga:
+    mode: batch
+    epsilon: 0.01
+    normalisation: relative
+    batch:
+      tolerance_prob: 0.95
+      max_iterations: 5
+      tolerance_explore: 0.1
+      n_samples: 200
+      alpha: 0.05
+      method: jeffreys
+      use_bounding_box: false
+      strategy_mode: bbo
+      max_function_evaluations: 200
+      n_restarts: 1
+      batch_size: 4
+      n_workers: 4
+      track_implied_threshold: true

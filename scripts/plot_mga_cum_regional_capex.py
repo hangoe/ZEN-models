@@ -14,7 +14,7 @@ the "iterate" points (fig12's violin overlay): 892 of them here (223
 outer iterations x batch_size=4) instead of the old run's 24 (6 x 4).
 
 Context: this is the cumulative-CAPEX sibling of the (now-deleted) PERIODS
-run analysis. Axes come from config_mga_axes_capex_cum.json
+run analysis. Axes come from config_mga_axes_capex_cum.yaml
 (node_capex_cumulative): 4 node clusters (north/west/south/east) x 3
 until_years ([2030, 2040, 2050] as of the tol002 run -- the original
 batch4_share run only had [2040, 2050]) = 12 node_capex_cumulative axes, plus
@@ -113,7 +113,7 @@ MODEL = "Crystal_Ball_ind_heat_v9_0_no_flexibility_nodiffusion"
 POLY_PATH = RUN_DIR / f"{MODEL}_batch_summary" / "polytope.npz"
 
 REGIONS = ["north", "west", "south", "east"]
-# As of the tol002 run (2026-09-03), config_mga_axes_capex_cum.json's
+# As of the tol002 run (2026-09-03), config_mga_axes_capex_cum.yaml's
 # until_years is [2030, 2040, 2050] -- a third horizon added on top of the
 # original [2040, 2050] pair every figure below used to assume. Every layout
 # below (column/row counts, divider spacing, bar offsets, color/legend

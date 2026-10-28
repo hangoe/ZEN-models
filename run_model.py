@@ -12,13 +12,13 @@ CHANGES:
     data/) is never modified.
   * On Euler, the staged dataset and the results go to $SCRATCH.
   * `--params` selects which CSV to sweep over (default parameters.csv). Each
-    row may also set a `config` column (e.g. config_mga_weights.json) to pick
-    which data/*.json config to run with; rows without it use config.json, so
+    row may also set a `config` column (e.g. config_mga_weights.yaml) to pick
+    which data/*.yaml config to run with; rows without it use config.yaml, so
     the original parameters.csv/submit_euler.sh path is unaffected.
   * Rows may also set a `normalisation` column (e.g. "relative", "units" or
     "minmax") that overwrites plugins.mga.normalisation in a private staged
-    copy of the chosen config -- the shared data/*.json config is never
-    touched, so one config_mga_bbo.json / config_mga_sampling.json covers
+    copy of the chosen config -- the shared data/*.yaml config is never
+    touched, so one config_mga_bbo.yaml / config_mga_sampling.yaml covers
     all normalisation modes instead of needing a config file per mode.
   * Rows may also set `batch_size` / `n_workers` / `tolerance_explore` /
     `seed_rng` columns that overwrite the matching keys under
@@ -41,11 +41,11 @@ CHANGES:
     #SBATCH profile actually allocates, or Gurobi will oversubscribe the
     node (see submit_euler_mga.sh's batch8/batch16 postmortem).
   * The `axes` block for every MGA mode except `weights` is no longer
-    duplicated per config file -- it's merged in from data/config_euler/config_mga_axes_capex.json
+    duplicated per config file -- it's merged in from data/config_euler/config_mga_axes_capex.yaml
     (the default) into the private staged copy, so all five
-    config_mga_{bbo,sampling,oracle,batch_bbo,batch_sampling}.json files
+    config_mga_{bbo,sampling,oracle,batch_bbo,batch_sampling}.yaml files
     share one axes definition. A row may set an `axes_config` column (e.g.
-    config_mga_axes_capex_cum.json) to merge in a different axes file
+    config_mga_axes_capex_cum.yaml) to merge in a different axes file
     instead, without touching the shared default.
   * Any system_overrides key a row's CSV doesn't set falls back to
     DEFAULT_SYSTEM_OVERRIDES, so a sweep whose rows all share the same
@@ -82,7 +82,7 @@ therefore slightly more diffusion-constrained than intended. Left unfixed on pur
 """
 
 import argparse
-import json
+import json  # legacy system.json datasets
 import os
 import shutil
 from pathlib import Path
@@ -94,8 +94,8 @@ from zen_garden import run, Results  # noqa: F401  (Results kept for post-proces
 
 # --- Fixed locations (same layout as your original script) ----------------------
 REPO_DIR = Path(__file__).parent                                  # .../ZEN-models
-DATA_DIR_CONFIG = REPO_DIR / "data"                               # config.json + local outputs
-CONFIG_EULER_DIR = DATA_DIR_CONFIG / "config_euler"               # config_mga_*.json (MGA + axes)
+DATA_DIR_CONFIG = REPO_DIR / "data"                               # config.yaml + local outputs
+CONFIG_EULER_DIR = DATA_DIR_CONFIG / "config_euler"               # config_mga_*.yaml (MGA + axes)
 
 # Places `my_dataset` is looked up, in order. ZEN-europe's generated datasets
 # (data/outputs/zen-europe) are the primary source; older pristine copies live
@@ -130,44 +130,44 @@ DEFAULT_SYSTEM_OVERRIDES = {
     "use_rolling_horizon": False,
 }
 
-# config.json used when a row/CSV has no "config" column (or leaves it
+# config.yaml used when a row/CSV has no "config" column (or leaves it
 # blank) -- keeps the original non-MGA parameters.csv working unchanged.
-DEFAULT_CONFIG = "config.json"
+DEFAULT_CONFIG = "config.yaml"
 
 # Default axes definition merged into every MGA config (see
 # apply_axes_override) so the axes block isn't duplicated per config file.
 # A row's own "axes_config" column (see main()) can point at a different
-# axes file instead -- e.g. data/config_euler/config_mga_axes_capex_cum.json for the
+# axes file instead -- e.g. data/config_euler/config_mga_axes_capex_cum.yaml for the
 # node_capex_cumulative investigation.
-AXES_CONFIG_DEFAULT = CONFIG_EULER_DIR / "config_mga_axes_capex.json"
+AXES_CONFIG_DEFAULT = CONFIG_EULER_DIR / "config_mga_axes_capex.yaml"
 
 
-def apply_axes_override(config_json: dict, config_name: str, axes_config_path: Path = AXES_CONFIG_DEFAULT) -> None:
+def apply_axes_override(run_config: dict, config_name: str, axes_config_path: Path = AXES_CONFIG_DEFAULT) -> None:
     """Merge in the axes definition from axes_config_path, in-place.
 
-    No-op if plugins.mga is absent (plain config.json runs). Otherwise
+    No-op if plugins.mga is absent (plain config.yaml runs). Otherwise
     overwrites plugins.mga.axes with the contents of axes_config_path
-    (defaults to data/config_euler/config_mga_axes_capex.json), so the per-mode config
+    (defaults to data/config_euler/config_mga_axes_capex.yaml), so the per-mode config
     files don't each carry their own copy of the axes. "weights" mode also
     needs an axes block now (weight keys reference axis names), so it is no
     longer skipped here.
     """
-    mga_cfg = config_json.get("plugins", {}).get("mga")
+    mga_cfg = run_config.get("plugins", {}).get("mga")
     if mga_cfg is None:
         return
     with open(axes_config_path) as f:
-        mga_cfg["axes"] = json.load(f)
+        mga_cfg["axes"] = yaml.safe_load(f)
 
 
-def apply_normalisation_override(config_json: dict, config_name: str, normalisation: str) -> None:
+def apply_normalisation_override(run_config: dict, config_name: str, normalisation: str) -> None:
     """Overwrite plugins.mga.normalisation in-place with the CSV row's value.
 
-    Lets one config_mga_bbo.json / config_mga_sampling.json serve both
+    Lets one config_mga_bbo.yaml / config_mga_sampling.yaml serve both
     normalisation modes -- the CSV row picks the mode, run_model.py bakes
     it into a private staged copy of the config (see main()), the shared
-    data/*.json file is never touched.
+    data/*.yaml file is never touched.
     """
-    mga_cfg = config_json.get("plugins", {}).get("mga")
+    mga_cfg = run_config.get("plugins", {}).get("mga")
     if mga_cfg is None:
         raise SystemExit(
             f"[run_model] row sets normalisation={normalisation!r} but "
@@ -176,11 +176,11 @@ def apply_normalisation_override(config_json: dict, config_name: str, normalisat
     mga_cfg["normalisation"] = normalisation
 
 
-def apply_epsilon_override(config_json: dict, config_name: str, epsilon) -> None:
+def apply_epsilon_override(run_config: dict, config_name: str, epsilon) -> None:
     """Overwrite plugins.mga.epsilon in-place with the CSV row's value.
 
     epsilon sets the near-optimality budget the MGA search explores within:
-    total_cost <= (1 + epsilon) * NPC*. The shared config_mga_*.json files
+    total_cost <= (1 + epsilon) * NPC*. The shared config_mga_*.yaml files
     default this to 0.01 (1%), an arbitrary tight budget. For the
     per_axes-normalised total-axes run, epsilon is instead sized from a
     welfare-tolerance estimate:
@@ -190,10 +190,10 @@ def apply_epsilon_override(config_json: dict, config_name: str, epsilon) -> None
         NPC* (this dataset's cost-optimal net present cost) ~= 22e12 EUR.
         epsilon = 1.5e12 / 22e12 ~= 0.068 -> rounded to 0.07 (7%).
     Same private-staged-copy pattern as apply_normalisation_override(): lets
-    one config_mga_batch_*.json be swept over different epsilon values from
-    parameters_mga.csv without touching the shared data/*.json file.
+    one config_mga_batch_*.yaml be swept over different epsilon values from
+    parameters_mga.csv without touching the shared data/*.yaml file.
     """
-    mga_cfg = config_json.get("plugins", {}).get("mga")
+    mga_cfg = run_config.get("plugins", {}).get("mga")
     if mga_cfg is None:
         raise SystemExit(
             f"[run_model] row sets epsilon={epsilon!r} but "
@@ -202,13 +202,13 @@ def apply_epsilon_override(config_json: dict, config_name: str, epsilon) -> None
     mga_cfg["epsilon"] = epsilon
 
 
-def apply_batch_overrides(config_json: dict, config_name: str, batch_size, n_workers, tolerance_explore, seed_rng) -> None:
+def apply_batch_overrides(run_config: dict, config_name: str, batch_size, n_workers, tolerance_explore, seed_rng) -> None:
     """Overwrite plugins.mga.batch.{batch_size,n_workers,tolerance_explore,seed_rng} in-place with the CSV row's values.
 
     Same private-staged-copy pattern as apply_normalisation_override(): lets
-    one config_mga_batch_*.json be swept over different batch_size/n_workers/
+    one config_mga_batch_*.yaml be swept over different batch_size/n_workers/
     tolerance_explore/seed_rng values from parameters.csv without touching
-    the shared data/*.json file. tolerance_explore is normalisation-dependent
+    the shared data/*.yaml file. tolerance_explore is normalisation-dependent
     (see the MGA plugin's docs): under "share" it trades off how much
     exploration effort larger vs. smaller axes/regions get, so a row may
     need its own value distinct from other rows sharing the same config
@@ -219,7 +219,7 @@ def apply_batch_overrides(config_json: dict, config_name: str, batch_size, n_wor
     """
     if batch_size is None and n_workers is None and tolerance_explore is None and seed_rng is None:
         return
-    batch_cfg = config_json.get("plugins", {}).get("mga", {}).get("batch")
+    batch_cfg = run_config.get("plugins", {}).get("mga", {}).get("batch")
     if batch_cfg is None:
         raise SystemExit(
             f"[run_model] row sets batch_size/n_workers/tolerance_explore/seed_rng but "
@@ -235,7 +235,7 @@ def apply_batch_overrides(config_json: dict, config_name: str, batch_size, n_wor
         batch_cfg["seed_rng"] = seed_rng
 
 
-def apply_solver_threads_override(config_json: dict, config_name: str, solver_threads) -> None:
+def apply_solver_threads_override(run_config: dict, config_name: str, solver_threads) -> None:
     """Overwrite solver.solver_options.Threads in-place with the CSV row's value.
 
     Same private-staged-copy pattern as the other overrides. Batch mode's
@@ -245,7 +245,7 @@ def apply_solver_threads_override(config_json: dict, config_name: str, solver_th
     """
     if solver_threads is None:
         return
-    solver_options = config_json.get("solver", {}).get("solver_options")
+    solver_options = run_config.get("solver", {}).get("solver_options")
     if solver_options is None:
         raise SystemExit(
             f"[run_model] row sets solver_threads but {config_name} has no "
@@ -254,16 +254,16 @@ def apply_solver_threads_override(config_json: dict, config_name: str, solver_th
     solver_options["Threads"] = solver_threads
 
 
-def apply_numeric_focus_override(config_json: dict, config_name: str, numeric_focus) -> None:
+def apply_numeric_focus_override(run_config: dict, config_name: str, numeric_focus) -> None:
     """Overwrite solver.solver_options.NumericFocus in-place with the CSV row's value.
 
     Same private-staged-copy pattern as the other overrides. Lets badly scaled
     datasets (e.g. zen_europe, whose barrier path fails at NumericFocus 0) use
-    NumericFocus 2 without slowing down every other row sharing config.json.
+    NumericFocus 2 without slowing down every other row sharing config.yaml.
     """
     if numeric_focus is None:
         return
-    solver_options = config_json.get("solver", {}).get("solver_options")
+    solver_options = run_config.get("solver", {}).get("solver_options")
     if solver_options is None:
         raise SystemExit(
             f"[run_model] row sets numeric_focus but {config_name} has no "
@@ -272,7 +272,7 @@ def apply_numeric_focus_override(config_json: dict, config_name: str, numeric_fo
     solver_options["NumericFocus"] = numeric_focus
 
 
-def apply_solver_options_override(config_json: dict, config_name: str, solver_options_str) -> None:
+def apply_solver_options_override(run_config: dict, config_name: str, solver_options_str) -> None:
     """Merge a row's "Key=val;Key=val" string into solver.solver_options in-place.
 
     Same private-staged-copy pattern as the other overrides, but generic: one
@@ -282,7 +282,7 @@ def apply_solver_options_override(config_json: dict, config_name: str, solver_op
     """
     if solver_options_str is None:
         return
-    solver_options = config_json.get("solver", {}).get("solver_options")
+    solver_options = run_config.get("solver", {}).get("solver_options")
     if solver_options is None:
         raise SystemExit(
             f"[run_model] row sets solver_options but {config_name} has no "
@@ -376,7 +376,7 @@ def apply_cost_noise(dataset_dir: Path, eps: float, seed: int) -> None:
     print(f"[run_model] cost_noise eps={eps} seed={seed}: wrote {n_files} per-node cost files")
 
 
-def validate_plugin_config(config_json: dict, config_name: str) -> None:
+def validate_plugin_config(run_config: dict, config_name: str) -> None:
     """Fail fast on an invalid plugins.mga block, before staging/running.
 
     The plugin's own validate_config() only runs from an after_solve hook,
@@ -384,7 +384,7 @@ def validate_plugin_config(config_json: dict, config_name: str) -> None:
     Calling it here catches a bad "normalisation" value or an
     oracle+"units" mismatch before a SLURM array task burns its walltime.
     """
-    mga_cfg = config_json.get("plugins", {}).get("mga")
+    mga_cfg = run_config.get("plugins", {}).get("mga")
     if mga_cfg is None:
         return
     from zen_garden_plugins.mga.plugin import validate_config
@@ -404,7 +404,12 @@ def resolve_dataset_dir(name: str) -> Path:
 
 
 def to_native(v):
-    """Convert a CSV/pandas cell to a clean Python bool/int/float/str for JSON."""
+    """Convert a CSV/pandas cell to a clean Python bool/int/float/str.
+
+    Integral floats become ints: ZEN-garden v3 validates config.yaml and
+    system.yaml strictly, so e.g. batch_size=4.0 (pandas reads an int column
+    with blanks as float) would be rejected.
+    """
     if isinstance(v, str):
         s = v.strip()
         if s.lower() in ("true", "false"):
@@ -517,17 +522,17 @@ def main() -> None:
 
     config_dir = CONFIG_EULER_DIR if config_name.startswith("config_mga") else DATA_DIR_CONFIG
     with open(config_dir / config_name) as f:
-        config_json = json.load(f)
-    apply_axes_override(config_json, config_name, axes_config_path)
+        run_config = yaml.safe_load(f)
+    apply_axes_override(run_config, config_name, axes_config_path)
     if normalisation is not None:
-        apply_normalisation_override(config_json, config_name, normalisation)
-    apply_batch_overrides(config_json, config_name, batch_size, n_workers, tolerance_explore, seed_rng)
-    apply_solver_threads_override(config_json, config_name, solver_threads)
-    apply_numeric_focus_override(config_json, config_name, numeric_focus)
-    apply_solver_options_override(config_json, config_name, solver_options_str)
+        apply_normalisation_override(run_config, config_name, normalisation)
+    apply_batch_overrides(run_config, config_name, batch_size, n_workers, tolerance_explore, seed_rng)
+    apply_solver_threads_override(run_config, config_name, solver_threads)
+    apply_numeric_focus_override(run_config, config_name, numeric_focus)
+    apply_solver_options_override(run_config, config_name, solver_options_str)
     if epsilon is not None:
-        apply_epsilon_override(config_json, config_name, epsilon)
-    validate_plugin_config(config_json, config_name)
+        apply_epsilon_override(run_config, config_name, epsilon)
+    validate_plugin_config(run_config, config_name)
 
     # --- 2. Stage a PRIVATE copy of the dataset (safe for parallel array tasks) --
     work = working_root(args.run_on) / f"task_{args.task_id}"
@@ -543,11 +548,11 @@ def main() -> None:
         apply_cost_noise(staged_dataset, cost_noise, noise_seed)
 
     # Write the (possibly normalisation-patched) config to the same private
-    # per-task folder, so the shared data/*.json file is never touched and
+    # per-task folder, so the shared data/*.yaml file is never touched and
     # concurrent array tasks never read/write it at once.
     staged_config_path = work / config_name
     with open(staged_config_path, "w") as f:
-        json.dump(config_json, f, indent=2)
+        yaml.safe_dump(run_config, f, sort_keys=False)
 
     # --- 3. Apply the system.json overrides to the COPY --------------------------
     # ZEN-creator's newer datasets ship system.yaml instead of system.json.

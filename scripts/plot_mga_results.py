@@ -69,7 +69,7 @@ zen_garden_plugins.mga.plugin.MGA._build_weight_array), not any region or
 CAPEX-money quantity, despite living in a "..._MGA_CAPEX_weights" folder --
 misleading enough that this project retired it in favour of the real
 per-region/per-carrier-group VMM max/min solves that batch16 (and any future
-BATCH_MODES/SUPF_MODES run against config_mga_axes_capex.json) actually
+BATCH_MODES/SUPF_MODES run against config_mga_axes_capex.yaml) actually
 provides. That real regional-CAPEX view (fig0a/b/c: baseline vs each axis's
 own VMM max/min, and cross-effects on every other axis) lives in
 scripts/plot_mga_batch16_regional_capex.py, not here -- this script no longer
@@ -78,8 +78,8 @@ sampling_units figures (including the old fig0_weights_axis_bars) were moved
 to data/outputs/figures/mga_tests/archive/ rather than deleted outright.
 
 As of the CAPEX-periods switchover (2026-08-26), RUN_PREFIX/BATCH_MODES
-below point at a NEW axis set -- config_mga_axes_capex_periods.json, not
-config_mga_axes_capex.json -- run against a full 2020-2050 pathway
+below point at a NEW axis set -- config_mga_axes_capex_periods.yaml, not
+config_mga_axes_capex.yaml -- run against a full 2020-2050 pathway
 ("2020_7a_5a_interval_3ts", not the earlier single-2050-year
 "2050_1a_5a_interval_5ts"), batch_size=4 ("batch4", not "batch16"). 4 node
 clusters (north/west/south/east) x 2 calendar-year periods ([2030, 2039],
@@ -256,9 +256,9 @@ MODEL = "Crystal_Ball_ind_heat_v9_0_no_flexibility_nodiffusion"
 # (north/west/south/east) x 2 cumulative horizons (until_year in
 # [2040, 2050]) = 8 node_capex_cumulative axes, plus net_present_cost -- see
 # each run's own polytope.npz axis_meta_json for the exact node membership
-# per region (config_mga_axes_capex_cum.json). batch4_tol002/batch6_tol002
+# per region (config_mga_axes_capex_cum.yaml). batch4_tol002/batch6_tol002
 # are the BATCH_MODES entries for this axis set (batch_size=4/6,
-# strategy_mode="bbo" per config_mga_batch_bbo.json, normalisation="share",
+# strategy_mode="bbo" per config_mga_batch_bbo.yaml, normalisation="share",
 # tolerance_explore=0.02 -- see the tol002-switchover note below);
 # SUPF_MODES is empty
 # until a v9_0 bbo_units/sampling_units run against this axis set is
@@ -384,7 +384,7 @@ def axis_value(r: Results, axis_meta: dict) -> float:
             vals = vals[vals.index.get_level_values("technology").isin(technologies)]
         return float(vals.to_numpy().sum()) if not vals.empty else 0.0
     if kind == "node_capex_period":
-        # CAPEX-PERIODS axis set (config_mga_axes_capex_periods.json, see the
+        # CAPEX-PERIODS axis set (config_mga_axes_capex_periods.yaml, see the
         # module docstring's periods-switchover note): same node-restriction
         # as node_capex_tech, but restricted to the axis's own calendar-year
         # period instead of a technology group -- get_total's DataFrame
@@ -400,7 +400,7 @@ def axis_value(r: Results, axis_meta: dict) -> float:
         vals = vals[[c for c in vals.columns if start <= c <= end]]
         return float(vals.to_numpy().sum()) if not vals.empty else 0.0
     if kind == "node_capex_cumulative":
-        # CAPEX-CUM axis set (config_mga_axes_capex_cum.json, see the module
+        # CAPEX-CUM axis set (config_mga_axes_capex_cum.yaml, see the module
         # docstring's cumulative/share-switchover note): same node-restriction
         # as node_capex_tech/node_capex_period, but summed over every model
         # year UP TO AND INCLUDING the axis's own until_year (axis_meta

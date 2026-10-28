@@ -1,0 +1,54 @@
+node_capex_cumulative:
+  nodes:
+  - north: [DK, EE, FI, IE, LT, LV, 'NO', SE, UK]
+  - west: [AT, BE, CH, DE, FR, LU, NL]
+  - south: [ES, EL, HR, IT, PT, SI]
+  - east: [BG, CZ, HU, PL, RO, SK]
+  until_years: [2030, 2040, 2050]
+node_capacity_ratio:
+  nodes:
+  - north: [DK, EE, FI, IE, LT, LV, 'NO', SE, UK]
+  - west: [AT, BE, CH, DE, FR, LU, NL]
+  - south: [ES, EL, HR, IT, PT, SI]
+  - east: [BG, CZ, HU, PL, RO, SK]
+  years: [2030, 2038, 2050]
+  ratio_groups:
+  - road_electrification:
+      numerator: [BEV, HDT_BET]
+      denominator: [BEV, ICE_petrol, ICE_diesel, HDT_BET, HDT_diesel, HDT_FCEV]
+  - heating_electrification:
+      numerator: [electrode_boiler, heat_pump, electrode_boiler_DH, heat_pump_DH, electrode_boiler_industry_glass,
+        electrode_boiler_industry_ceramic, electrode_boiler_industry_paper, electrode_boiler_industry_food,
+        heat_pump_industry_0_100_water_glass, heat_pump_industry_0_100_water_ceramic, heat_pump_industry_0_100_water_paper,
+        heat_pump_industry_0_100_water_food, heat_pump_industry_0_100_waste_heat_glass, heat_pump_industry_0_100_waste_heat_ceramic,
+        heat_pump_industry_0_100_waste_heat_paper, heat_pump_industry_0_100_waste_heat_food, heat_pump_industry_100_150_water_glass,
+        heat_pump_industry_100_150_water_ceramic, heat_pump_industry_100_150_water_paper, heat_pump_industry_100_150_water_food,
+        heat_pump_industry_100_150_waste_heat_glass, heat_pump_industry_100_150_waste_heat_ceramic, heat_pump_industry_100_150_waste_heat_paper,
+        heat_pump_industry_100_150_waste_heat_food, heat_pump_industry_150_200_water_glass, heat_pump_industry_150_200_water_ceramic,
+        heat_pump_industry_150_200_water_paper, heat_pump_industry_150_200_water_food, heat_pump_industry_150_200_waste_heat_glass,
+        heat_pump_industry_150_200_waste_heat_ceramic, heat_pump_industry_150_200_waste_heat_paper, heat_pump_industry_150_200_waste_heat_food]
+      denominator: [electrode_boiler, heat_pump, natural_gas_boiler, oil_boiler, biomass_boiler, electrode_boiler_DH,
+        heat_pump_DH, natural_gas_boiler_DH, oil_boiler_DH, biomass_boiler_DH, hard_coal_boiler_DH, waste_boiler_DH,
+        electrode_boiler_industry_glass, electrode_boiler_industry_ceramic, electrode_boiler_industry_paper,
+        electrode_boiler_industry_food, heat_pump_industry_0_100_water_glass, heat_pump_industry_0_100_water_ceramic,
+        heat_pump_industry_0_100_water_paper, heat_pump_industry_0_100_water_food, heat_pump_industry_0_100_waste_heat_glass,
+        heat_pump_industry_0_100_waste_heat_ceramic, heat_pump_industry_0_100_waste_heat_paper, heat_pump_industry_0_100_waste_heat_food,
+        heat_pump_industry_100_150_water_glass, heat_pump_industry_100_150_water_ceramic, heat_pump_industry_100_150_water_paper,
+        heat_pump_industry_100_150_water_food, heat_pump_industry_100_150_waste_heat_glass, heat_pump_industry_100_150_waste_heat_ceramic,
+        heat_pump_industry_100_150_waste_heat_paper, heat_pump_industry_100_150_waste_heat_food, heat_pump_industry_150_200_water_glass,
+        heat_pump_industry_150_200_water_ceramic, heat_pump_industry_150_200_water_paper, heat_pump_industry_150_200_water_food,
+        heat_pump_industry_150_200_waste_heat_glass, heat_pump_industry_150_200_waste_heat_ceramic, heat_pump_industry_150_200_waste_heat_paper,
+        heat_pump_industry_150_200_waste_heat_food, natural_gas_boiler_industry_glass, natural_gas_boiler_industry_ceramic,
+        natural_gas_boiler_industry_paper, natural_gas_boiler_industry_food, oil_boiler_industry_glass,
+        oil_boiler_industry_ceramic, oil_boiler_industry_paper, oil_boiler_industry_food, biomass_boiler_industry_glass,
+        biomass_boiler_industry_ceramic, biomass_boiler_industry_paper, biomass_boiler_industry_food,
+        coal_boiler_industry_glass, coal_boiler_industry_ceramic, coal_boiler_industry_paper, coal_boiler_industry_food,
+        waste_boiler_industry_glass, waste_boiler_industry_ceramic, waste_boiler_industry_paper, waste_boiler_industry_food]
+node_carbon_emissions_cumulative:
+  nodes:
+  - north_co2: [DK, EE, FI, IE, LT, LV, 'NO', SE, UK]
+  - west_co2: [AT, BE, CH, DE, FR, LU, NL]
+  - south_co2: [ES, EL, HR, IT, PT, SI]
+  - east_co2: [BG, CZ, HU, PL, RO, SK]
+  until_years: [2030, 2040, 2050]
+include_cost: true

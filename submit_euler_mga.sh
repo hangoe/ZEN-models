@@ -7,7 +7,7 @@
 # SLURM_ARRAY_TASK_ID; the row's own task_id value, NOT its position in the
 # file). As of 2026-09-16, all 4 rows share the same MGA setup -- batch bbo,
 # "share" normalisation, batch_size=n_workers=4, tolerance_explore=0.02,
-# config_mga_axes_capex_cum.json (node_capex_cumulative axes), reference_year
+# config_mga_axes_capex_cum.yaml (node_capex_cumulative axes), reference_year
 # 2020 -- and only vary time series aggregation and the period schedule:
 #   task_id 0 = aggregated_time_steps_per_year=1, optimized_years=7,
 #               interval_between_years=5 (2020 -> 2050, 7 periods every 5y)
@@ -52,11 +52,11 @@
 # task_id 7 added 2026-09-18 (commits "new run with 48 axes added for
 # testing" + "adapt solver threads") -- a different axes config from
 # task_id 0-6, not another share/capex_cum variant:
-#   task_id 7 = axes_config=config_mga_axes_total.json (48 axes: node_capex_
+#   task_id 7 = axes_config=config_mga_axes_total.yaml (48 axes: node_capex_
 #               cumulative and node_carbon_emissions_cumulative each give
 #               4 regions x 3 until_years, node_capacity_ratio gives 4
 #               regions x 3 years x 2 ratio_groups -- vs. task_id 0-6's
-#               12-axis config_mga_axes_capex_cum.json), normalisation=
+#               12-axis config_mga_axes_capex_cum.yaml), normalisation=
 #               per_axes (not share/minmax), tolerance_explore=0.1 (vs.
 #               0.02), epsilon=0.07 (vs. the config's default 0.01),
 #               batch_size=n_workers=16, solver_threads=2 -- same batch/
