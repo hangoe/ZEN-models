@@ -79,12 +79,26 @@
 #               max_iterations=1.
 #   task_id 12 = all 48 axes, batch16 (task_id 7's shape), max_iterations=3.
 #   task_id 13 = the full run: task_id 7 with minmax.
-# Profiles (untested guesses, refine from `sacct -j <jobid> --format=
-# JobID,Elapsed,MaxRSS,State` of the previous row):
-#   sbatch --array=10 --time=1-00:00:00 --cpus-per-task=8 --mem-per-cpu=16G submit_euler_mga.sh
-#   sbatch --array=11 --time=3-00:00:00 --cpus-per-task=8 --mem-per-cpu=16G submit_euler_mga.sh
-#   sbatch --array=12 --time=3-00:00:00 --cpus-per-task=32 --mem-per-cpu=6G submit_euler_mga.sh
-#   sbatch --array=13 --cpus-per-task=32 --mem-per-cpu=6G submit_euler_mga.sh
+# Profiles sized from the v9 1ts runs' slurm_usage.json (batch4: MaxRSS
+# ~29GB, 2.4-3.6h for a full converged run; batch16/solver_threads=2: ~87GB,
+# 1.6h) plus headroom for the larger 8a/4a v1 dataset -- refine from
+# `sacct -j <jobid> --format=JobID,Elapsed,MaxRSS,State` of the previous row:
+#   sbatch --array=10 --time=08:00:00 --cpus-per-task=8 --mem-per-cpu=6G submit_euler_mga.sh
+#   sbatch --array=11 --time=1-00:00:00 --cpus-per-task=8 --mem-per-cpu=6G submit_euler_mga.sh
+#   sbatch --array=12 --time=1-00:00:00 --cpus-per-task=32 --mem-per-cpu=4G submit_euler_mga.sh
+#   sbatch --array=13 --time=4-00:00:00 --cpus-per-task=32 --mem-per-cpu=4G submit_euler_mga.sh
+#
+# task_id 14-15 added 2026-10-28: task_id 12 showed the node_capacity_ratio
+# axes reach 14-2688x the baseline capacity (idle capacity bought with the
+# cost slack). These rows use config_mga_axes_total_output.yaml instead:
+# node_output_ratio axes (share of delivered flow_conversion_output, needs
+# the ZEN-garden-plugins node_output_ratio change), road = passenger cars
+# only, years 2030/2050 for all kinds -> 33 axes (66 bound LPs, ~30 min).
+#   task_id 14 = test, batch4, max_iterations=1.
+#   task_id 15 = the full run, batch16. task_id 12 peaked at ~109 GiB of
+#               128G, so 5G/cpu (160G):
+#   sbatch --array=14 --time=02:00:00 --cpus-per-task=8 --mem-per-cpu=6G submit_euler_mga.sh
+#   sbatch --array=15 --time=4-00:00:00 --cpus-per-task=32 --mem-per-cpu=5G submit_euler_mga.sh
 #
 # Requires the MGA install step in setup_euler_env.sh to have been run once
 # (clones + installs ZEN-garden-plugins and near_optimal_tools/pyoNearOpt,
