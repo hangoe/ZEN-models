@@ -66,8 +66,10 @@ CHANGES:
     `flex_cost_fix` = 1 gives TES/DSM a power capex (0.1 x energy capex) and
     TES a 0.5 Euro/MWh variable opex (numerical test, not final data).
     See scripts/solver_tests/NOTES.md.
-  * Datasets are looked up first in data/outputs/zen-europe (ZEN-europe
-    output), then ZEN-creator/outputs, then data/ (see DATASET_SEARCH_DIRS).
+  * Datasets are looked up first in data/outputs/zen-models-new (current
+    ZEN-europe output, models.yaml names), then data/outputs/zen-europe (older
+    ZEN-europe output), then ZEN-creator/outputs, then data/ (see
+    DATASET_SEARCH_DIRS).
 
 Run one row by hand (local test):   python run_model.py --task_id 0 --run_on local
 On Euler it is launched by submit_euler.sh (or submit_euler_mga.sh) via the
@@ -101,9 +103,12 @@ DATA_DIR_CONFIG = REPO_DIR / "data"                               # config.yaml 
 CONFIG_EULER_DIR = DATA_DIR_CONFIG / "config_euler"               # config_mga_*.yaml (MGA + axes)
 
 # Places `my_dataset` is looked up, in order. ZEN-europe's generated datasets
-# (data/outputs/zen-europe) are the primary source; older pristine copies live
-# in ZEN-creator/outputs; data/ is kept as a fallback for one-off/local datasets.
+# (data/outputs/zen-models-new, named as in ZEN-europe's models.yaml) are the
+# primary source; data/outputs/zen-europe holds the older generation (old names);
+# older pristine copies live in ZEN-creator/outputs; data/ is kept as a fallback
+# for one-off/local datasets.
 DATASET_SEARCH_DIRS = [
+    REPO_DIR / "data" / "outputs" / "zen-models-new",
     REPO_DIR / "data" / "outputs" / "zen-europe",
     REPO_DIR.parent / "ZEN-creator" / "outputs",
     REPO_DIR / "data",
