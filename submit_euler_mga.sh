@@ -111,6 +111,15 @@
 #   sbatch --array=16 --time=02:00:00 --cpus-per-task=8 --mem-per-cpu=6G submit_euler_mga.sh
 #   sbatch --array=17 --time=4-00:00:00 --cpus-per-task=32 --mem-per-cpu=5G submit_euler_mga.sh
 #
+# task_id 18-19 added 2026-10-29: task_id 17 (33 axes) did not converge
+# (CI lower bound 0.000 after 192 iterations). Same rows with two regions
+# (config_mga_axes_total_output_2reg.yaml: north = old north + BE, NL, DE,
+# PL, CZ; south = the rest) -> 17 axes. Targets unchanged.
+#   task_id 18 = test, batch4, max_iterations=1.
+#   task_id 19 = the full run, batch16.
+#   sbatch --array=18 --time=02:00:00 --cpus-per-task=8 --mem-per-cpu=6G submit_euler_mga.sh
+#   sbatch --array=19 --time=4-00:00:00 --cpus-per-task=32 --mem-per-cpu=5G submit_euler_mga.sh
+#
 # Requires the MGA install step in setup_euler_env.sh to have been run once
 # (clones + installs ZEN-garden-plugins and near_optimal_tools/pyoNearOpt,
 # incl. the "bbo" extra needed by batch bbo mode).
