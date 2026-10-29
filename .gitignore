@@ -16,3 +16,6 @@ _runs/
 
 # NetCDF model outputs (too large for GitHub)
 *.nc
+
+# ZEN-garden result file locks
+*.lock

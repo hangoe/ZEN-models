@@ -14,7 +14,7 @@ Two modes:
 Usage:
     python scripts/check_hp_diffusion.py --dataset zen_europe_ind_heat_v1_no_flexibility
     python scripts/check_hp_diffusion.py --results <run folder name in euler_outputs>
-Datasets are looked up in data/outputs/zen-europe, results in data/outputs/euler_outputs
+Datasets are looked up in data/outputs/zen-europe-old, results in data/outputs/euler_outputs
 (absolute paths work too).
 """
 
@@ -26,7 +26,7 @@ import yaml
 
 from plots.figure_settings import EULER_ROOT, OUTPUT_DIR, _search_var_dict
 
-DATASET_ROOT = OUTPUT_DIR / "zen-europe"
+DATASET_ROOT = OUTPUT_DIR / "zen-europe-old"
 TARGET_SHARE = 0.02
 HP_PREFIX = "heat_pump_industry_"
 

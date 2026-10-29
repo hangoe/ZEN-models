@@ -66,8 +66,8 @@ CHANGES:
     `flex_cost_fix` = 1 gives TES/DSM a power capex (0.1 x energy capex) and
     TES a 0.5 Euro/MWh variable opex (numerical test, not final data).
     See scripts/solver_tests/NOTES.md.
-  * Datasets are looked up first in data/outputs/zen-models-new (current
-    ZEN-europe output, models.yaml names), then data/outputs/zen-europe (older
+  * Datasets are looked up first in data/outputs/zen-europe-new (current
+    ZEN-europe output, models.yaml names), then data/outputs/zen-europe-old (older
     ZEN-europe output), then ZEN-creator/outputs, then data/ (see
     DATASET_SEARCH_DIRS).
 
@@ -103,13 +103,13 @@ DATA_DIR_CONFIG = REPO_DIR / "data"                               # config.yaml 
 CONFIG_EULER_DIR = DATA_DIR_CONFIG / "config_euler"               # config_mga_*.yaml (MGA + axes)
 
 # Places `my_dataset` is looked up, in order. ZEN-europe's generated datasets
-# (data/outputs/zen-models-new, named as in ZEN-europe's models.yaml) are the
-# primary source; data/outputs/zen-europe holds the older generation (old names);
+# (data/outputs/zen-europe-new, named as in ZEN-europe's models.yaml) are the
+# primary source; data/outputs/zen-europe-old holds the older generation (old names);
 # older pristine copies live in ZEN-creator/outputs; data/ is kept as a fallback
 # for one-off/local datasets.
 DATASET_SEARCH_DIRS = [
-    REPO_DIR / "data" / "outputs" / "zen-models-new",
-    REPO_DIR / "data" / "outputs" / "zen-europe",
+    REPO_DIR / "data" / "outputs" / "zen-europe-new",
+    REPO_DIR / "data" / "outputs" / "zen-europe-old",
     REPO_DIR.parent / "ZEN-creator" / "outputs",
     REPO_DIR / "data",
 ]
@@ -588,7 +588,7 @@ def main() -> None:
     if args.run_on == "euler":
         out_dir = working_root(args.run_on) / "outputs" / f"{my_dataset}_{my_comment}"
     else:
-        out_dir = DATA_DIR_CONFIG / "outputs" / f"{my_dataset}_{my_comment}"
+        out_dir = DATA_DIR_CONFIG / "outputs" / "zen-europe-outputs-new" / f"{my_dataset}_{my_comment}"
     out_dir.parent.mkdir(parents=True, exist_ok=True)
 
     # --- 5. Run the model --------------------------------------------------------

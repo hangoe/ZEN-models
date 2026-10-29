@@ -106,7 +106,7 @@ parameters.csv        submit_euler.sh                 compute nodes
 3. applies the row's overrides to the copy's `system.json`/`system.yaml`,
 4. runs ZEN-garden, writing to `$SCRATCH/zen_runs/outputs/<my_dataset>_<my_comment>`.
 
-With `--run_on local`, outputs go to `data/outputs/` instead.
+With `--run_on local`, outputs go to `data/outputs/zen-europe-outputs-new/` instead.
 
 ## 5. Run order
 
