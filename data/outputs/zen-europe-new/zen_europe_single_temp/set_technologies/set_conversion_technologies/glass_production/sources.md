@@ -27,7 +27,7 @@ capacity_existing
 -----------------
 
 Step 1
-The existing production capacity is the JRC-IDEES installed capacity (glass, paper) at 8760 hours per year; for ceramic, food and the paper nodes without JRC-IDEES data it equals the product demand (see demand). It is assumed to be built evenly over the lifetime of the technology.
+The existing production capacity is the JRC-IDEES installed capacity (glass, paper) at 8760 hours per year; for ceramic, food and the paper nodes without JRC-IDEES data it is the product demand (see demand) divided by an assumed capacity utilisation of 0.8 (general industry assumptions). It is assumed to be built evenly over the lifetime of the technology.
 
 **Citations**
 
