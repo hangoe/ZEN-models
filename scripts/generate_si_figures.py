@@ -1,5 +1,12 @@
 """Generate print-ready figures for the MT_report SI Results section.
 
+As of 2026-10-29 the runs are read from data/outputs/zen-europe-outputs-new/
+and named after ZEN-europe's models.yaml variants (see SCENARIOS): the old
+"Full flexibility" is now "ZEN-Europe", "TES only" -> "No DSM", "DSM only" ->
+"No TES", "DSM pessimistic" -> "No TES, DSM pessimistic", "Single
+temperature level" -> "Single temp" and "ZEN-Europe (base)" -> "ZEN-Europe
+legacy". The descriptions below still use the old labels.
+
 As of 2026-10-12 the figures are generated from the zen-europe runs
 (zen_europe_ind_heat_v1_*, current ZEN-garden output format), not the
 ZEN-Europe v9_0 runs the history below describes; the previous figures are
@@ -246,7 +253,6 @@ from plots.figures_by_scenario import (
     plot_stacked_bars,
 )
 from plots.figure_settings import (
-    EULER_ROOT,
     HOURS_PER_YEAR,
     Run,
     SCENARIO_PALETTE,
@@ -266,6 +272,8 @@ from plots.figure_settings import (
 apply_font_mode()
 
 FIGURES_DIR = REPO_ROOT / "data" / "outputs" / "figures" / "SI_results"
+# Runs named after the models.yaml variants: <model>_<comment>/<model>/ (see SCENARIOS).
+RUNS_ROOT = REPO_ROOT / "data" / "outputs" / "zen-europe-outputs-new"
 # Single-year snapshot used throughout (horizon totals used where noted).
 # As of the v8_0 re-run the horizon changed from 2025-2070/step5 to
 # 2020-2048/step2 (reference_year=2020, interval_between_years=2,
@@ -296,13 +304,25 @@ COMPARISON_YEARS = [2030, 2040, 2050]
 # zen-europe: "No flexibility" is the full-horizon run (parameters.csv task 50,
 # 2022-2050, time steps per system.yaml). The other entries use the folder
 # names those scenarios are expected to get and self-skip until run.
+# 2026-10-29: folder names and labels follow ZEN-europe's models.yaml variants
+# (parameters.csv), where `zen_europe` itself is the full-flexibility model.
+# Old labels: Full flexibility -> ZEN-Europe, DSM pessimistic -> No TES, DSM
+# pessimistic, DSM only -> No TES, TES only -> No DSM, Single temperature
+# level -> Single temp, ZEN-Europe (base) -> ZEN-Europe legacy.
+NO_FLEX = "No flexibility"
+FULL = "ZEN-Europe"
+NO_TES_DSM_PESS = "No TES, DSM pessimistic"
+NO_TES = "No TES"
+NO_DSM = "No DSM"
+SINGLE_TEMP = "Single temp"
+
 SCENARIOS = [
-    ("zen_europe_ind_heat_v1_no_flexibility_2022_8a_4a_interval_10ts", "No flexibility"),
-    ("zen_europe_ind_heat_v1_full_flexibility_2022_8a_4a_interval_10ts", "Full flexibility"),
-    ("zen_europe_ind_heat_v1_DSM_pessimistic_2022_8a_4a_interval_10ts", "DSM pessimistic"),
-    ("zen_europe_ind_heat_v1_DSM_only_2022_8a_4a_interval_10ts", "DSM only"),
-    ("zen_europe_ind_heat_v1_TES_only_2022_8a_4a_interval_10ts", "TES only"),
-    ("zen_europe_ind_heat_v1_full_flexibility_single_temp", "Single temperature level"),
+    ("zen_europe_no_flex_2022_8a_4a_interval_10ts", NO_FLEX),
+    ("zen_europe_2022_8a_4a_interval_10ts", FULL),
+    ("zen_europe_no_tes_dsm_pess_2022_8a_4a_interval_10ts", NO_TES_DSM_PESS),
+    ("zen_europe_no_tes_2022_8a_4a_interval_10ts", NO_TES),
+    ("zen_europe_no_dsm_2022_8a_4a_interval_10ts", NO_DSM),
+    ("zen_europe_single_temp_2022_8a_4a_interval_10ts", SINGLE_TEMP),
 ]
 
 # fig0a/fig0b only. Uses SCENARIO_PALETTE slot 6 (grey) — see the comment there.
@@ -327,7 +347,7 @@ SCENARIOS = [
 # 2026-09 "add 2050" re-sync: base case re-run with optimized_years=16
 # (2020-2050, matching the SCENARIOS list's new 16a runs) — see the
 # COMPARISON_YEARS comment above for the same re-sync.
-BASE_SCENARIO = ("zen_europe_base", "ZEN-Europe (base)")
+BASE_SCENARIO = ("zen_europe_legacy_2022_8a_4a_interval_10ts", "ZEN-Europe legacy")
 
 # Single-temperature-band counterpart of "No flexibility", loaded separately
 # from SCENARIOS (like BASE_SCENARIO) since it isn't one of the 6 case-study
@@ -335,25 +355,23 @@ BASE_SCENARIO = ("zen_europe_base", "ZEN-Europe (base)")
 # compare singletemp vs. not for BOTH model options (No flexibility and
 # Full flexibility), not just Full flexibility as before, per user request.
 NO_FLEX_SINGLE_TEMP_SCENARIO = (
-    "zen_europe_ind_heat_v1_no_flexibility_single_temp_2022_8a_4a_interval_10ts",
-    "No flexibility (single temp)")
+    "zen_europe_no_flex_single_temp_2022_8a_4a_interval_10ts",
+    "No flexibility, single temp")
 
 # fig50 only: Full flexibility with all 10 *_DSM storage techs made (nearly)
 # free (opex_specific_variable/capex_specific_storage energy 0.001) AND their
 # energy_to_power_ratio_max raised to 336 h (was 2/48 h for 7 of them) —
 # parameters.csv row 8. Loaded separately (like NO_FLEX_SINGLE_TEMP_SCENARIO)
 # so it doesn't enter the flexibility-scenario figures or shift palette slots.
-DSM_NO_COST_SCENARIO = ("zen_europe_ind_heat_v1_dsm_no_cost_2022_8a_4a_interval_10ts",
-                        "DSM no cost (336 h)")
+DSM_NO_COST_SCENARIO = ("zen_europe_dsm_no_cost_2022_8a_4a_interval_10ts", "DSM no cost")
 
 # fig31/fig60/fig61 only: Full flexibility / No flexibility with 20 instead of
 # 10 representative time steps per year (parameters.csv row 9 for Full
 # flexibility). Loaded separately like DSM_NO_COST_SCENARIO. If the No
 # flexibility 20 ts run is missing, fig31 falls back to the 10 ts No
 # flexibility run as a marked placeholder (see main()).
-FULL_FLEX_20TS_SCENARIO = ("zen_europe_ind_heat_v1_full_flexibility_2022_8a_4a_interval_20ts",
-                           "Full flexibility (20 ts)")
-NO_FLEX_20TS_SCENARIO = ("zen_europe_ind_heat_v1_no_flexibility_2022_8a_4a_interval_20ts",
+FULL_FLEX_20TS_SCENARIO = ("zen_europe_2022_8a_4a_interval_20ts", f"{FULL} (20 ts)")
+NO_FLEX_20TS_SCENARIO = ("zen_europe_no_flex_2022_8a_4a_interval_20ts",
                          "No flexibility (20 ts)")
 
 
@@ -366,9 +384,9 @@ def load_scenarios() -> list[Run]:
     runs = []
     for i, (folder, label) in enumerate(SCENARIOS):
         try:
-            results = load_results(EULER_ROOT, folder)
+            results = load_results(RUNS_ROOT, folder)
         except FileNotFoundError:
-            print(f"  skipping {label!r}: {folder} not found/incomplete under {EULER_ROOT}")
+            print(f"  skipping {label!r}: {folder} not found/incomplete under {RUNS_ROOT}")
             continue
         runs.append(Run(name=folder, label=label, mode="euler", results=results,
                          color=SCENARIO_PALETTE[i % len(SCENARIO_PALETTE)]))
@@ -379,7 +397,7 @@ def load_base_scenario() -> Run | None:
     """Returns None (rather than raising) if the run hasn't landed yet."""
     folder, label = BASE_SCENARIO
     try:
-        results = load_results(EULER_ROOT, folder)
+        results = load_results(RUNS_ROOT, folder)
     except FileNotFoundError:
         return None
     return Run(name=folder, label=label, mode="euler", results=results,
@@ -391,7 +409,7 @@ def load_no_flex_single_temp_scenario() -> Run | None:
     in SCENARIOS/load_scenarios() — see NO_FLEX_SINGLE_TEMP_SCENARIO."""
     folder, label = NO_FLEX_SINGLE_TEMP_SCENARIO
     try:
-        results = load_results(EULER_ROOT, folder)
+        results = load_results(RUNS_ROOT, folder)
     except FileNotFoundError:
         return None
     # Color unused: fig14a/fig14b pick their own colors by hand (HP/e-boiler
@@ -405,7 +423,7 @@ def load_dsm_no_cost_scenario() -> Run | None:
     in SCENARIOS/load_scenarios() — see DSM_NO_COST_SCENARIO."""
     folder, label = DSM_NO_COST_SCENARIO
     try:
-        results = load_results(EULER_ROOT, folder)
+        results = load_results(RUNS_ROOT, folder)
     except FileNotFoundError:
         return None
     # Color unused: fig50 is a table with its own shading.
@@ -418,7 +436,7 @@ def load_extra_scenario(scenario: tuple[str, str]) -> Run | None:
     SCENARIOS. Returns None if the run hasn't landed yet."""
     folder, label = scenario
     try:
-        results = load_results(EULER_ROOT, folder)
+        results = load_results(RUNS_ROOT, folder)
     except FileNotFoundError:
         return None
     # Color unused: fig31/fig60 shade by value, fig61 by technology.
@@ -571,7 +589,7 @@ def fig0a_cost_composition(components_with_base: pd.DataFrame) -> None:
     base_label = BASE_SCENARIO[1]
     baseline = components_with_base.loc[base_label]
     others = components_with_base.drop(base_label)
-    others = others.drop(index="Single temperature level", errors="ignore")
+    others = others.drop(index=SINGLE_TEMP, errors="ignore")
     delta = others.subtract(baseline, axis=1)
     # Percentages are relative to "No flexibility" (first scenario), not the ZEN-Europe base.
     ref_label = SCENARIOS[0][1]
@@ -599,8 +617,8 @@ def fig0a_cost_composition(components_with_base: pd.DataFrame) -> None:
     ax.axhline(0, color="black", linewidth=0.8)
     ax.set_xticks(x)
     ax.set_xticklabels(delta.index, rotation=25, ha="right", fontsize=9)
-    ax.set_ylabel(r"$\Delta$ discounted system cost vs ZEN-Europe base [MEUR]")
-    ax.set_title("Non-Carbon Cost Increase vs ZEN-Europe Base\n(% labels relative to No flexibility)",
+    ax.set_ylabel(rf"$\Delta$ discounted system cost vs {BASE_SCENARIO[1]} [MEUR]")
+    ax.set_title(f"Non-Carbon Cost Increase vs {BASE_SCENARIO[1]}\n(% labels relative to {NO_FLEX})",
                  fontsize=12, fontweight="bold")
     ax.set_ylim(top=ax.get_ylim()[1] * 1.15)  # headroom so the legend clears the bars
     ax.legend(fontsize=9, frameon=True, facecolor="white", framealpha=0.9, loc="upper center", ncol=3)
@@ -853,7 +871,7 @@ def fig9_heat_supply_trajectory(no_flex_run: Run, full_run: Run) -> None:
     for ax in axes.flat:
         plt.setp(ax.get_xticklabels(), rotation=0)
     fig.tight_layout()
-    savefig(fig, "fig9_heat_supply_trajectory_noflex_vs_fullflex")
+    savefig(fig, "fig9_heat_supply_trajectory_noflex_vs_zen_europe")
 
 
 _TOTAL_CACHE: dict[tuple[int, str], pd.DataFrame] = {}
@@ -1018,8 +1036,8 @@ def fig14a_heat_supply_electrification_singletemp_vs_full(no_flex_run: Run, no_f
     the full 2020/2030/2040/2050 trajectory and mechanism.
     -> SI_results/fig14a_heat_supply_electrification_singletemp_vs_full.svg
     """
-    groups = [("No flexibility", no_flex_run, no_flex_single_run),
-              ("Full flexibility", full_run, single_run)]
+    groups = [(NO_FLEX, no_flex_run, no_flex_single_run),
+              (FULL, full_run, single_run)]
     # Thin ("/" not "//", hatch.linewidth 0.5 not matplotlib's default 1.0)
     # per user request — the singletemp/full-res distinction should read as
     # a light texture cue, not compete visually with the tech-color fills.
@@ -1268,9 +1286,9 @@ def fig5b_dsm_discharge_by_product(runs: list[Run]) -> None:
     # Products keep their ETH COLOR_MAP colors; ammonia/methanol are stored in
     # GWh and converted to kt via DSM_LHV_MWH_PER_T (hatched as in fig5 to
     # flag that they are LHV-derived).
-    scenarios = ["Full flexibility", "DSM pessimistic"]
-    titles = {"Full flexibility": "Optimistic (Full flexibility)",
-              "DSM pessimistic": "Pessimistic (DSM pessimistic)"}
+    scenarios = [FULL, NO_TES_DSM_PESS]
+    titles = {FULL: f"Optimistic ({FULL})",
+              NO_TES_DSM_PESS: f"Pessimistic ({NO_TES_DSM_PESS})"}
     pretty = lambda t: t.replace("_DSM", "").replace("_", " ")
     color_map = {pretty(t): COLOR_MAP[t] for t in INDUSTRY_DSM_TECHS}
     hatch_map = {pretty(t): "//" for t in DSM_ENERGY_CARRIER_TECHS}
@@ -1365,11 +1383,11 @@ def fig3b_heat_pathway(runs: list[Run]) -> None:
     # Fixed at 2050 (not the module-level YEAR=2036 snapshot used elsewhere)
     # per the figure's documented intent (see module docstring above).
     year = 2050
-    scenarios = ["Full flexibility", "Single temperature level"]
+    scenarios = [FULL, SINGLE_TEMP]
     bands = INDUSTRY_HEAT_CARRIERS_ENERGY
     dfs = {label: heat_pathway_split_by_band(by_label(runs, label).results, year) for label in scenarios}
     colors = {"Direct (boiler/HP)": "#215CAF", "Via conversion cascade": "#8E6713"}  # ETH blue / bronze
-    hatches = {"Full flexibility": "", "Single temperature level": "//"}
+    hatches = {FULL: "", SINGLE_TEMP: "//"}
 
     fig, ax = plt.subplots(figsize=(5, 7.5))
     n = len(scenarios)
@@ -1564,7 +1582,7 @@ def fig4b_industry_fuel_demand_comparison(runs: list[Run]) -> None:
     one "Natural gas (fuel shift possible)" segment — see _consolidate_blended_fuel/
     _merge_dri_fuel and FIG4B_SECTOR_GROUPS' comment.
     """
-    r = by_label(runs, "No flexibility").results
+    r = by_label(runs, NO_FLEX).results
     year = get_available_years(r)[0]
 
     rows: list[tuple[str, pd.Series]] = []
@@ -1890,7 +1908,7 @@ def fig8a_diffusion_mechanisms_heat_pumps(runs: list[Run]) -> None:
     cascaded down to the lower bands.
 
     See the module comment above DIFFUSION_HP_TECHS for the finding."""
-    run = by_label(runs, "No flexibility")
+    run = by_label(runs, NO_FLEX)
     r = run.results
     years = get_available_years(r)
     msu = float(r.get_total("market_share_unbounded").iloc[0])
@@ -2463,7 +2481,7 @@ def _fig30_matrix_panel(fig: plt.Figure, ax: plt.Axes, values: dict[tuple[int, i
                         delta_unit: str | None = None,
                         ramp: tuple[str, str, str] = (_eth_tint(_ETH_BLUE, 0.85), _ETH_BLUE,
                                                       "#0F2A52"),
-                        col_names: tuple[str, str] = ("Full flexibility", "No flexibility"),
+                        col_names: tuple[str, str] = (FULL, NO_FLEX),
                         row_names: tuple[str, str] = ("3 temp. levels", "Single temp. level"),
                         placeholders: frozenset = frozenset()):
     """One 2x2 flexibility x temperature-resolution matrix of fig30: `values`
@@ -2784,7 +2802,7 @@ FIG40_PANELS = {"cost": ("Total cumulative costs", "bn €", "{:,.0f}"),
                 "tes": (f"TES discharge {FIG30_YEAR}", "TWh", "{:,.1f}")}
 # Full flexibility on top (the zero line), No flexibility at the bottom,
 # behind a dashed separator.
-FIG40_ORDER = ["Full flexibility", "DSM pessimistic", "DSM only", "TES only", "No flexibility"]
+FIG40_ORDER = [FULL, NO_TES_DSM_PESS, NO_TES, NO_DSM, NO_FLEX]
 
 
 def fig40_flex_scenarios(runs: list[Run]) -> None:
@@ -2800,7 +2818,7 @@ def fig40_flex_scenarios(runs: list[Run]) -> None:
     by = {r.label: r for r in runs}
     order = [lbl for lbl in FIG40_ORDER if lbl in by]
     metrics = {lbl: _fig30_metrics(by[lbl]) for lbl in order}
-    base = metrics["Full flexibility"]
+    base = metrics[FULL]
     y = np.arange(len(order))
 
     fig, axes = plt.subplots(2, 3, figsize=(16, 8), sharey=True)
@@ -2815,7 +2833,7 @@ def fig40_flex_scenarios(runs: list[Run]) -> None:
         ax.set_xlim(lo - (0.6 if lo < 0 else 0.1) * span, hi + (0.6 if hi > 0 else 0.1) * span)
         pct_fmt = "{:.2f}" if key == "cost" else "{:.1f}"
         for yi, lbl, d in zip(y, order, deltas):
-            if lbl == "Full flexibility":
+            if lbl == FULL:
                 abs_unit = "%" if key == "hp_share" else unit
                 left = hi <= 0  # put it on whichever side has room
                 ax.text(-0.03 * span if left else 0.03 * span, yi,
@@ -2863,7 +2881,7 @@ def fig41_flex_scenarios_table(runs: list[Run], panels: dict = FIG40_PANELS,
     by = {r.label: r for r in runs}
     order = [lbl for lbl in FIG40_ORDER if lbl in by]
     metrics = {lbl: metrics_fn(by[lbl]) for lbl in order}
-    base = metrics["Full flexibility"]
+    base = metrics[FULL]
     cmap = LinearSegmentedColormap.from_list("fig41_delta", [_ETH_BLUE, "white", _ETH_RED])
     norm = Normalize(vmin=-1, vmax=1)
 
@@ -2896,20 +2914,20 @@ def fig41_flex_scenarios_table(runs: list[Run], panels: dict = FIG40_PANELS,
             ax.add_patch(Rectangle((x, y), 1, 1, facecolor=color, edgecolor="white",
                                    linewidth=2, zorder=1))
             text_color = _text_color_for_bg(color)
-            cx = x + (0.6 if transpose and lbl == "Full flexibility" else 0.5)
+            cx = x + (0.6 if transpose and lbl == FULL else 0.5)
             ax.text(cx, y + 0.4, fmt.format(val), ha="center", va="center",
                     fontsize=12, fontweight="bold", color=text_color)
-            if lbl == "Full flexibility":
+            if lbl == FULL:
                 sub = "baseline"
             else:
                 sign = "+" if d >= 0 else "−"
                 sub = (f"{sign}{fmt.format(abs(d))} {unit} "
                        f"({sign}{pct_fmt.format(abs(d) / base[key] * 100)} %)")
             ax.text(cx, y + 0.72, sub, ha="center", va="center", fontsize=9,
-                    style="italic" if lbl == "Full flexibility" else "normal", color=text_color)
+                    style="italic" if lbl == FULL else "normal", color=text_color)
     for i_s, lbl in enumerate(order):
         if transpose:
-            ax.text(i_s + (0.6 if lbl == "Full flexibility" else 0.5), -0.12, lbl, ha="center",
+            ax.text(i_s + (0.6 if lbl == FULL else 0.5), -0.12, lbl, ha="center",
                     va="bottom", fontsize=11,
                     fontweight="bold")
         else:
@@ -2925,9 +2943,9 @@ def fig41_flex_scenarios_table(runs: list[Run], panels: dict = FIG40_PANELS,
     ax.axis("off")
     cbar = fig.colorbar(ScalarMappable(norm=norm, cmap=cmap), ax=ax, fraction=0.025, pad=0.02,
                         ticks=[-1, 0, 1])
-    cbar.ax.set_yticklabels(["largest\ndecrease", "same as\nFull flex.", "largest\nincrease"],
+    cbar.ax.set_yticklabels(["largest\ndecrease", f"same as\n{FULL}", "largest\nincrease"],
                             fontsize=9)
-    cbar.set_label(f"Difference to Full flexibility (scaled per {'row' if transpose else 'column'})",
+    cbar.set_label(f"Difference to {FULL} (scaled per {'row' if transpose else 'column'})",
                    fontsize=10)
     savefig(fig, fig_name)
 
@@ -3001,28 +3019,28 @@ def fig50_dsm_no_cost_vs_full_flex(full_run: Run, no_cost_run: Run) -> None:
     (2/48 h -> 336 h for ammonia, ceramic, clinker, food, glass, olefin,
     primary steel; methanol/paper/secondary steel already 336 h) — all other
     inputs and settings identical (checked 2026-10-22).
-    -> SI_results/fig50_dsm_no_cost_vs_full_flex.svg
+    -> SI_results/fig50_dsm_no_cost_vs_zen_europe.svg
     """
     _comparison_table(full_run, no_cost_run, FIG50_ROWS, _fig50_metrics,
                       "DSM no cost: DSM storage cost ≈ 0 and max. energy-to-power ratio 336 h for "
-                      "all DSM technologies\n(Full flexibility: 2–48 h for 7 of 10).",
-                      "fig50_dsm_no_cost_vs_full_flex")
+                      f"all DSM technologies\n({FULL}: 2–48 h for 7 of 10).",
+                      "fig50_dsm_no_cost_vs_zen_europe")
 
 
 def fig60_full_flex_20ts_vs_10ts(full_run: Run, full_20ts_run: Run) -> None:
     """fig50's table for Full flexibility with 10 (baseline) vs. 20
     representative time steps per year, on fig43's metrics (no "excl. DSM
     storage cost" row — both runs have the same DSM cost).
-    -> SI_results/fig60_full_flex_20ts_vs_10ts.svg
+    -> SI_results/fig60_zen_europe_20ts_vs_10ts.svg
     """
     _comparison_table(full_run, full_20ts_run, FIG43_PANELS, _fig43_metrics,
                       "20 ts: 20 instead of 10 representative time steps per year; all other "
-                      "inputs identical.", "fig60_full_flex_20ts_vs_10ts",
-                      base_label="Full flexibility (10 ts)")
+                      "inputs identical.", "fig60_zen_europe_20ts_vs_10ts",
+                      base_label=f"{FULL} (10 ts)")
 
 
 def _comparison_table(base_run: Run, other_run: Run, rows: dict, metrics_fn, footnote: str,
-                      fig_name: str, base_label: str = "Full flexibility") -> None:
+                      fig_name: str, base_label: str = FULL) -> None:
     """fig50's body for any run pair: `rows` key -> (title, unit, format) of
     `metrics_fn`'s metrics; `base_run` is the baseline column."""
     m_base, m_other = metrics_fn(base_run), metrics_fn(other_run)
@@ -3085,16 +3103,16 @@ def fig42_flex_decomposition(runs: list[Run]) -> None:
     -> SI_results/fig42_flex_decomposition.svg
     """
     by = {r.label: r for r in runs}
-    needed = ["No flexibility", "TES only", "DSM only", "Full flexibility"]
+    needed = [NO_FLEX, NO_DSM, NO_TES, FULL]
     if any(lbl not in by for lbl in needed):
         print(f"  skipping fig42_flex_decomposition: needs {', '.join(needed)}")
         return
-    labels = needed + (["DSM pessimistic"] if "DSM pessimistic" in by else [])
+    labels = needed + ([NO_TES_DSM_PESS] if NO_TES_DSM_PESS in by else [])
     metrics = {lbl: _fig30_metrics(by[lbl]) for lbl in labels}
     # (intermediate scenario, x of the intermediate point, line style)
-    paths = [("TES only", 1.0, "-"), ("DSM only", 1.0, "-")]
-    if "DSM pessimistic" in by:
-        paths.append(("DSM pessimistic", 1.0, ":"))
+    paths = [(NO_DSM, 1.0, "-"), (NO_TES, 1.0, "-")]
+    if NO_TES_DSM_PESS in by:
+        paths.append((NO_TES_DSM_PESS, 1.0, ":"))
 
     fig, axes = plt.subplots(2, 3, figsize=(15, 8.5))
     for ax, (key, (title, unit, fmt)) in zip(axes.flat, FIG40_PANELS.items()):
@@ -3102,16 +3120,16 @@ def fig42_flex_decomposition(runs: list[Run]) -> None:
         abs_unit = "%" if key == "hp_share" else unit
         for mid, x_mid, ls in paths:
             color = by[mid].color
-            steps = [((0, v["No flexibility"]), (x_mid, v[mid]))]
-            if mid != "DSM pessimistic":
-                steps.append(((x_mid, v[mid]), (2, v["Full flexibility"])))
+            steps = [((0, v[NO_FLEX]), (x_mid, v[mid]))]
+            if mid != NO_TES_DSM_PESS:
+                steps.append(((x_mid, v[mid]), (2, v[FULL])))
             for (x0, y0), (x1, y1) in steps:
                 ax.annotate("", xy=(x1, y1), xytext=(x0, y0),
                             arrowprops=dict(arrowstyle="-|>", color=color, lw=1.8, linestyle=ls,
                                             shrinkA=7, shrinkB=7, mutation_scale=14), zorder=2)
-        for lbl, x in [("No flexibility", 0), ("Full flexibility", 2)] + \
+        for lbl, x in [(NO_FLEX, 0), (FULL, 2)] + \
                       [(mid, x_mid) for mid, x_mid, _ in paths]:
-            hollow = lbl == "DSM pessimistic"
+            hollow = lbl == NO_TES_DSM_PESS
             ax.scatter(x, v[lbl], s=70, zorder=3, linewidths=1.5,
                        facecolor="white" if hollow else by[lbl].color,
                        edgecolor=by[lbl].color if hollow else "#1F2A3A")
@@ -3134,8 +3152,8 @@ def fig42_flex_decomposition(runs: list[Run]) -> None:
         for side in ("top", "right"):
             ax.spines[side].set_visible(False)
     handles = [Line2D([], [], color=by[mid].color, lw=1.8, linestyle=ls,
-                      marker="o", markerfacecolor="white" if mid == "DSM pessimistic" else by[mid].color,
-                      markeredgecolor=by[mid].color if mid == "DSM pessimistic" else "#1F2A3A",
+                      marker="o", markerfacecolor="white" if mid == NO_TES_DSM_PESS else by[mid].color,
+                      markeredgecolor=by[mid].color if mid == NO_TES_DSM_PESS else "#1F2A3A",
                       label=f"via {mid}") for mid, _, ls in paths]
     fig.legend(handles=handles, loc="lower center", ncol=len(handles), frameon=False,
                fontsize=10.5, bbox_to_anchor=(0.5, -0.02))
@@ -3859,21 +3877,21 @@ def fig51_capacity_and_storage_dsm_no_cost_vs_full_flex(full_run: Run, no_cost_r
     """fig12 for Full flexibility (absolute stack) vs. DSM no cost (336 h)
     (floating Δ bar) — same panels, years and tech scope as fig12; see
     fig50 for what the DSM no cost run changes.
-    -> SI_results/fig51_capacity_and_storage_dsm_no_cost_vs_full_flex.svg
+    -> SI_results/fig51_capacity_and_storage_dsm_no_cost_vs_zen_europe.svg
     """
     _capacity_and_storage_base_and_delta(full_run, no_cost_run, full_run.label,
                                          rf"$\Delta$ {no_cost_run.label}",
-                                         "fig51_capacity_and_storage_dsm_no_cost_vs_full_flex")
+                                         "fig51_capacity_and_storage_dsm_no_cost_vs_zen_europe")
 
 
 def fig61_capacity_and_storage_full_flex_20ts_vs_10ts(full_run: Run, full_20ts_run: Run) -> None:
     """fig51 for Full flexibility with 10 (absolute stack) vs. 20 (floating
     Δ bar) representative time steps per year.
-    -> SI_results/fig61_capacity_and_storage_full_flex_20ts_vs_10ts.svg
+    -> SI_results/fig61_capacity_and_storage_zen_europe_20ts_vs_10ts.svg
     """
-    _capacity_and_storage_base_and_delta(full_run, full_20ts_run, "Full flexibility (10 ts)",
+    _capacity_and_storage_base_and_delta(full_run, full_20ts_run, f"{FULL} (10 ts)",
                                          rf"$\Delta$ {full_20ts_run.label}",
-                                         "fig61_capacity_and_storage_full_flex_20ts_vs_10ts")
+                                         "fig61_capacity_and_storage_zen_europe_20ts_vs_10ts")
 
 
 def _capacity_and_storage_base_and_delta(base_run: Run, no_flex_run: Run, base_label: str,
@@ -4655,12 +4673,12 @@ def main() -> None:
     no_flex_20ts = load_extra_scenario(NO_FLEX_20TS_SCENARIO)
 
     by = {r.label: r for r in runs}
-    no_flex = by.get("No flexibility")
-    full = by.get("Full flexibility")
-    single_temp = by.get("Single temperature level")
-    dsm_pess = by.get("DSM pessimistic")
-    available = {"base": base, "No flexibility": no_flex, "Full flexibility": full,
-                 "Single temperature level": single_temp, "DSM pessimistic": dsm_pess,
+    no_flex = by.get(NO_FLEX)
+    full = by.get(FULL)
+    single_temp = by.get(SINGLE_TEMP)
+    dsm_pess = by.get(NO_TES_DSM_PESS)
+    available = {"base": base, NO_FLEX: no_flex, FULL: full,
+                 SINGLE_TEMP: single_temp, NO_TES_DSM_PESS: dsm_pess,
                  NO_FLEX_SINGLE_TEMP_SCENARIO[1]: no_flex_single,
                  DSM_NO_COST_SCENARIO[1]: dsm_no_cost,
                  FULL_FLEX_20TS_SCENARIO[1]: full_20ts}
@@ -4679,43 +4697,42 @@ def main() -> None:
         fig0a_cost_composition(compute_cost_components([base] + runs))
     else:
         print("  skipping fig0a_cost_composition: base not loaded")
-    run_if(["base", "No flexibility", "Full flexibility"],
+    run_if(["base", NO_FLEX, FULL],
            fig0b_emissions_source_comparison, base, no_flex, full)
-    run_if(["Full flexibility", "DSM pessimistic"], fig5b_dsm_discharge_by_product, runs)
-    run_if(["Single temperature level"], fig3b_heat_pathway, runs)
-    run_if(["base", "No flexibility"], fig5_retrofit_ccs_comparison, no_flex, base)
-    run_if(["No flexibility"], fig8a_diffusion_mechanisms_heat_pumps, runs)
-    run_if(["No flexibility", "Full flexibility"], fig9_heat_supply_trajectory, no_flex, full)
-    run_if(["base", "No flexibility"], fig12_capacity_and_storage_base_and_delta, base, no_flex)
-    single_temp_set = ["No flexibility", NO_FLEX_SINGLE_TEMP_SCENARIO[1], "Full flexibility",
-                       "Single temperature level"]
+    run_if([FULL, NO_TES_DSM_PESS], fig5b_dsm_discharge_by_product, runs)
+    run_if([SINGLE_TEMP], fig3b_heat_pathway, runs)
+    run_if(["base", NO_FLEX], fig5_retrofit_ccs_comparison, no_flex, base)
+    run_if([NO_FLEX], fig8a_diffusion_mechanisms_heat_pumps, runs)
+    run_if([NO_FLEX, FULL], fig9_heat_supply_trajectory, no_flex, full)
+    run_if(["base", NO_FLEX], fig12_capacity_and_storage_base_and_delta, base, no_flex)
+    single_temp_set = [NO_FLEX, NO_FLEX_SINGLE_TEMP_SCENARIO[1], FULL, SINGLE_TEMP]
     for fn in (fig14a_heat_supply_electrification_singletemp_vs_full,
                fig14b_cost_and_emissions_totals_singletemp_vs_full, fig30_matrix):
         run_if(single_temp_set, fn, no_flex, no_flex_single, full, single_temp)
-    run_if(["No flexibility"], fig15_heat_supply_output_twh_for,
-           runs, "No flexibility", "fig15a_heat_supply_output_no_flexibility_twh")
-    run_if(["Full flexibility"], fig15_heat_supply_output_twh_for,
-           runs, "Full flexibility", "fig15b_heat_supply_output_full_flexibility_twh")
-    run_if(["base", "No flexibility", "Full flexibility"],
+    run_if([NO_FLEX], fig15_heat_supply_output_twh_for,
+           runs, NO_FLEX, "fig15a_heat_supply_output_no_flexibility_twh")
+    run_if([FULL], fig15_heat_supply_output_twh_for,
+           runs, FULL, "fig15b_heat_supply_output_zen_europe_twh")
+    run_if(["base", NO_FLEX, FULL],
            fig20_cost_breakdown_sector_industry_heating, base, no_flex, full)
-    run_if(["No flexibility", "Full flexibility"], fig40_flex_scenarios, runs)
-    run_if(["No flexibility", "Full flexibility"], fig41_flex_scenarios_table, runs)
-    run_if(["No flexibility", "Full flexibility"], fig42_flex_decomposition, runs)
-    run_if(["No flexibility", "Full flexibility"], fig43_flex_scenarios_table_curtailment, runs)
-    run_if(["Full flexibility", DSM_NO_COST_SCENARIO[1]], fig50_dsm_no_cost_vs_full_flex,
+    run_if([NO_FLEX, FULL], fig40_flex_scenarios, runs)
+    run_if([NO_FLEX, FULL], fig41_flex_scenarios_table, runs)
+    run_if([NO_FLEX, FULL], fig42_flex_decomposition, runs)
+    run_if([NO_FLEX, FULL], fig43_flex_scenarios_table_curtailment, runs)
+    run_if([FULL, DSM_NO_COST_SCENARIO[1]], fig50_dsm_no_cost_vs_full_flex,
            full, dsm_no_cost)
-    run_if(["Full flexibility", DSM_NO_COST_SCENARIO[1]],
+    run_if([FULL, DSM_NO_COST_SCENARIO[1]],
            fig51_capacity_and_storage_dsm_no_cost_vs_full_flex, full, dsm_no_cost)
     # No flexibility 20 ts missing -> 10 ts run as a marked placeholder.
-    run_if(["No flexibility", "Full flexibility", FULL_FLEX_20TS_SCENARIO[1]], fig31_matrix_tsa,
+    run_if([NO_FLEX, FULL, FULL_FLEX_20TS_SCENARIO[1]], fig31_matrix_tsa,
            no_flex, no_flex_20ts or no_flex, full, full_20ts, no_flex_20ts is None)
-    run_if(["Full flexibility", FULL_FLEX_20TS_SCENARIO[1]], fig60_full_flex_20ts_vs_10ts,
+    run_if([FULL, FULL_FLEX_20TS_SCENARIO[1]], fig60_full_flex_20ts_vs_10ts,
            full, full_20ts)
-    run_if(["Full flexibility", FULL_FLEX_20TS_SCENARIO[1]],
+    run_if([FULL, FULL_FLEX_20TS_SCENARIO[1]],
            fig61_capacity_and_storage_full_flex_20ts_vs_10ts, full, full_20ts)
 
     # method/
-    run_if(["No flexibility"], fig4b_industry_fuel_demand_comparison, runs)
+    run_if([NO_FLEX], fig4b_industry_fuel_demand_comparison, runs)
     fig8_industry_sector_emissions_context()
     fig9_model_scope_coverage()
     fig15_global_ghg_sector_breakdown()
