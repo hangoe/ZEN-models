@@ -72,8 +72,8 @@ the zen-europe versions of removed ones in archive/zen_europe/):
                                           counterpart's difference, and (separately) Full flexibility's
                                           own totals in grey vs. its single-temp counterpart's difference
   fig30_matrix                         — fig14b's 4 runs as a 2x2 matrix (flexibility x temperature
-                                          resolution), 2x3 panels (cost, HP share / VRE, bulk storage
-                                          discharge), cells shaded by value, with arrows from the
+                                          resolution), 2x2 panels (cost, HP share / VRE, 2050
+                                          curtailment as in fig43), cells shaded by value, with arrows from the
                                           cheapest cell (Full flexibility, 3 temp levels) giving each
                                           other cell's extra cost in % and bn EUR
   fig31_matrix_tsa                     — fig30 with 10 / 20 representative time steps as rows instead
@@ -1429,28 +1429,24 @@ HEAT_DEMAND_SECTOR_LABELS = {"glass": "Glass", "ceramic": "Ceramic", "paper": "P
 # electricity is ETH blue (drawio system-overview convention).
 HEAT_DEMAND_BAND_LABELS = {"0_100": "0-100 °C", "100_150": "100-150 °C", "150_200": "150-200 °C"}
 HEAT_BAND_COLORS = {"0_100": _eth_tint(_ETH_RED, 0.6), "100_150": _eth_tint(_ETH_RED, 0.3), "150_200": _ETH_RED}
+# waste = purple as in the boiler/emission figures (per user); all 7 ETH hues
+# are taken here, so hydrogen gets a light ETH-blue tint.
 FUEL_CARRIER_COLORS = {"natural_gas": _ETH_TURQUOISE, "hard_coal": _ETH_GREY, "oil": _ETH_BRONZE,
-                       "biomass": _ETH_GREEN, "waste": _eth_tint(_ETH_GREEN, 0.5), "hydrogen": _ETH_PURPLE,
+                       "biomass": _ETH_GREEN, "waste": _ETH_PURPLE, "hydrogen": _eth_tint(_ETH_BLUE, 0.55),
                        "naphtha": _eth_tint(_ETH_BRONZE, 0.5), "methanol": _eth_tint(_ETH_PURPLE, 0.5),
                        "fuel_to_process": _eth_tint(_ETH_GREY, 0.6)}
 FUEL_CARRIER_LABELS = {"natural_gas": "Natural gas", "hard_coal": "Hard coal", "oil": "Oil", "biomass": "Biomass",
                        "waste": "Waste", "hydrogen": "Hydrogen", "naphtha": "Naphtha", "methanol": "Methanol",
                        "fuel_to_process": "Natural gas\n(fuel shift possible)"}
 
-# fuel_to_kiln (glass/ceramic, ZEN-creator commit 1687533) and fuel_for_cement
-# (cement_kiln's own input_carrier) are both intermediate, blended-fuel hub
-# carriers with no real-world identity of their own -- produced from actual
-# raw fuels by dedicated X_to_kilnfuel/X_to_cement_fuel conversion techs, each
-# with its OWN conversion factor. Splitting THOSE raw fuels back out (as an
-# earlier version of this figure did for cement) either double-counts the
-# blending tech's own efficiency loss, or -- for fig4b's steel bar, where
-# NG_DRI/H2_DRI's natural_gas/hydrogen inputs are real and already correct --
-# just recreates the early-buildout NG-vs-H2 diffusion-limit-artifact
-# confusion documented in this figure's old CAVEAT. User feedback: stop
-# splitting all three by carrier; consolidate into one flat, unhatched grey
-# "Fuel to process" segment instead -- _consolidate_blended_fuel does this for
-# fuel_to_kiln/fuel_for_cement, _merge_dri_fuel for NG_DRI/H2_DRI.
-_BLENDED_FUEL_CARRIERS = ("fuel_to_kiln", "fuel_for_cement", "fuel_to_process")
+# fuel_to_kiln (glass/ceramic, ZEN-creator commit 1687533) is an
+# intermediate, blended-fuel hub carrier produced from natural gas (in
+# practice) by X_to_kilnfuel techs, which can shift to electricity/hydrogen —
+# drawn as one grey "Natural gas (fuel shift possible)" segment by
+# _consolidate_blended_fuel. fuel_for_cement is NOT merged here: it has no
+# natural-gas route, so fig4b splits it into its raw fuels instead
+# (_split_cement_fuel).
+_BLENDED_FUEL_CARRIERS = ("fuel_to_kiln", "fuel_to_process")
 
 
 def _consolidate_blended_fuel(fuel_by_carrier: dict) -> dict:
@@ -1465,20 +1461,6 @@ def _consolidate_blended_fuel(fuel_by_carrier: dict) -> dict:
     out["fuel_to_process"] = sum(fuel_by_carrier[c] for c in present)
     return out
 
-
-def _merge_dri_fuel(fuel_by_carrier: pd.Series) -> pd.Series:
-    """Merges NG_DRI/H2_DRI's natural_gas/hydrogen entries into one
-    "fuel_to_process" entry -- unlike fuel_to_kiln/fuel_for_cement these are
-    real, correctly-computed primary-carrier flows (no blending tech
-    involved), so this is a pure presentation choice, not a conversion-factor
-    fix. BF_BOF's hard_coal is untouched (a real, unambiguous carrier -- see
-    _BLENDED_FUEL_CARRIERS' docstring)."""
-    dri_carriers = [c for c in ("natural_gas", "hydrogen") if c in fuel_by_carrier.index]
-    if not dri_carriers:
-        return fuel_by_carrier
-    out = fuel_by_carrier.drop(index=dri_carriers)
-    out["fuel_to_process"] = fuel_by_carrier[dri_carriers].sum()
-    return out
 
 # Electricity: not temperature-banded and not part of the >200°C fuel mix —
 # every X_production tech has a fixed electricity input alongside both.
@@ -1498,44 +1480,36 @@ _ELECTRICITY_LABEL = "Electricity"
 # SVGs' own visible structure/values/labels plus direct verification against
 # a solved v8_0 run, rather than left as an unreproducible artifact.
 
-# Cement/primary-steel each get a post-processing step applied to
-# _tech_fuel_by_carrier's raw per-carrier Series, both towards the same goal
-# as _consolidate_blended_fuel above -- one flat "Fuel to process" segment
-# instead of a per-carrier split -- but for two DIFFERENT underlying reasons:
-#
-# Cement: cement_kiln's own input_carrier is ["fuel_for_cement",
-# "electricity"] -- "fuel_for_cement" is an intermediate, blended carrier
-# with no real-world identity, produced from the ACTUAL raw fuels by 4
-# dedicated conversion techs (coal/waste/hydrogen/biomass_to_cement_fuel),
-# each with its OWN conversion factor. An earlier version of this figure
-# read those 4 techs' own raw-carrier inputs instead of cement_kiln's
-# "fuel_for_cement" directly, to show a real per-fuel split -- but summing
-# raw inputs across techs with different efficiencies doesn't cleanly equal
-# "how much fuel_for_cement cement_kiln actually consumed", i.e. exactly the
-# conversion-factor mismatch _BLENDED_FUEL_CARRIERS' docstring describes.
-# Reading cement_kiln's own input directly (via plain _tech_fuel_by_carrier,
-# then _consolidate_series to rename "fuel_for_cement" -> "fuel_to_process")
-# sidesteps that mismatch entirely.
-#
-# Primary steel: BF_BOF (hard_coal) and NG_DRI/H2_DRI (natural_gas/hydrogen)
-# are three real, alternative primary-steel production pathways grouped into
-# one bar (matching how the original figure grouped "BF-BOF/DRI") -- their
-# carrier flows are each already correct on their own (no blending tech, no
-# conversion-factor issue). But NG_DRI vs H2_DRI's split is a diffusion-limit
-# artifact of early tech buildout, not a genuine fuel preference (both hit
-# the same shared technology-diffusion ceiling from ~zero real-world
-# capacity -- see fig6_diffusion_mechanisms), so showing hydrogen/natural_gas
-# as separate segments invited exactly that ("is that much steel from H2
-# really right?") misreading. _merge_dri_fuel merges the two into
-# "fuel_to_process" too, purely for clarity -- BF_BOF's hard_coal is left
-# untouched (a real, unambiguous segment).
+# Cement: cement_kiln's input "fuel_for_cement" is a blended hub carrier made
+# from hard coal/waste/biomass/hydrogen by X_to_cement_fuel techs (no natural
+# gas route). Per user, the bar shows the actual raw fuels: the hub techs'
+# raw inputs, scaled so they sum to the fuel_for_cement the kiln consumed
+# (raw inputs are larger by the hub techs' conversion factors, e.g. 18.8 vs
+# 15.3 GW in 2022). Hydrogen is left out for now (per user; 0 in 2022).
+CEMENT_FUEL_TECHS = ["coal_to_cement_fuel", "waste_to_cement_fuel", "biomass_to_cement_fuel"]
+
+
+def _split_cement_fuel(s: pd.Series, r, year: int) -> pd.Series:
+    if "fuel_for_cement" not in s.index:
+        return s
+    raw = _tech_fuel_by_carrier(r, CEMENT_FUEL_TECHS, year)
+    out = s.drop(index="fuel_for_cement")
+    if raw.sum() > 0:
+        out = out.add(raw * s["fuel_for_cement"] / raw.sum(), fill_value=0.0)
+    return out
+
+
 def _consolidate_series(s: pd.Series) -> pd.Series:
     return pd.Series(_consolidate_blended_fuel(s.to_dict()))
 
 
 FIG4B_SECTOR_GROUPS = [
-    ("Cement (clinker)", ["cement_kiln"], _consolidate_series),
-    ("Primary steel (BF-BOF/DRI)", ["BF_BOF", "NG_DRI", "H2_DRI"], _merge_dri_fuel),
+    ("Cement (clinker)", ["cement_kiln"], _split_cement_fuel),
+    # BF_BOF (hard_coal) and NG_DRI/H2_DRI (natural_gas/hydrogen) are real,
+    # alternative pathways with fixed inputs, so their carriers keep their own
+    # colours — switching means building H2_DRI, not substituting fuel in
+    # NG_DRI (per user).
+    ("Primary steel (BF-BOF/DRI)", ["BF_BOF", "NG_DRI", "H2_DRI"], None),
     ("Secondary steel (EAF)", ["EAF"], None),
     # Chemicals: real per-carrier inputs (no blending hub, no merge). The
     # carbon feedstock of methanol_from_hydrogen isn't an energy carrier and
@@ -1577,10 +1551,10 @@ def fig4b_industry_fuel_demand_comparison(runs: list[Run]) -> None:
     flow_conversion_input in its first modeled year (2022), as average GW.
 
     Horizontal stacked bars, one per sector: heat bands (red tints), then
-    >200°C fuels (one solid color each), then electricity. Blended hub fuels
-    (fuel_to_kiln/fuel_for_cement) and NG_DRI/H2_DRI's fuels are merged into
-    one "Natural gas (fuel shift possible)" segment — see _consolidate_blended_fuel/
-    _merge_dri_fuel and FIG4B_SECTOR_GROUPS' comment.
+    >200°C fuels (one solid color each), then electricity. Glass/ceramic's
+    blended fuel_to_kiln is one "Natural gas (fuel shift possible)" segment
+    (_consolidate_blended_fuel); cement's fuel_for_cement is split into its
+    raw fuels (_split_cement_fuel).
     """
     r = by_label(runs, NO_FLEX).results
     year = get_available_years(r)[0]
@@ -1591,12 +1565,14 @@ def fig4b_industry_fuel_demand_comparison(runs: list[Run]) -> None:
     n_new = len(rows)
     for label, techs, post in FIG4B_SECTOR_GROUPS:
         s = _tech_fuel_by_carrier(r, techs, year)
-        rows.append((label, post(s) if post is not None else s))
+        rows.append((label, post(s, r, year) if post is not None else s))
 
     segments = ([(f"heat_industry_{b}", HEAT_BAND_COLORS[b]) for b in HEAT_BAND_COLORS]
                 + [(c, FUEL_CARRIER_COLORS[c]) for c in FUEL_CARRIER_COLORS]
                 + [("electricity", _ELECTRICITY_COLOR)])
-    present = [(c, col) for c, col in segments if any(v.get(c, 0.0) > 0 for _, v in rows)]
+    # Threshold, not > 0: olefin_from_methanol's ~1e-3 GW methanol input in the
+    # first year is invisible but would still put "Methanol" in the legend.
+    present = [(c, col) for c, col in segments if any(v.get(c, 0.0) > 0.05 for _, v in rows)]
 
     # One-row gap between the two groups, top to bottom.
     y = np.array([i if i < n_new else i + 1 for i in range(len(rows))], dtype=float)
@@ -2689,10 +2665,9 @@ def _fig43_metrics(r: Run) -> dict[str, float]:
     return {**_fig30_metrics(r), "curtailment": _curtailment_twh(r)}
 
 
-# fig30 panels in grid order (row-major, 2x2): metric key (_fig30_metrics)
-# -> (title, unit, colourbar label, _fig30_matrix_panel kwargs). Storage is
-# bulk storage only — DSM/TES discharge are 0 in No flexibility, so a matrix
-# against it says nothing; fig40 shows them per scenario instead.
+# fig30 panels in grid order (row-major, 2x2): metric key (_fig43_metrics)
+# -> (title, unit, colourbar label, _fig30_matrix_panel kwargs). Bottom right
+# is FIG30_YEAR renewable curtailment, computed as in fig43 (_curtailment_twh).
 FIG30_PANELS = {
     "cost": ("Total cumulative costs in bn €", "bn €",
              "Discounted total system cost [bn EUR]", {}),
@@ -2701,8 +2676,8 @@ FIG30_PANELS = {
                  dict(value_fmt="{:.1f}", delta_unit="pp")),
     "vre": (f"Variable renewable capacity {FIG30_YEAR} in GW", "GW",
             f"Solar + wind + hydro capacity {FIG30_YEAR} [GW]", {}),
-    "storage": (f"Storage discharge {FIG30_YEAR} in TWh", "TWh",
-                f"Annual bulk storage discharge {FIG30_YEAR} [TWh]", {}),
+    "curtailment": (f"Curtailment {FIG30_YEAR} in TWh", "TWh",
+                    f"Renewable curtailment {FIG30_YEAR} [TWh]", {}),
 }
 
 
@@ -2722,13 +2697,8 @@ def fig30_matrix(no_flex_run: Run, no_flex_single_run: Run, full_run: Run,
     system cost [bn EUR] | 2050 total heat-pump share of industry heat
     output [%] (change in pp); bottom row 2050 variable renewable power
     capacity [GW] (solar + wind on/offshore + reservoir/run-of-river hydro)
-    | 2050 annual bulk storage discharge [TWh], without DSM and TES (per
-    user: DSM/TES are 0 in No flexibility, so their matrix cells say
-    nothing — fig40 shows them per flexibility scenario). Discharge rather than storage ENERGY
-    capacity per user choice: energy capacity is ~98% natural_gas_storage
-    (~1,015 TWh, essentially all existing stock and identical across
-    scenarios), whereas discharge is what fig12 already shows
-    (battery-dominated).
+    | 2050 renewable curtailment [TWh], computed as in fig43 (per user,
+    replacing bulk storage discharge; see _curtailment_twh).
     -> SI_results/fig30_matrix.svg
     """
     cells = {(0, 0): full_run, (0, 1): no_flex_run,
@@ -2758,10 +2728,10 @@ def fig31_matrix_tsa(no_flex_run: Run, no_flex_20ts_run: Run, full_run: Run,
 def _matrix_figure(cells: dict[tuple[int, int], Run], fig_name: str, **panel_kw) -> None:
     """fig30's body for any 2x2 `cells` (row, col) -> run, (0, 0) the
     baseline; `panel_kw` goes to every _fig30_matrix_panel."""
-    metrics = {rc: _fig30_metrics(r) for rc, r in cells.items()}
+    metrics = {rc: _fig43_metrics(r) for rc, r in cells.items()}
     vals = {k: {rc: m[k] for rc, m in metrics.items()} for k in FIG30_PANELS}
 
-    # 2x2 grid of panels: cost | HP share over VRE | storage.
+    # 2x2 grid of panels: cost | HP share over VRE | curtailment.
     fig, axes = plt.subplots(2, 2, figsize=(15, 14))
     panels = [(vals[k], *FIG30_PANELS[k]) for k in FIG30_PANELS]
     cbars = [_fig30_matrix_panel(fig, ax, vals, title, unit, cbar_label, row_labels=(i % 2 == 0),
