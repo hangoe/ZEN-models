@@ -20,7 +20,7 @@ plugins:
   mga:
     mode: sampling
     epsilon: 0.01
-    normalisation: relative
+    normalisation: minmax
     sampling:
       tolerance_prob: 0.95
       max_iterations: 1500

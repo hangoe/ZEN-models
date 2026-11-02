@@ -1,94 +1,29 @@
-"""
-ZEN-models run, adapted to run as a SLURM array sweep.
+"""Run one row of a parameter CSV (parameters.csv or parameters_mga.csv).
 
-CHANGES:
-  * `my_dataset`, `my_comment` and every `system_overrides` value now come from
-    ONE ROW of `parameters.csv`, selected by --task_id. So each row is a complete
-    run configuration and a SLURM array can run them all in parallel.
-  * Instead of patching the dataset's shared system.json in place (which races
-    when several array tasks run at once, and can leave the file corrupted if a
-    job is killed), each task STAGES A PRIVATE COPY of the dataset, patches that
-    copy, and runs on it. Your pristine dataset (in ZEN-creator/outputs or
-    data/) is never modified.
-  * On Euler, the staged dataset and the results go to $SCRATCH.
-  * `--params` selects which CSV to sweep over (default parameters.csv). Each
-    row may also set a `config` column (e.g. config_mga_weights.yaml) to pick
-    which data/*.yaml config to run with; rows without it use config.yaml, so
-    the original parameters.csv/submit_euler.sh path is unaffected.
-  * Rows may also set a `normalisation` column (e.g. "relative", "units" or
-    "minmax") that overwrites plugins.mga.normalisation in a private staged
-    copy of the chosen config -- the shared data/*.yaml config is never
-    touched, so one config_mga_bbo.yaml / config_mga_sampling.yaml covers
-    all normalisation modes instead of needing a config file per mode.
-  * Rows may also set `batch_size` / `n_workers` / `tolerance_explore` /
-    `seed_rng` columns that overwrite the matching keys under
-    plugins.mga.batch (batch mode only) in the same private staged copy, the
-    same way `normalisation` does -- e.g. a row using normalisation="share"
-    can set its own tolerance_explore without changing the shared config
-    file's value for the other (minmax) rows that also point at it.
-    `seed_rng` pins pyoNearOpt's batch_oracle RNG (BBO restarts + direction
-    fallbacks); left unset, batch_oracle seeds nondeterministically from OS
-    entropy (see shared_direction_oracle._get_rng), so two rows with
-    otherwise-identical config still explore different directions and are
-    NOT reproducible against each other unless both set seed_rng explicitly.
-    `max_iterations` caps plugins.mga.batch.max_iterations the same way --
-    e.g. for short Euler test rows that only need the bound LPs plus a
-    batch iteration or two before committing to a full run.
-  * Rows may also set a `solver_threads` column that overwrites
-    solver.solver_options.Threads in the same private staged copy. Batch
-    mode forks batch_size worker processes that each run their own Gurobi
-    solve concurrently, so cpus-per-task (see submit_euler_mga.sh) needs to
-    be sized as batch_size x Threads-per-worker -- a row using a larger
-    batch_size than the shared config's default Threads was tuned for
-    should set solver_threads to whatever per-worker core count its own
-    #SBATCH profile actually allocates, or Gurobi will oversubscribe the
-    node (see submit_euler_mga.sh's batch8/batch16 postmortem).
-  * The `axes` block for every MGA mode except `weights` is no longer
-    duplicated per config file -- it's merged in from data/config_euler/config_mga_axes_capex.yaml
-    (the default) into the private staged copy, so all five
-    config_mga_{bbo,sampling,oracle,batch_bbo,batch_sampling}.yaml files
-    share one axes definition. A row may set an `axes_config` column (e.g.
-    config_mga_axes_capex_cum.yaml) to merge in a different axes file
-    instead, without touching the shared default.
-  * Any system_overrides key a row's CSV doesn't set falls back to
-    DEFAULT_SYSTEM_OVERRIDES, so a sweep whose rows all share the same
-    dataset-processing setup (e.g. parameters_mga.csv) doesn't need to repeat
-    those columns in every row -- a row can still override any of them by
-    adding that column, the way parameters.csv already does explicitly.
-    A BLANK cell in an existing system column means "keep the dataset's own
-    system.yaml value" (no override, no default) -- e.g. rows 50/51 run the
-    zen-europe datasets exactly as generated.
-  * Solver/degeneracy tests for the TES/DSM (full flexibility) models, all
-    applied to the private staged copies only:
-    `solver_options` ("BarOrder=1;BarHomogeneous=0") merges any Gurobi
-    parameters into solver.solver_options; `cost_noise` (+ `noise_seed`)
-    multiplies TES/DSM cost parameters by (1 + eps*u), u ~ U(-1, 1), per node;
-    `flex_cost_fix` = 1 gives TES/DSM a power capex (0.1 x energy capex) and
-    TES a 0.5 Euro/MWh variable opex (numerical test, not final data).
-    See scripts/solver_tests/NOTES.md.
-  * Datasets are looked up first in data/outputs/zen-europe-new (current
-    ZEN-europe output, models.yaml names), then data/outputs/zen-europe-old (older
-    ZEN-europe output), then ZEN-creator/outputs, then data/ (see
-    DATASET_SEARCH_DIRS).
+Each row is a complete run: dataset, comment, config file and overrides. The
+row's dataset is staged as a private copy (on Euler under $SCRATCH), the
+row's system columns are applied to that copy, MGA/solver columns are
+applied to a private copy of the config, and ZEN-garden runs on both. The
+shared dataset and config files are never modified.
 
-Run one row by hand (local test):   python run_model.py --task_id 0 --run_on local
-On Euler it is launched by submit_euler.sh (or submit_euler_mga.sh) via the
-SLURM array.
-KNOWN ISSUE (ZEN-garden, not patched here): for interval_between_years (dy) > 1,
-`constraint_technology_diffusion_limit` in zen_garden/model/technology/technology.py
-scales the growth term correctly ((1+max_diffusion_rate)**dy - 1) but NOT the
-"unbounded" terms -- `market_share_unbounded * capacity_previous` and
-`capacity_addition_unbounded` are per-year amounts, while capacity additions are
-per investment period. The docstring states dy*(xi*sum(S) + zeta), but the code
-omits the factor dy, so at dy=2 the unbounded diffusion allowance is effectively
-halved (no effect at dy=1). Results at dy > 1 (e.g. v9 and the 2a v10 runs) are
-therefore slightly more diffusion-constrained than intended. Left unfixed on purpose.
+Columns other than META_COLUMNS are system.yaml overrides; system keys a row
+has no column for fall back to DEFAULT_SYSTEM_OVERRIDES, and a blank cell
+keeps the dataset's own value. Column reference: euler/README_euler.md;
+history of the sweep driver: euler/MGA_RUN_HISTORY.md.
 
+Run one row by hand:  python run_model.py --task_id 0 --run_on local
+On Euler it is launched by submit_euler.sh / submit_euler_mga.sh.
+
+Known ZEN-garden issue (not patched here): for interval_between_years > 1,
+constraint_technology_diffusion_limit scales the growth term but not the
+"unbounded" terms, so diffusion is slightly over-constrained at dy > 1.
 """
 
 import argparse
 import json  # legacy system.json datasets
+import logging
 import os
+import sys
 import shutil
 from pathlib import Path
 
@@ -96,6 +31,14 @@ import numpy as np
 import pandas as pd
 import yaml
 from zen_garden import run, Results  # noqa: F401  (Results kept for post-processing)
+
+# Own stdout handler: ZEN-garden configures the root logger itself.
+logger = logging.getLogger("run_model")
+logger.setLevel(logging.INFO)
+logger.propagate = False
+_handler = logging.StreamHandler(sys.stdout)
+_handler.setFormatter(logging.Formatter("[run_model] %(message)s"))
+logger.addHandler(_handler)
 
 # --- Fixed locations (same layout as your original script) ----------------------
 REPO_DIR = Path(__file__).parent                                  # .../ZEN-models
@@ -142,26 +85,15 @@ DEFAULT_SYSTEM_OVERRIDES = {
 # blank) -- keeps the original non-MGA parameters.csv working unchanged.
 DEFAULT_CONFIG = "config.yaml"
 
-# Default axes definition merged into every MGA config (see
-# apply_axes_override) so the axes block isn't duplicated per config file.
-# A row's own "axes_config" column (see main()) can point at a different
-# axes file instead -- e.g. data/config_euler/config_mga_axes_capex_cum.yaml for the
-# node_capex_cumulative investigation.
-AXES_CONFIG_DEFAULT = CONFIG_EULER_DIR / "config_mga_axes_capex.yaml"
+def apply_axes_override(run_config: dict, axes_config_path: Path | None) -> None:
+    """Replace plugins.mga.axes with the row's axes file, in-place.
 
-
-def apply_axes_override(run_config: dict, config_name: str, axes_config_path: Path = AXES_CONFIG_DEFAULT) -> None:
-    """Merge in the axes definition from axes_config_path, in-place.
-
-    No-op if plugins.mga is absent (plain config.yaml runs). Otherwise
-    overwrites plugins.mga.axes with the contents of axes_config_path
-    (defaults to data/config_euler/config_mga_axes_capex.yaml), so the per-mode config
-    files don't each carry their own copy of the axes. "weights" mode also
-    needs an axes block now (weight keys reference axis names), so it is no
-    longer skipped here.
+    The axes live in their own files (data/config_euler/config_mga_axes_*.yaml)
+    so the mode configs don't each carry a copy. No-op for configs without
+    plugins.mga and for rows without an axes_config.
     """
     mga_cfg = run_config.get("plugins", {}).get("mga")
-    if mga_cfg is None:
+    if mga_cfg is None or axes_config_path is None:
         return
     with open(axes_config_path) as f:
         mga_cfg["axes"] = yaml.safe_load(f)
@@ -351,7 +283,7 @@ def apply_flex_cost_fix(dataset_dir: Path) -> None:
             attrs["opex_specific_variable"]["unit"] = "Euro/MWh"
         with open(path, "w") as f:
             yaml.safe_dump(attrs, f, sort_keys=False)
-    print(f"[run_model] flex_cost_fix applied to {len(flex_storage_dirs(dataset_dir))} TES/DSM techs")
+    logger.info(f"flex_cost_fix applied to {len(flex_storage_dirs(dataset_dir))} TES/DSM techs")
 
 
 def apply_cost_noise(dataset_dir: Path, eps: float, seed: int) -> None:
@@ -384,7 +316,7 @@ def apply_cost_noise(dataset_dir: Path, eps: float, seed: int) -> None:
             values = base * (1.0 + eps * rng.uniform(-1.0, 1.0, size=len(nodes)))
             pd.DataFrame({"node": nodes, attr: values}).to_csv(csv_path, index=False)
             n_files += 1
-    print(f"[run_model] cost_noise eps={eps} seed={seed}: wrote {n_files} per-node cost files")
+    logger.info(f"cost_noise eps={eps} seed={seed}: wrote {n_files} per-node cost files")
 
 
 def validate_plugin_config(run_config: dict, config_name: str) -> None:
@@ -392,8 +324,8 @@ def validate_plugin_config(run_config: dict, config_name: str) -> None:
 
     The plugin's own validate_config() only runs from an after_solve hook,
     i.e. after the (potentially long) baseline solve has already finished.
-    Calling it here catches a bad "normalisation" value or an
-    oracle+"units" mismatch before a SLURM array task burns its walltime.
+    Calling it here catches e.g. a bad "normalisation" value before a SLURM
+    array task burns its walltime.
     """
     mga_cfg = run_config.get("plugins", {}).get("mga")
     if mga_cfg is None:
@@ -469,53 +401,34 @@ def main() -> None:
                          f"(available: {list(table.index)})")
     row = table.loc[args.task_id]
 
+    def cell(column):
+        """The row's value in ``column``, or None if the column or value is blank."""
+        if column not in table.columns or pd.isna(row[column]):
+            return None
+        return row[column] if str(row[column]).strip() else None
+
+    def native_cell(column):
+        value = cell(column)
+        return None if value is None else to_native(value)
+
     my_dataset = str(row["my_dataset"])
     my_comment = str(row["my_comment"])
-    config_name = DEFAULT_CONFIG
-    if "config" in table.columns and pd.notna(row["config"]) and str(row["config"]).strip():
-        config_name = str(row["config"]).strip()
-    axes_config_path = AXES_CONFIG_DEFAULT
-    if "axes_config" in table.columns and pd.notna(row["axes_config"]) and str(row["axes_config"]).strip():
-        axes_config_path = CONFIG_EULER_DIR / str(row["axes_config"]).strip()
-    normalisation = None
-    if "normalisation" in table.columns and pd.notna(row["normalisation"]) and str(row["normalisation"]).strip():
-        normalisation = str(row["normalisation"]).strip()
-    batch_size = None
-    if "batch_size" in table.columns and pd.notna(row["batch_size"]) and str(row["batch_size"]).strip():
-        batch_size = to_native(row["batch_size"])
-    n_workers = None
-    if "n_workers" in table.columns and pd.notna(row["n_workers"]) and str(row["n_workers"]).strip():
-        n_workers = to_native(row["n_workers"])
-    tolerance_explore = None
-    if "tolerance_explore" in table.columns and pd.notna(row["tolerance_explore"]) and str(row["tolerance_explore"]).strip():
-        tolerance_explore = to_native(row["tolerance_explore"])
-    seed_rng = None
-    if "seed_rng" in table.columns and pd.notna(row["seed_rng"]) and str(row["seed_rng"]).strip():
-        seed_rng = to_native(row["seed_rng"])
-    max_iterations = None
-    if "max_iterations" in table.columns and pd.notna(row["max_iterations"]) and str(row["max_iterations"]).strip():
-        max_iterations = to_native(row["max_iterations"])
-    solver_threads = None
-    if "solver_threads" in table.columns and pd.notna(row["solver_threads"]) and str(row["solver_threads"]).strip():
-        solver_threads = to_native(row["solver_threads"])
-    numeric_focus = None
-    if "numeric_focus" in table.columns and pd.notna(row["numeric_focus"]) and str(row["numeric_focus"]).strip():
-        numeric_focus = to_native(row["numeric_focus"])
-    epsilon = None
-    if "epsilon" in table.columns and pd.notna(row["epsilon"]) and str(row["epsilon"]).strip():
-        epsilon = to_native(row["epsilon"])
-    solver_options_str = None
-    if "solver_options" in table.columns and pd.notna(row["solver_options"]) and str(row["solver_options"]).strip():
-        solver_options_str = str(row["solver_options"]).strip()
-    cost_noise = None
-    if "cost_noise" in table.columns and pd.notna(row["cost_noise"]) and str(row["cost_noise"]).strip():
-        cost_noise = float(row["cost_noise"])
-    noise_seed = 0
-    if "noise_seed" in table.columns and pd.notna(row["noise_seed"]) and str(row["noise_seed"]).strip():
-        noise_seed = int(to_native(row["noise_seed"]))
-    flex_cost_fix = False
-    if "flex_cost_fix" in table.columns and pd.notna(row["flex_cost_fix"]) and str(row["flex_cost_fix"]).strip():
-        flex_cost_fix = bool(to_native(row["flex_cost_fix"]))
+    config_name = str(cell("config")).strip() if cell("config") is not None else DEFAULT_CONFIG
+    axes_config = cell("axes_config")
+    axes_config_path = CONFIG_EULER_DIR / str(axes_config).strip() if axes_config is not None else None
+    normalisation = str(cell("normalisation")).strip() if cell("normalisation") is not None else None
+    batch_size = native_cell("batch_size")
+    n_workers = native_cell("n_workers")
+    tolerance_explore = native_cell("tolerance_explore")
+    seed_rng = native_cell("seed_rng")
+    max_iterations = native_cell("max_iterations")
+    solver_threads = native_cell("solver_threads")
+    numeric_focus = native_cell("numeric_focus")
+    epsilon = native_cell("epsilon")
+    solver_options_str = str(cell("solver_options")).strip() if cell("solver_options") is not None else None
+    cost_noise = float(cell("cost_noise")) if cell("cost_noise") is not None else None
+    noise_seed = int(native_cell("noise_seed")) if cell("noise_seed") is not None else 0
+    flex_cost_fix = bool(native_cell("flex_cost_fix")) if cell("flex_cost_fix") is not None else False
     # Defaults only fill keys the CSV has no column for; a blank cell in an
     # existing column keeps the dataset's own system.yaml value.
     system_cols = [col for col in table.columns if col not in META_COLUMNS]
@@ -525,19 +438,20 @@ def main() -> None:
            if pd.notna(row[col]) and str(row[col]).strip()},
     }
 
-    print(f"[run_model] task_id={args.task_id}  dataset={my_dataset}  comment={my_comment}")
-    print(f"[run_model] config={config_name}  axes_config={axes_config_path.name}  normalisation={normalisation}")
-    print(f"[run_model] batch_size={batch_size}  n_workers={n_workers}  tolerance_explore={tolerance_explore}  "
+    logger.info(f"task_id={args.task_id}  dataset={my_dataset}  comment={my_comment}")
+    logger.info(f"config={config_name}  axes_config={axes_config_path.name if axes_config_path else None}  "
+                f"normalisation={normalisation}")
+    logger.info(f"batch_size={batch_size}  n_workers={n_workers}  tolerance_explore={tolerance_explore}  "
           f"seed_rng={seed_rng}  solver_threads={solver_threads}  epsilon={epsilon}  "
           f"numeric_focus={numeric_focus}  max_iterations={max_iterations}")
-    print(f"[run_model] solver_options={solver_options_str}  cost_noise={cost_noise}  "
+    logger.info(f"solver_options={solver_options_str}  cost_noise={cost_noise}  "
           f"noise_seed={noise_seed}  flex_cost_fix={flex_cost_fix}")
-    print(f"[run_model] system_overrides={system_overrides}")
+    logger.info(f"system_overrides={system_overrides}")
 
     config_dir = CONFIG_EULER_DIR if config_name.startswith("config_mga") else DATA_DIR_CONFIG
     with open(config_dir / config_name) as f:
         run_config = yaml.safe_load(f)
-    apply_axes_override(run_config, config_name, axes_config_path)
+    apply_axes_override(run_config, axes_config_path)
     if normalisation is not None:
         apply_normalisation_override(run_config, config_name, normalisation)
     apply_batch_overrides(run_config, config_name, batch_size, n_workers, tolerance_explore, seed_rng, max_iterations)
@@ -597,7 +511,7 @@ def main() -> None:
         dataset=str(staged_dataset),
         folder_output=str(out_dir),
     )
-    print(f"[run_model] done task_id={args.task_id}: results in {out_dir}")
+    logger.info(f"done task_id={args.task_id}: results in {out_dir}")
 
 
 if __name__ == "__main__":

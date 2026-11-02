@@ -68,11 +68,12 @@ module spider python   # available versions
 
 | File | Role |
 |---|---|
-| `run_model.py` | Runs **one row** of a sweep CSV (`--task_id`; CSV chosen by `--params`, default `parameters.csv`). Stages a private copy of the dataset, applies the row's `system` overrides to the copy, and runs ZEN-garden. Any override a row doesn't set falls back to `DEFAULT_SYSTEM_OVERRIDES`. For MGA configs it merges in the axes file (`data/config_euler/config_mga_axes_capex.yaml`, or the row's `axes_config`). |
+| `run_model.py` | Runs **one row** of a sweep CSV (`--task_id`; CSV chosen by `--params`, default `parameters.csv`). Stages a private copy of the dataset, applies the row's `system` overrides to the copy, and runs ZEN-garden. Any override a row doesn't set falls back to `DEFAULT_SYSTEM_OVERRIDES`. For MGA configs it replaces `plugins.mga.axes` with the row's `axes_config` file (rows without one keep the config's own axes). |
 | `parameters.csv` | Normal sweep table, one row per run. Columns: `my_dataset`, `my_comment`, one column per `system` override, plus optional meta columns (e.g. `numeric_focus`). Runs `data/config.yaml`. |
 | `submit_euler.sh` | SLURM array job for `parameters.csv`. |
 | `parameters_mga.csv` | MGA sweep table. It adds the `config`, `normalisation`, `batch_size`, `n_workers`, `tolerance_explore` and `axes_config` columns. |
 | `submit_euler_mga.sh` | SLURM array job for `parameters_mga.csv`. Its header comment lists the per-range resource profiles. |
+| `euler/MGA_RUN_HISTORY.md` | History of the MGA rows, their resource profiles and the sweep driver. |
 | `setup_euler_env.sh` | One-time environment build (venv + `zen_garden`, plus the MGA plugin and `pyoNearOpt`). |
 
 ```
@@ -107,6 +108,22 @@ parameters.csv        submit_euler.sh                 compute nodes
 4. runs ZEN-garden, writing to `$SCRATCH/zen_runs/outputs/<my_dataset>_<my_comment>`.
 
 With `--run_on local`, outputs go to `data/outputs/zen-europe-outputs-new/` instead.
+
+### Row columns (`run_model.py`)
+
+Every column except the ones below is a `system.yaml` override (a blank cell
+keeps the dataset's value; a system key without a column falls back to
+`DEFAULT_SYSTEM_OVERRIDES`). All of these only change private staged copies.
+
+| Column | Effect |
+|---|---|
+| `my_dataset`, `my_comment` | Dataset name (looked up in `DATASET_SEARCH_DIRS`) and run name; output folder `<my_dataset>_<my_comment>`. |
+| `config` | Config file (`config_mga_*` from `data/config_euler/`, others from `data/`); default `config.yaml`. |
+| `axes_config` | Axes file in `data/config_euler/` that replaces `plugins.mga.axes`. |
+| `normalisation`, `epsilon` | Override `plugins.mga.normalisation` / `epsilon`. |
+| `batch_size`, `n_workers`, `tolerance_explore`, `seed_rng`, `max_iterations` | Override the keys of `plugins.mga.batch`. Without `seed_rng`, batch mode is not reproducible between runs. |
+| `solver_threads`, `numeric_focus`, `solver_options` | Override Gurobi `Threads`, `NumericFocus`, or any `Key=value;Key=value` options. |
+| `cost_noise` (+ `noise_seed`), `flex_cost_fix` | Solver-degeneracy tests on the TES/DSM technologies (see `scripts/solver_tests/NOTES.md`). |
 
 ## 5. Run order
 
@@ -176,7 +193,7 @@ Batch mode forks `batch_size` Gurobi workers, so size `cpus-per-task` as
 the header comment of `submit_euler_mga.sh`), for example:
 
 ```bash
-sbatch --array=0-2 --time=72:00:00 --cpus-per-task=40 --mem-per-cpu=1G submit_euler_mga.sh
+sbatch --array=0-4 submit_euler_mga.sh   # standard profile (#SBATCH defaults)
 ```
 
 Use `check_mga_convergence.sh` to follow a running MGA job.

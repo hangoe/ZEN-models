@@ -9,3 +9,4 @@ task_id,my_dataset,my_comment,conduct_time_series_aggregation,aggregated_time_st
 7,zen_europe_no_tes_dsm_pess,2022_8a_4a_interval_10ts,,10,,,,,2,BarHomogeneous=0,,,
 8,zen_europe_dsm_no_cost,2022_8a_4a_interval_10ts,,10,,,,,2,BarHomogeneous=0,,,
 9,zen_europe,2022_8a_4a_interval_20ts,,20,,,,,2,BarHomogeneous=0,,,
+10,zen_europe_no_flex,2022_8a_4a_interval_20ts,,20,,,,,2,,,,
