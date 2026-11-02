@@ -5,7 +5,9 @@ and named after ZEN-europe's models.yaml variants (see SCENARIOS): the old
 "Full flexibility" is now "ZEN-Europe", "TES only" -> "No DSM", "DSM only" ->
 "No TES", "DSM pessimistic" -> "No TES, DSM pessimistic", "Single
 temperature level" -> "Single temp" and "ZEN-Europe (base)" -> "ZEN-Europe
-legacy". The descriptions below still use the old labels.
+legacy". As of 2026-11-02 the figure labels use the MT_report names
+(ZEN-Europe-No-Flex, ZEN-Europe-No-TES, ZEN-Europe-Legacy, ...). The
+descriptions below still use the old labels.
 
 As of 2026-10-12 the figures are generated from the zen-europe runs
 (zen_europe_ind_heat_v1_*, current ZEN-garden output format), not the
@@ -309,12 +311,12 @@ COMPARISON_YEARS = [2030, 2040, 2050]
 # Old labels: Full flexibility -> ZEN-Europe, DSM pessimistic -> No TES, DSM
 # pessimistic, DSM only -> No TES, TES only -> No DSM, Single temperature
 # level -> Single temp, ZEN-Europe (base) -> ZEN-Europe legacy.
-NO_FLEX = "No flexibility"
+NO_FLEX = "ZEN-Europe-No-Flex"
 FULL = "ZEN-Europe"
-NO_TES_DSM_PESS = "No TES, DSM pessimistic"
-NO_TES = "No TES"
-NO_DSM = "No DSM"
-SINGLE_TEMP = "Single temp"
+NO_TES_DSM_PESS = "ZEN-Europe-No-TES-DSM-Pess"
+NO_TES = "ZEN-Europe-No-TES"
+NO_DSM = "ZEN-Europe-No-DSM"
+SINGLE_TEMP = "ZEN-Europe-Single-Temp"
 
 SCENARIOS = [
     ("zen_europe_no_flex_2022_8a_4a_interval_10ts", NO_FLEX),
@@ -347,7 +349,7 @@ SCENARIOS = [
 # 2026-09 "add 2050" re-sync: base case re-run with optimized_years=16
 # (2020-2050, matching the SCENARIOS list's new 16a runs) — see the
 # COMPARISON_YEARS comment above for the same re-sync.
-BASE_SCENARIO = ("zen_europe_legacy_2022_8a_4a_interval_10ts", "ZEN-Europe legacy")
+BASE_SCENARIO = ("zen_europe_legacy_2022_8a_4a_interval_10ts", "ZEN-Europe-Legacy")
 
 # Single-temperature-band counterpart of "No flexibility", loaded separately
 # from SCENARIOS (like BASE_SCENARIO) since it isn't one of the 6 case-study
@@ -356,14 +358,14 @@ BASE_SCENARIO = ("zen_europe_legacy_2022_8a_4a_interval_10ts", "ZEN-Europe legac
 # Full flexibility), not just Full flexibility as before, per user request.
 NO_FLEX_SINGLE_TEMP_SCENARIO = (
     "zen_europe_no_flex_single_temp_2022_8a_4a_interval_10ts",
-    "No flexibility, single temp")
+    "ZEN-Europe-No-Flex-Single-Temp")
 
 # fig50 only: Full flexibility with all 10 *_DSM storage techs made (nearly)
 # free (opex_specific_variable/capex_specific_storage energy 0.001) AND their
 # energy_to_power_ratio_max raised to 336 h (was 2/48 h for 7 of them) —
 # parameters.csv row 8. Loaded separately (like NO_FLEX_SINGLE_TEMP_SCENARIO)
 # so it doesn't enter the flexibility-scenario figures or shift palette slots.
-DSM_NO_COST_SCENARIO = ("zen_europe_dsm_no_cost_2022_8a_4a_interval_10ts", "DSM no cost")
+DSM_NO_COST_SCENARIO = ("zen_europe_dsm_no_cost_2022_8a_4a_interval_10ts", "ZEN-Europe-DSM-No-Cost")
 
 # fig31/fig60/fig61 only: Full flexibility / No flexibility with 20 instead of
 # 10 representative time steps per year (parameters.csv row 9 for Full
@@ -372,7 +374,7 @@ DSM_NO_COST_SCENARIO = ("zen_europe_dsm_no_cost_2022_8a_4a_interval_10ts", "DSM 
 # flexibility run as a marked placeholder (see main()).
 FULL_FLEX_20TS_SCENARIO = ("zen_europe_2022_8a_4a_interval_20ts", f"{FULL} (20 ts)")
 NO_FLEX_20TS_SCENARIO = ("zen_europe_no_flex_2022_8a_4a_interval_20ts",
-                         "No flexibility (20 ts)")
+                         f"{NO_FLEX} (20 ts)")
 
 
 def load_scenarios() -> list[Run]:
@@ -1605,7 +1607,7 @@ def fig4b_industry_fuel_demand_comparison(runs: list[Run]) -> None:
 
     ax.set_xlabel("Average energy input [GW]")
     ax.set_title(f"Industrial energy input by carrier in {year}", fontsize=12, fontweight="bold", loc="left", pad=20)
-    ax.text(0, 1.015, "ZEN-europe without flexibility",
+    ax.text(0, 1.015, NO_FLEX,
             transform=ax.transAxes, fontsize=9, color=_ETH_GREY, va="bottom")
     for spine in ("top", "right", "left"):
         ax.spines[spine].set_visible(False)
@@ -2010,7 +2012,7 @@ def fig8a_diffusion_mechanisms_heat_pumps(runs: list[Run]) -> None:
         ax3.grid(axis="y", alpha=0.25)
 
     fig.suptitle("Technology-Diffusion Limit for Industrial Heat Pumps\n"
-                 f"No flexibility, {years[0]}-{years[-1]} - row 2 is the exact diffusion-limit RHS "
+                 f"{NO_FLEX}, {years[0]}-{years[-1]} - row 2 is the exact diffusion-limit RHS "
                  "(no approximation: HPs have no existing capacity)", fontsize=12.5)
     fig.text(0.5, 0.035,
              "Temp-conversion techs have capex = 0 and max_diffusion_rate = inf, so their capacity is "
@@ -2992,7 +2994,7 @@ def fig50_dsm_no_cost_vs_full_flex(full_run: Run, no_cost_run: Run) -> None:
     -> SI_results/fig50_dsm_no_cost_vs_zen_europe.svg
     """
     _comparison_table(full_run, no_cost_run, FIG50_ROWS, _fig50_metrics,
-                      "DSM no cost: DSM storage cost ≈ 0 and max. energy-to-power ratio 336 h for "
+                      "ZEN-Europe-DSM-No-Cost: DSM storage cost ≈ 0 and max. energy-to-power ratio 336 h for "
                       f"all DSM technologies\n({FULL}: 2–48 h for 7 of 10).",
                       "fig50_dsm_no_cost_vs_zen_europe")
 
@@ -3112,7 +3114,7 @@ def fig42_flex_decomposition(runs: list[Run]) -> None:
         ax.set_ylim(lo - pad, hi + pad)
         ax.set_xlim(-0.6, 2.6)
         ax.set_xticks([0, 1, 2])
-        ax.set_xticklabels(["No\nflexibility", "One option", "Full\nflexibility"], fontsize=9.5)
+        ax.set_xticklabels(["ZEN-Europe-\nNo-Flex", "One option", FULL], fontsize=9.5)
         ax.set_title(title, fontsize=11.5, fontweight="bold")
         ax.set_ylabel(f"[{abs_unit}]", fontsize=10)
         ax.yaxis.set_major_formatter(plt.FuncFormatter(lambda val, _: f"{val:,.0f}"))
@@ -3716,7 +3718,7 @@ def get_dsm_energy_equivalent(r, dsm_techs: list[str], years: list[int]) -> pd.D
 # ONE meaningful denominator (that year's own EU-wide base total) — no
 # small-base blow-up risk.
 
-DELTA_LABEL = r"$\Delta$ No flexibility"
+DELTA_LABEL = rf"$\Delta$ {NO_FLEX}"
 
 
 def _base_and_delta_df(base_series: pd.Series, no_flex_series: pd.Series,
