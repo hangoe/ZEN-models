@@ -127,6 +127,33 @@ PL, CZ; south = the rest) -> 17 axes. Targets unchanged.
   sbatch --array=18 --time=02:00:00 --cpus-per-task=8 --mem-per-cpu=6G submit_euler_mga.sh
   sbatch --array=19 --time=4-00:00:00 --cpus-per-task=32 --mem-per-cpu=5G submit_euler_mga.sh
 
+task_id 20-23 added 2026-11-03, after task_id 19 stalled (CI ~0.01 after 324
+batch16 iterations, tolerance_explore 0.1). Two findings:
+  1. The node_carbon_emissions_cumulative axes counted only
+     carbon_emissions_technology (process emissions, carbon_storage -1), not
+     carbon_emissions_carrier, where ZEN-europe books fossil CO2 (natural gas,
+     crude oil, coal, lignite at import). Fixed in ZEN-garden-plugins: the
+     axes now sum technology + carrier emissions, i.e. the share of
+     carbon_emissions_annual the budget limits. task_id <= 19 used the old
+     definition.
+  2. tolerance_explore 0.1 in minmax units is far stricter than any converged
+     run so far: the converged share/tol0.02 capex runs (task_id 0/5),
+     re-expressed in minmax units, have a 95% gap quantile of ~0.45-0.50.
+     The new full rows use 0.3; implied_threshold_for_tolerance is tracked,
+     so the diagnostics show which tolerance each run reaches over time.
+  task_id 20 = CO2-fix test (17 axes), batch4, max_iterations=1.
+  task_id 21 = CO2-fix full run (17 axes), batch16, tol 0.3.
+  task_id 22 = ablation without emission axes (13 axes,
+              config_mga_axes_total_output_2reg_noco2.yaml), batch16, tol 0.3.
+  task_id 23 = capex-only axes (13 axes, config_mga_axes_capex_cum.yaml) with
+              minmax on the same dataset, batch16, tol 0.3: same dimension as
+              task_id 22, so 22 vs 23 isolates the effect of the axis kinds.
+  21-23 use max_iterations=500: no SIGTERM handling exists, so a run killed
+  by the SLURM time limit never writes polytope.npz/diagnostics.csv. Task 19
+  did ~15 iterations/h (324 in 22 h), so 500 ends after ~1.5-2 days.
+  sbatch --array=20 --time=02:00:00 --cpus-per-task=8 --mem-per-cpu=6G submit_euler_mga.sh
+  sbatch --array=21-23 --time=4-00:00:00 --cpus-per-task=32 --mem-per-cpu=5G submit_euler_mga.sh
+
 Requires the MGA install step in setup_euler_env.sh to have been run once
 (clones + installs ZEN-garden-plugins and near_optimal_tools/pyoNearOpt,
 incl. the "bbo" extra needed by batch bbo mode).
