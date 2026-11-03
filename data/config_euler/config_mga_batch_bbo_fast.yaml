@@ -1,0 +1,45 @@
+# Copy of config_mga_batch_bbo.yaml for faster batch iterations (task_id 20-23).
+# Task 19 used 6% of its 32 cores: most of each iteration was pyoNearOpt's
+# single-core bookkeeping (gap sampling + BBO), not the 16 parallel solves.
+# Changes vs. config_mga_batch_bbo.yaml: n_samples 2000 -> 1000,
+# max_function_evaluations 2000 -> 500, n_jobs_sampling 8 (parallel gap
+# sampling on the idle cores; needs the ZEN-garden-plugins version with
+# batch.n_jobs_sampling).
+analysis:
+  dataset: snapshot
+solver:
+  name: gurobi
+  solver_options:
+    Method: 2
+    NodeMethod: 2
+    BarHomogeneous: 1
+    DualReductions: 0
+    Threads: 10
+    Crossover: 0
+    ScaleFlag: 2
+    BarOrder: 0
+    BarIterLimit: 3000
+  save_duals: true
+  use_scaling: false
+  run_diagnostics: true
+  scaling_include_rhs: true
+plugins:
+  mga:
+    mode: batch
+    epsilon: 0.01
+    normalisation: minmax
+    batch:
+      tolerance_prob: 0.95
+      max_iterations: 5000
+      tolerance_explore: 0.1
+      n_samples: 1000
+      alpha: 0.05
+      method: jeffreys
+      use_bounding_box: false
+      strategy_mode: bbo
+      max_function_evaluations: 500
+      n_restarts: 1
+      batch_size: 4
+      n_workers: 4
+      n_jobs_sampling: 8
+      track_implied_threshold: true

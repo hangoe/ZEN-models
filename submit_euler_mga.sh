@@ -26,7 +26,7 @@
 #   sbatch --array=14,16,18 --time=02:00:00 --cpus-per-task=8 --mem-per-cpu=6G submit_euler_mga.sh    # output-ratio tests
 #   sbatch --array=15,17,19 --time=4-00:00:00 --cpus-per-task=32 --mem-per-cpu=5G submit_euler_mga.sh # output-ratio full
 #   sbatch --array=20 --time=02:00:00 --cpus-per-task=8 --mem-per-cpu=6G submit_euler_mga.sh          # CO2 fix, test
-#   sbatch --array=21-23 --time=4-00:00:00 --cpus-per-task=32 --mem-per-cpu=5G submit_euler_mga.sh    # CO2 fix / no CO2 / capex, full
+#   sbatch --array=21-23 --time=4-00:00:00 --cpus-per-task=32 --mem-per-cpu=5500M submit_euler_mga.sh # CO2 fix / no CO2 / capex, full
 # Refine a profile from `sacct -j <jobid> --format=JobID,Elapsed,MaxRSS,State`
 # of the previous run.
 ###############################################################################

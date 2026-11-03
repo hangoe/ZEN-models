@@ -152,7 +152,14 @@ batch16 iterations, tolerance_explore 0.1). Two findings:
   by the SLURM time limit never writes polytope.npz/diagnostics.csv. Task 19
   did ~15 iterations/h (324 in 22 h), so 500 ends after ~1.5-2 days.
   sbatch --array=20 --time=02:00:00 --cpus-per-task=8 --mem-per-cpu=6G submit_euler_mga.sh
-  sbatch --array=21-23 --time=4-00:00:00 --cpus-per-task=32 --mem-per-cpu=5G submit_euler_mga.sh
+  20-23 use config_mga_batch_bbo_fast.yaml: task 19 (job 18836226) had 6% CPU
+  efficiency (1.9 of 32 cores busy on average over 5 days) and 146 of 160 GB
+  memory, i.e. most of each iteration was pyoNearOpt's single-core gap
+  sampling + BBO, not the parallel solves. The fast config halves n_samples
+  (2000 -> 1000), cuts max_function_evaluations 2000 -> 500 and samples on 8
+  processes (batch.n_jobs_sampling, new in ZEN-garden-plugins). The sampling
+  processes re-import run_model.py (~0.3-0.5 GB each), hence 5500M per cpu.
+  sbatch --array=21-23 --time=4-00:00:00 --cpus-per-task=32 --mem-per-cpu=5500M submit_euler_mga.sh
 
 Requires the MGA install step in setup_euler_env.sh to have been run once
 (clones + installs ZEN-garden-plugins and near_optimal_tools/pyoNearOpt,
