@@ -158,8 +158,8 @@ batch16 iterations, tolerance_explore 0.1). Two findings:
   sampling + BBO, not the parallel solves. The fast config halves n_samples
   (2000 -> 1000), cuts max_function_evaluations 2000 -> 500 and samples on 8
   processes (batch.n_jobs_sampling, new in ZEN-garden-plugins). The sampling
-  processes re-import run_model.py (~0.3-0.5 GB each), hence 5500M per cpu.
-  sbatch --array=21-23 --time=4-00:00:00 --cpus-per-task=32 --mem-per-cpu=5500M submit_euler_mga.sh
+  processes re-import run_model.py (~0.3-0.5 GB each), hence 6G per cpu.
+  sbatch --array=21 --time=4-00:00:00 --cpus-per-task=32 --mem-per-cpu=6G submit_euler_mga.sh
 
 Requires the MGA install step in setup_euler_env.sh to have been run once
 (clones + installs ZEN-garden-plugins and near_optimal_tools/pyoNearOpt,

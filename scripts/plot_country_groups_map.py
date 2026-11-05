@@ -1,20 +1,18 @@
 """Europe map of the countries/nodes implemented in the zen-europe model,
-colored by placeholder region group (north/west/south/east).
+colored by the MGA region group (north/south).
 
-Node codes come straight from the zen_europe dataset's energy_system/set_nodes.csv
-(in ../ZEN-creator/outputs)
+Node codes come straight from the dataset's energy_system/set_nodes.csv
 (EU statistical convention: EL = Greece, UK = United Kingdom -- not strict
 ISO 3166-1). Country borders come from Natural Earth's 50m admin-0-countries
 dataset, downloaded once and cached under data/naturalearth/ (gitignored).
 
-NODE_GROUPS below is a placeholder split -- north/west/south/east assigned by
-rough geography, not any real modelling criterion. Replace it once real
-groups are defined.
+NODE_GROUPS below is the split used by config_mga_axes_total_output_2reg.yaml.
 
 Usage:
     python scripts/plot_country_groups_map.py
 """
 
+import math
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).parent.parent
@@ -23,26 +21,25 @@ import geopandas as gpd
 import matplotlib.pyplot as plt
 import pandas as pd
 
-from plots.figure_settings import SCENARIO_PALETTE, apply_font_mode
+from plots.figure_settings import apply_font_mode
+from plots.mga_capex_periods_common import REGION_COLOR
 from plots.natural_earth import EUROPE_EXTENT, ISO_A2_EH_OVERRIDES, ensure_naturalearth_data
 
 # See figure_settings.FONT_MODE for the rationale and for the one-flag
 # toggle that switches every figure script in this repo at once.
 apply_font_mode()
 
-NODES_CSV = (REPO_ROOT.parent / "ZEN-creator" / "outputs" / "zen_europe_ind_heat_v1_no_flexibility"
+NODES_CSV = (REPO_ROOT / "data" / "outputs" / "zen-europe-old"
+             / "zen_europe_ind_heat_v1_no_flexibility_nodiffusion_export0"
              / "energy_system" / "set_nodes.csv")
 FIGURES_DIR = REPO_ROOT / "data" / "outputs" / "figures" / "mga"
 
-# Placeholder region groups -- sorted by rough geography, to be replaced once
-# the user specifies real groups.
+# Same split as config_mga_axes_total_output_2reg.yaml.
 NODE_GROUPS = {
-    "north": ["DK", "EE", "FI", "IE", "LT", "LV", "NO", "SE", "UK"],
-    "west": ["AT", "BE", "CH", "DE", "FR", "LU", "NL"],
-    "south": ["ES", "EL", "HR", "IT", "PT", "SI"],
-    "east": ["BG", "CZ", "HU", "PL", "RO", "SK"],
+    "north": ["DK", "EE", "FI", "IE", "LT", "LV", "NO", "SE", "UK", "BE", "NL", "DE", "PL", "CZ"],
+    "south": ["ES", "EL", "HR", "IT", "PT", "SI", "FR", "CH", "AT", "LU", "BG", "HU", "RO", "SK"],
 }
-GROUP_COLORS = dict(zip(NODE_GROUPS, SCENARIO_PALETTE))
+GROUP_COLORS = {group: REGION_COLOR[group] for group in NODE_GROUPS}
 
 
 def load_node_groups() -> pd.DataFrame:
@@ -80,6 +77,9 @@ def main() -> None:
 
     ax.set_xlim(minx, maxx)
     ax.set_ylim(miny, maxy)
+    # A degree of longitude is shorter than a degree of latitude at these
+    # latitudes; correct for it at the extent's middle so the map isn't squashed.
+    ax.set_aspect(1 / math.cos(math.radians((miny + maxy) / 2)))
     ax.set_axis_off()
     ax.set_title("ZEN-Europe nodes by region group", fontsize=13, fontweight="bold")
 
