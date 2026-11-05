@@ -180,12 +180,13 @@ costs 5000 EUR/t in 2050, ~1275 EUR/t after discounting at 5%, so the slack buys
   task_id 31 = the full run, batch16, tol 0.3. Flags are task_id 21's; refine
               them from task_id 30's sacct output.
   sbatch --array=30 --time=02:00:00 --cpus-per-task=8 --mem-per-cpu=6G submit_euler_mga.sh
-  task_id 32 = task_id 31 with tolerance_explore 0.15. Run 21 (17 axes) reached
-              only ~0.31 after 486 iterations, and extrapolating gives ~0.26-0.30
-              for 13 axes at 500, so expect converged=False; read the reached
+  task_id 32 = task_id 31 with tolerance_explore 0.15 and max_iterations=700.
+              Run 21 (17 axes) reached only ~0.31 after 486 iterations, and
+              extrapolating gives ~0.23-0.27 for 13 axes at 700, so expect
+              converged=False; read the reached
               level from implied_threshold_for_tolerance in diagnostics.csv.
   sbatch --array=31 --time=4-00:00:00 --cpus-per-task=32 --mem-per-cpu=6G submit_euler_mga.sh
-  sbatch --array=32 --time=4-00:00:00 --cpus-per-task=32 --mem-per-cpu=6G submit_euler_mga.sh
+  sbatch --array=32 --time=5-00:00:00 --cpus-per-task=32 --mem-per-cpu=6G submit_euler_mga.sh
 
 Requires the MGA install step in setup_euler_env.sh to have been run once
 (clones + installs ZEN-garden-plugins and near_optimal_tools/pyoNearOpt,
