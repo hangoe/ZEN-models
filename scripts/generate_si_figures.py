@@ -78,6 +78,10 @@ the zen-europe versions of removed ones in archive/zen_europe/):
                                           curtailment as in fig43), cells shaded by value, with arrows from the
                                           cheapest cell (Full flexibility, 3 temp levels) giving each
                                           other cell's extra cost in % and bn EUR
+  fig310_matrix_sized_delta_hatched_border — fig30 with box size set by the relative change to the
+                                          baseline, baseline block inside each box, increase hatched
+                                          blue, decrease hatched ETH bronze on white, thick border
+                                          around each whole box, no colourbar
   fig31_matrix_tsa                     — fig30 with 10 / 20 representative time steps as rows instead
                                           of temperature resolution, ETH green cells
   fig20_cost_breakdown_sector_industry_heating — total system cost drilled down sector ->
@@ -224,7 +228,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from matplotlib.cm import ScalarMappable
-from matplotlib.colors import LinearSegmentedColormap, Normalize
+from matplotlib.colors import LinearSegmentedColormap, Normalize, to_rgba
 from matplotlib.patches import FancyArrow, FancyBboxPatch, Patch, Polygon, Rectangle, Wedge
 from matplotlib.path import Path as MplPath
 from matplotlib.lines import Line2D
@@ -2575,6 +2579,209 @@ def _fig30_matrix_panel(fig: plt.Figure, ax: plt.Axes, values: dict[tuple[int, i
     return cbar
 
 
+# fig300-302 box sizes (slot = 1): the baseline's side and the side of the
+# largest change in a panel. A change of the opposite sign shrinks the box below
+# the baseline by the same scale. 0.6 keeps the smallest box (HP share, -12.5 %)
+# wide enough for its text.
+FIG300_BASE_SIDE, FIG300_MAX_SIDE = 0.6, 1.0
+# fig306-308 colour schemes, one hue each so they also hold in print: the
+# baseline block's colour + text colour, and the patch style of what's added to
+# it (increase) or missing from it (decrease). In fig308 the opposite diagonals
+# tell an increase from a decrease.
+_FIG306_LIGHT = _eth_tint(_ETH_BLUE, 0.7)
+_FIG306_DECREASE = dict(facecolor="white", edgecolor=_ETH_BLUE, hatch="////")
+FIG306_STYLE = dict(baseline=_ETH_BLUE, text="white", decrease=_FIG306_DECREASE,
+                    increase=dict(facecolor=_FIG306_LIGHT, edgecolor="#1F2A3A"))
+FIG307_STYLE = dict(baseline=_FIG306_LIGHT, text="black", decrease=_FIG306_DECREASE,
+                    increase=dict(facecolor=_ETH_BLUE, edgecolor="#1F2A3A"))
+FIG308_STYLE = dict(baseline=_FIG306_LIGHT, text="black",
+                    increase=dict(facecolor=_FIG306_LIGHT, edgecolor=_ETH_BLUE, hatch="////"),
+                    decrease=dict(facecolor=_FIG306_LIGHT, edgecolor=_ETH_BLUE, hatch="\\\\\\\\"))
+# fig309/310: `whole_border` is the linewidth of the border around each whole box,
+# so the numbers read as describing it rather than the baseline block inside.
+FIG309_STYLE = {**FIG307_STYLE, "whole_border": 2.6}
+# fig310's decrease is ETH bronze on white so it doesn't read as an increase.
+FIG310_STYLE = {**FIG308_STYLE, "whole_border": 2.6,
+                "decrease": dict(facecolor="white", edgecolor=_ETH_BRONZE, hatch="\\\\\\\\")}
+
+
+def _fig306_legend(style: dict) -> list[Patch]:
+    """Legend handles for a FIG30x_STYLE."""
+    whole = style.get("whole_border")
+    handles = [Patch(facecolor=style["baseline"], edgecolor="none" if whole else "#1F2A3A",
+                     label=f"Baseline ({FULL}, 3 temp. levels)"),
+               Patch(**style["increase"], label="Increase over baseline"),
+               Patch(**style["decrease"], label="Decrease below baseline")]
+    if whole:
+        handles.append(Patch(facecolor="none", edgecolor="#1F2A3A", linewidth=whole,
+                             label="Whole square = value shown"))
+    return handles
+
+
+FIG300_CAPTION = ("Box side length grows linearly with the change relative to the baseline, "
+                  "scaled within each panel (largest change = largest box): "
+                  "sizes are not comparable between panels.")
+
+
+def _fig300_sized_panel(fig: plt.Figure, ax: plt.Axes, values: dict[tuple[int, int], float],
+                        title: str, unit: str, cbar_label: str, row_labels: bool = True,
+                        value_fmt: str = "{:,.0f}", delta_fmt: str = "{:,.1f}",
+                        delta_unit: str | None = None,
+                        col_names: tuple[str, str] = (FULL, NO_FLEX),
+                        row_names: tuple[str, str] = ("3 temp. levels", "Single temp. level"),
+                        align: str = "inner", arrows: bool = False,
+                        single_color: str | None = None, max_outline: bool = False,
+                        baseline_delta: dict | None = None):
+    """_fig30_matrix_panel with the relative change also encoded as box size
+    (see FIG300_BASE_SIDE). Same colours and colourbar, unless `single_color`
+    fills every box with that colour and drops the colourbar. `align` "inner":
+    boxes grow outwards from the matrix centre, so their inner corners stay on
+    the central gap; "center": each box is centred in its own slot; "top_left":
+    each box sits in its slot's top left corner. Text is stacked on 3 lines to
+    fit the smaller boxes, at each box's outer edge ("top_left": at the top of
+    every box). `arrows` draws one thin arrow from the baseline into each other
+    box, stopping short of that box's text. `max_outline` draws the largest box's
+    outline (the full slot, FIG300_MAX_SIDE), filled light blue, behind every box,
+    with the labels following those outlines. `baseline_delta` (a FIG30x_STYLE) shows the
+    baseline block in every box instead of shading by value, anchored like the box,
+    so the delta is what's left around it: the style's increase patch, or its decrease
+    patch where the box is smaller than the block. No colourbar; text centred in
+    the block. Returns the colourbar, or None without one (see
+    _fig30_matrix_panel)."""
+    base_rc = (0, 0)
+    base = values[base_rc]
+    slot, gap = 1.0, 0.12
+    max_abs = max(abs(v - base) for v in values.values()) or 1.0
+    side = {rc: FIG300_BASE_SIDE + (FIG300_MAX_SIDE - FIG300_BASE_SIDE) * (v - base) / max_abs
+            for rc, v in values.items()}
+
+    def corner(rc, s=None):  # lower-left corner of a box (side `s`), row 0 on top
+        row, col = rc
+        s = side[rc] if s is None else s
+        x_slot, y_slot = col * (slot + gap), (1 - row) * (slot + gap)
+        if align == "center":
+            return x_slot + (slot - s) / 2, y_slot + (slot - s) / 2
+        if align == "top_left":
+            return x_slot, y_slot + slot - s
+        return x_slot + (slot - s if col == 0 else 0), y_slot + (0 if row == 0 else slot - s)
+
+    cmap = LinearSegmentedColormap.from_list("fig30_cost", [_eth_tint(_ETH_BLUE, 0.85), _ETH_BLUE,
+                                                            "#0F2A52"])
+    norm = Normalize(vmin=min(values.values()), vmax=max(values.values()))
+    edge, line = 0.085, 0.125  # first text line's distance from the box edge; line spacing
+    text_height = {rc: edge + (1 if rc == base_rc else 2) * line + 0.05 for rc in values}
+    for rc, c in values.items():
+        x0, y0 = corner(rc)
+        s = side[rc]
+        if baseline_delta:
+            s_dark = min(s, FIG300_BASE_SIDE)
+            whole = baseline_delta.get("whole_border")
+            if s > FIG300_BASE_SIDE:
+                ax.add_patch(Rectangle((x0, y0), s, s, linewidth=0 if whole else 1.2, zorder=1,
+                                       **baseline_delta["increase"]))
+            elif s < FIG300_BASE_SIDE:
+                ax.add_patch(Rectangle(corner(rc, FIG300_BASE_SIDE), FIG300_BASE_SIDE,
+                                       FIG300_BASE_SIDE, linewidth=0.6 if whole else 1.2, zorder=1,
+                                       **baseline_delta["decrease"]))
+            dx0, dy0 = corner(rc, s_dark)
+            ax.add_patch(Rectangle((dx0, dy0), s_dark, s_dark, facecolor=baseline_delta["baseline"],
+                                   edgecolor="none" if whole else "#1F2A3A", linewidth=1.2, zorder=2))
+            if whole:
+                ax.add_patch(Rectangle((x0, y0), s, s, fill=False, edgecolor="#1F2A3A",
+                                       linewidth=whole, zorder=3))
+            delta = c - base
+            sign = "+" if delta >= 0 else "−"
+            lines = [(f"{value_fmt.format(c)} {unit}", dict(fontsize=11))]
+            if rc == base_rc:
+                lines.append(("baseline", dict(fontsize=11.5, style="italic")))
+            else:
+                lines += [(f"({sign}{delta_fmt.format(abs(delta))} {delta_unit or unit})", dict(fontsize=11)),
+                          (f"{sign}{abs(delta) / base * 100:.2f} %", dict(fontsize=14, fontweight="bold"))]
+            y_first = dy0 + s_dark / 2 + (len(lines) - 1) * line / 2
+            for i, (txt, kw) in enumerate(lines):
+                ax.text(dx0 + s_dark / 2, y_first - i * line, txt, ha="center", va="center",
+                        color=baseline_delta["text"], zorder=4, **kw)
+            continue
+        if max_outline:
+            ax.add_patch(Rectangle((rc[1] * (slot + gap), (1 - rc[0]) * (slot + gap)), slot, slot,
+                                   facecolor=_eth_tint(_ETH_BLUE, 0.85), edgecolor="#1F2A3A",
+                                   linewidth=1.2, zorder=0.5))
+        face = to_rgba(single_color) if single_color else cmap(norm(c))
+        ax.add_patch(Rectangle((x0, y0), s, s, facecolor=face, edgecolor="#1F2A3A",
+                               linewidth=1.2, zorder=1))
+        r_, g_, b_ = (v / 12.92 if v <= 0.04045 else ((v + 0.055) / 1.055) ** 2.4
+                      for v in face[:3])
+        text_color = "white" if 0.2126 * r_ + 0.7152 * g_ + 0.0722 * b_ < 0.179 else "black"
+        delta = c - base
+        sign = "+" if delta >= 0 else "−"
+        lines = [(f"{value_fmt.format(c)} {unit}", dict(fontsize=11))]
+        if rc == base_rc:
+            lines.append(("baseline", dict(fontsize=11.5, style="italic")))
+        else:
+            lines += [(f"({sign}{delta_fmt.format(abs(delta))} {delta_unit or unit})", dict(fontsize=11)),
+                      (f"{sign}{abs(delta) / base * 100:.2f} %", dict(fontsize=14, fontweight="bold"))]
+        # Top row hangs from the box's top edge, bottom row sits on its bottom edge.
+        y_first = (y0 + s - edge if rc[0] == 0 or align == "top_left"
+                   else y0 + edge + (len(lines) - 1) * line)
+        for i, (txt, kw) in enumerate(lines):
+            ax.text(x0 + s / 2, y_first - i * line, txt, ha="center", va="center",
+                    color=text_color, zorder=4, **kw)
+
+    if arrows:
+        bx0, by0 = corner(base_rc)
+        s0 = side[base_rc]
+        def tip_depth(rc):  # how far an arrow may enter a bottom-row box, above its text
+            return min(0.28, max(0.03, 0.7 * (side[rc] - text_height[rc])))
+        tx, ty = corner((0, 1))
+        y_h = by0 + 0.12
+        lx, ly = corner((1, 0))
+        dx, dy = corner((1, 1))
+        segments = [((bx0 + 0.62 * s0, y_h), (tx + 0.6 * side[(0, 1)], y_h)),
+                    ((bx0 + 0.28 * s0, y_h), (bx0 + 0.28 * s0, ly + side[(1, 0)] - tip_depth((1, 0)))),
+                    ((bx0 + s0 - 0.1, by0 + 0.06),
+                     (dx + 0.3, dy + side[(1, 1)] - tip_depth((1, 1))))]
+        for start, end in segments:
+            ax.annotate("", xy=end, xytext=start, zorder=5,
+                        arrowprops=dict(arrowstyle="-|>", color=_ETH_PURPLE, lw=1.4,
+                                        shrinkA=0, shrinkB=0, mutation_scale=12))
+
+    # Labels follow the boxes: over each column's widest box, left of each row's tallest.
+    def x_center(col):
+        return max(((corner(rc)[0] + side[rc] / 2, side[rc]) for rc in values if rc[1] == col),
+                   key=lambda t: t[1])[0]
+    def y_center(row):
+        return max(((corner(rc)[1] + side[rc] / 2, side[rc]) for rc in values if rc[0] == row),
+                   key=lambda t: t[1])[0]
+    label_y = max(corner(rc)[1] + side[rc] for rc in values if rc[0] == 0) + 0.06
+    label_x = min(corner(rc)[0] for rc in values if rc[1] == 0) - 0.06
+    if max_outline:
+        label_y, label_x = 2 * slot + gap + 0.06, -0.06
+        x_center = lambda col: col * (slot + gap) + slot / 2
+        y_center = lambda row: (1 - row) * (slot + gap) + slot / 2
+    top_left = align == "top_left"  # labels flush with the shared top left corners
+    for col, label in enumerate(col_names):
+        ax.text(col * (slot + gap) if top_left else x_center(col), label_y, label,
+                ha="left" if top_left else "center", va="bottom", fontsize=11, color="black")
+    for row, label in enumerate(row_names if row_labels else []):
+        y_top = (1 - row) * (slot + gap) + slot
+        ax.text(label_x, y_top if top_left else y_center(row), label, ha="right",
+                va="top" if top_left else "center", rotation=90, fontsize=11, color="black")
+
+    top_y = 2 * slot + gap
+    ax.set_xlim(-0.2, top_y + 0.02)
+    ax.set_ylim(-0.02, top_y + 0.2)
+    ax.set_aspect("equal")
+    ax.axis("off")
+    if single_color or baseline_delta:
+        return None
+    cbar = fig.colorbar(ScalarMappable(norm=norm, cmap=cmap), ax=ax, fraction=0.04, pad=0.03,
+                        shrink=0.8)
+    cbar.set_label(cbar_label, fontsize=10)
+    cbar.ax.tick_params(labelsize=9)
+    cbar.ax.yaxis.set_major_formatter(plt.FuncFormatter(lambda v, _: f"{v:,.0f}"))
+    return cbar
+
+
 _FIG30_METRICS_CACHE: dict[tuple[int, int], dict[str, float]] = {}
 
 
@@ -2708,6 +2915,20 @@ def fig30_matrix(no_flex_run: Run, no_flex_single_run: Run, full_run: Run,
     _matrix_figure(cells, "fig30_matrix")
 
 
+def fig310_matrix_sized_delta_hatched(no_flex_run: Run, no_flex_single_run: Run, full_run: Run,
+                                      single_temp_run: Run) -> None:
+    """fig30's matrices with the relative change encoded as box size too: the
+    baseline block sits in every box and the delta around it is hatched (see
+    _fig300_sized_panel, FIG310_STYLE).
+    -> SI_results/fig310_matrix_sized_delta_hatched_border.svg
+    """
+    cells = {(0, 0): full_run, (0, 1): no_flex_run,
+             (1, 0): single_temp_run, (1, 1): no_flex_single_run}
+    _matrix_figure(cells, "fig310_matrix_sized_delta_hatched_border", panel_fn=_fig300_sized_panel,
+                   caption=FIG300_CAPTION, baseline_delta=FIG310_STYLE,
+                   legend=_fig306_legend(FIG310_STYLE))
+
+
 def fig31_matrix_tsa(no_flex_run: Run, no_flex_20ts_run: Run, full_run: Run,
                      full_20ts_run: Run, no_flex_20ts_placeholder: bool = False) -> None:
     """fig30 with the time-series aggregation as the second dimension: rows
@@ -2727,17 +2948,20 @@ def fig31_matrix_tsa(no_flex_run: Run, no_flex_20ts_run: Run, full_run: Run,
                    placeholders=frozenset({(1, 1)} if no_flex_20ts_placeholder else ()))
 
 
-def _matrix_figure(cells: dict[tuple[int, int], Run], fig_name: str, **panel_kw) -> None:
+def _matrix_figure(cells: dict[tuple[int, int], Run], fig_name: str,
+                   panel_fn=_fig30_matrix_panel, caption: str | None = None,
+                   legend: list | None = None, **panel_kw) -> None:
     """fig30's body for any 2x2 `cells` (row, col) -> run, (0, 0) the
-    baseline; `panel_kw` goes to every _fig30_matrix_panel."""
+    baseline; `panel_kw` goes to every `panel_fn`. `caption` replaces the
+    arrow-width note under the panels; `legend` handles go below it."""
     metrics = {rc: _fig43_metrics(r) for rc, r in cells.items()}
     vals = {k: {rc: m[k] for rc, m in metrics.items()} for k in FIG30_PANELS}
 
     # 2x2 grid of panels: cost | HP share over VRE | curtailment.
     fig, axes = plt.subplots(2, 2, figsize=(15, 14))
     panels = [(vals[k], *FIG30_PANELS[k]) for k in FIG30_PANELS]
-    cbars = [_fig30_matrix_panel(fig, ax, vals, title, unit, cbar_label, row_labels=(i % 2 == 0),
-                                 **kw, **panel_kw)
+    cbars = [panel_fn(fig, ax, vals, title, unit, cbar_label, row_labels=(i % 2 == 0),
+                      **kw, **panel_kw)
              for i, (ax, (vals, title, unit, cbar_label, kw)) in enumerate(zip(axes.flat, panels))]
     fig.subplots_adjust(hspace=0.1, wspace=0.12)
     # Centre each title over its cells + colourbar (incl. its label) — only
@@ -2748,12 +2972,18 @@ def _matrix_figure(cells: dict[tuple[int, int], Run], fig_name: str, **panel_kw)
     to_fig = fig.transFigure.inverted()
     for ax, cbar, (_, title, *_rest) in zip(axes.flat, cbars, panels):
         left = ax.transData.transform((0, 0))[0]  # left edge of the cells
-        right = cbar.ax.get_tightbbox(renderer).x1
+        right = cbar.ax.get_tightbbox(renderer).x1 if cbar else ax.get_window_extent(renderer).x1
         top = ax.get_window_extent(renderer).y1
         x, y = to_fig.transform(((left + right) / 2, top))
         fig.text(x, y + 0.003, title, ha="center", va="bottom", fontsize=12.5, fontweight="bold")
     bottom = to_fig.transform((0, axes[1, 0].get_window_extent(renderer).y0))[1]
-    if FIG30_SHOW_ARROWS:
+    if legend:
+        fig.legend(handles=legend, loc="upper center", bbox_to_anchor=(0.5, bottom - 0.03), ncol=len(legend),
+                   frameon=False, fontsize=10.5)
+    if caption:
+        fig.text(0.5, bottom - 0.012, caption, ha="center", va="top", fontsize=10,
+                 style="italic", color="black")
+    elif FIG30_SHOW_ARROWS:
         fig.text(0.5, bottom - 0.012, "Arrow width is proportional to the size of the change relative to "
                  "the largest change within each panel.", ha="center", va="top", fontsize=10,
                  style="italic", color="black")
@@ -4679,7 +4909,8 @@ def main() -> None:
     run_if(["base", NO_FLEX], fig12_capacity_and_storage_base_and_delta, base, no_flex)
     single_temp_set = [NO_FLEX, NO_FLEX_SINGLE_TEMP_SCENARIO[1], FULL, SINGLE_TEMP]
     for fn in (fig14a_heat_supply_electrification_singletemp_vs_full,
-               fig14b_cost_and_emissions_totals_singletemp_vs_full, fig30_matrix):
+               fig14b_cost_and_emissions_totals_singletemp_vs_full, fig30_matrix,
+               fig310_matrix_sized_delta_hatched):
         run_if(single_temp_set, fn, no_flex, no_flex_single, full, single_temp)
     run_if([NO_FLEX], fig15_heat_supply_output_twh_for,
            runs, NO_FLEX, "fig15a_heat_supply_output_no_flexibility_twh")
