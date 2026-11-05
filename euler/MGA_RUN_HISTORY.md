@@ -172,14 +172,20 @@ injection rate only, no reservoir, so it measures use of the rate limit (about
 113 ktCO2/h, 0.99 Gt/yr), not of a storage volume. The existing kinds do not
 fit: tech capacity has no year window, a capacity ratio can be moved by idle
 capacity (see task_id 12), and carbon_storage has no output for node_output_ratio.
-With one region, all_co2_until_2050 sits at the budget in the baseline; overshoot
-at 5000 EUR/t lets the slack buy only ~0.33 Gt, so expect a one-sided range.
+With one region, all_co2_until_2050 sits at the budget in the baseline. Overshoot
+costs 5000 EUR/t in 2050, ~1275 EUR/t after discounting at 5%, so the slack buys
+~1.3 Gt: task_id 30's range is 5.6-25.2 Gt around 23.8 Gt, i.e. mostly downwards.
   task_id 30 = test, batch4, max_iterations=1, to calibrate task_id 31 and check
               the new axis stays within 0-1 in polytope.npz.
   task_id 31 = the full run, batch16, tol 0.3. Flags are task_id 21's; refine
               them from task_id 30's sacct output.
   sbatch --array=30 --time=02:00:00 --cpus-per-task=8 --mem-per-cpu=6G submit_euler_mga.sh
+  task_id 32 = task_id 31 with tolerance_explore 0.15. Run 21 (17 axes) reached
+              only ~0.31 after 486 iterations, and extrapolating gives ~0.26-0.30
+              for 13 axes at 500, so expect converged=False; read the reached
+              level from implied_threshold_for_tolerance in diagnostics.csv.
   sbatch --array=31 --time=4-00:00:00 --cpus-per-task=32 --mem-per-cpu=6G submit_euler_mga.sh
+  sbatch --array=32 --time=4-00:00:00 --cpus-per-task=32 --mem-per-cpu=6G submit_euler_mga.sh
 
 Requires the MGA install step in setup_euler_env.sh to have been run once
 (clones + installs ZEN-garden-plugins and near_optimal_tools/pyoNearOpt,

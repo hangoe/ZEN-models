@@ -29,6 +29,7 @@
 #   sbatch --array=21 --time=4-00:00:00 --cpus-per-task=32 --mem-per-cpu=6G submit_euler_mga.sh # CO2 fix, full (22/23: same flags)
 #   sbatch --array=30 --time=02:00:00 --cpus-per-task=8 --mem-per-cpu=6G submit_euler_mga.sh          # 1 region + CO2 storage, test
 #   sbatch --array=31 --time=4-00:00:00 --cpus-per-task=32 --mem-per-cpu=6G submit_euler_mga.sh # 1 region + CO2 storage, full (refine from task 30)
+#   sbatch --array=32 --time=4-00:00:00 --cpus-per-task=32 --mem-per-cpu=6G submit_euler_mga.sh # as 31, tol 0.15
 # Refine a profile from `sacct -j <jobid> --format=JobID,Elapsed,MaxRSS,State`
 # of the previous run.
 ###############################################################################
