@@ -1,0 +1,69 @@
+# One region (all 28 nodes), 2030/2038/2050 (task_id 30-31). 13 axes: 3 x 3
+# (industrial heat + passenger road output shares, CO2 storage utilisation)
+# + 3 cumulative emissions + cost.
+# Years: run 21's model years are 2022 + 4k, so 2040 is not a model year.
+# until_2038 is interval-expanded through 2041, i.e. effectively until ~2040.
+# Ratio groups unchanged from config_mga_axes_total_output_2reg.yaml; use with
+# the *_export0 dataset.
+# CO2 storage axis (node_limit_utilisation): CO2 injected in the year /
+# (max(capacity_limit, existing capacity) x hours). carbon_storage has an
+# injection rate only, no reservoir, so this is the use of the injection limit
+# (about 113 ktCO2/h, 0.99 Gt/yr), not of a storage volume. Needs the
+# ZEN-garden-plugins version with node_limit_utilisation.
+node_output_ratio:
+  nodes:
+  - all: [AT, BE, BG, CH, CZ, DE, DK, EE, EL, ES, FI, FR, HR, HU, IE, IT, LT, LU, LV, NL, 'NO',
+      PL, PT, RO, SE, SI, SK, UK]
+  years: [2030, 2038, 2050]
+  ratio_groups:
+  - passenger_road_electrification:
+      numerator: [BEV]
+      denominator: [BEV, ICE_petrol, ICE_diesel]
+  - industry_heat_electrification:
+      numerator: [electrode_boiler_industry_glass, electrode_boiler_industry_ceramic,
+        electrode_boiler_industry_paper, electrode_boiler_industry_food, heat_pump_industry_0_100_water_glass,
+        heat_pump_industry_0_100_water_ceramic, heat_pump_industry_0_100_water_paper,
+        heat_pump_industry_0_100_water_food, heat_pump_industry_0_100_waste_heat_glass,
+        heat_pump_industry_0_100_waste_heat_ceramic, heat_pump_industry_0_100_waste_heat_paper,
+        heat_pump_industry_0_100_waste_heat_food, heat_pump_industry_100_150_water_glass,
+        heat_pump_industry_100_150_water_ceramic, heat_pump_industry_100_150_water_paper,
+        heat_pump_industry_100_150_water_food, heat_pump_industry_100_150_waste_heat_glass,
+        heat_pump_industry_100_150_waste_heat_ceramic, heat_pump_industry_100_150_waste_heat_paper,
+        heat_pump_industry_100_150_waste_heat_food, heat_pump_industry_150_200_water_glass,
+        heat_pump_industry_150_200_water_ceramic, heat_pump_industry_150_200_water_paper,
+        heat_pump_industry_150_200_water_food, heat_pump_industry_150_200_waste_heat_glass,
+        heat_pump_industry_150_200_waste_heat_ceramic, heat_pump_industry_150_200_waste_heat_paper,
+        heat_pump_industry_150_200_waste_heat_food]
+      denominator: [electrode_boiler_industry_glass, electrode_boiler_industry_ceramic,
+        electrode_boiler_industry_paper, electrode_boiler_industry_food, heat_pump_industry_0_100_water_glass,
+        heat_pump_industry_0_100_water_ceramic, heat_pump_industry_0_100_water_paper,
+        heat_pump_industry_0_100_water_food, heat_pump_industry_0_100_waste_heat_glass,
+        heat_pump_industry_0_100_waste_heat_ceramic, heat_pump_industry_0_100_waste_heat_paper,
+        heat_pump_industry_0_100_waste_heat_food, heat_pump_industry_100_150_water_glass,
+        heat_pump_industry_100_150_water_ceramic, heat_pump_industry_100_150_water_paper,
+        heat_pump_industry_100_150_water_food, heat_pump_industry_100_150_waste_heat_glass,
+        heat_pump_industry_100_150_waste_heat_ceramic, heat_pump_industry_100_150_waste_heat_paper,
+        heat_pump_industry_100_150_waste_heat_food, heat_pump_industry_150_200_water_glass,
+        heat_pump_industry_150_200_water_ceramic, heat_pump_industry_150_200_water_paper,
+        heat_pump_industry_150_200_water_food, heat_pump_industry_150_200_waste_heat_glass,
+        heat_pump_industry_150_200_waste_heat_ceramic, heat_pump_industry_150_200_waste_heat_paper,
+        heat_pump_industry_150_200_waste_heat_food, natural_gas_boiler_industry_glass,
+        natural_gas_boiler_industry_ceramic, natural_gas_boiler_industry_paper, natural_gas_boiler_industry_food,
+        oil_boiler_industry_glass, oil_boiler_industry_ceramic, oil_boiler_industry_paper, oil_boiler_industry_food,
+        biomass_boiler_industry_glass, biomass_boiler_industry_ceramic, biomass_boiler_industry_paper,
+        biomass_boiler_industry_food, coal_boiler_industry_glass, coal_boiler_industry_ceramic,
+        coal_boiler_industry_paper, coal_boiler_industry_food, waste_boiler_industry_glass,
+        waste_boiler_industry_ceramic, waste_boiler_industry_paper, waste_boiler_industry_food]
+node_limit_utilisation:
+  nodes:
+  - all: [AT, BE, BG, CH, CZ, DE, DK, EE, EL, ES, FI, FR, HR, HU, IE, IT, LT, LU, LV, NL, 'NO',
+      PL, PT, RO, SE, SI, SK, UK]
+  years: [2030, 2038, 2050]
+  technology_groups:
+  - co2_storage: [carbon_storage]
+node_carbon_emissions_cumulative:
+  nodes:
+  - all_co2: [AT, BE, BG, CH, CZ, DE, DK, EE, EL, ES, FI, FR, HR, HU, IE, IT, LT, LU, LV, NL, 'NO',
+      PL, PT, RO, SE, SI, SK, UK]
+  until_years: [2030, 2038, 2050]
+include_cost: true

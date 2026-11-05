@@ -161,6 +161,26 @@ batch16 iterations, tolerance_explore 0.1). Two findings:
   processes re-import run_model.py (~0.3-0.5 GB each), hence 6G per cpu.
   sbatch --array=21 --time=4-00:00:00 --cpus-per-task=32 --mem-per-cpu=6G submit_euler_mga.sh
 
+task_id 30-31 added 2026-11-05: run 21's model and settings with one region
+(all 28 nodes), 2030/2038/2050 and a CO2 storage axis
+(config_mga_axes_total_output_1reg_co2storage.yaml): heating share, passenger
+road share, storage utilisation, cumulative emissions, cost -> 13 axes. 2040 is
+not a model year (2022 + 4k), hence 2038. The storage axis is the new
+node_limit_utilisation kind in ZEN-garden-plugins: CO2 injected in the year /
+(max(capacity_limit, existing capacity) x hours). carbon_storage has an
+injection rate only, no reservoir, so it measures use of the rate limit (about
+113 ktCO2/h, 0.99 Gt/yr), not of a storage volume. The existing kinds do not
+fit: tech capacity has no year window, a capacity ratio can be moved by idle
+capacity (see task_id 12), and carbon_storage has no output for node_output_ratio.
+With one region, all_co2_until_2050 sits at the budget in the baseline; overshoot
+at 5000 EUR/t lets the slack buy only ~0.33 Gt, so expect a one-sided range.
+  task_id 30 = test, batch4, max_iterations=1, to calibrate task_id 31 and check
+              the new axis stays within 0-1 in polytope.npz.
+  task_id 31 = the full run, batch16, tol 0.3. Flags are task_id 21's; refine
+              them from task_id 30's sacct output.
+  sbatch --array=30 --time=02:00:00 --cpus-per-task=8 --mem-per-cpu=6G submit_euler_mga.sh
+  sbatch --array=31 --time=4-00:00:00 --cpus-per-task=32 --mem-per-cpu=6G submit_euler_mga.sh
+
 Requires the MGA install step in setup_euler_env.sh to have been run once
 (clones + installs ZEN-garden-plugins and near_optimal_tools/pyoNearOpt,
 incl. the "bbo" extra needed by batch bbo mode).
