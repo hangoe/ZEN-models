@@ -29,7 +29,7 @@ plugins:
     epsilon: 0.01
     normalisation: minmax
     batch:
-      tolerance_prob: 0.95
+      tolerance_prob: 0.90
       max_iterations: 5000
       tolerance_explore: 0.1
       n_samples: 1000
