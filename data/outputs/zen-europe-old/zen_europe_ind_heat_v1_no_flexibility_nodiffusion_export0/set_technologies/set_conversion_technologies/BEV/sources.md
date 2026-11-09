@@ -86,3 +86,8 @@ The conversion factor of BEV is the tank-to-wheel energy demand of the lower med
 **Citation**
 
 Brian Cox, Christian Bauer, Angelica Mendoza Beltran, Detlef P. van Vuuren, Christopher L. Mutel (2020). Life cycle environmental and cost comparison of current and future passenger cars under different energy scenarios. Applied Energy. https://doi.org/10.1016/j.apenergy.2020.115021
+
+capacity_limit (first-year freeze)
+----------------------------------
+
+Set to 0 in 2022 by ZEN-models scripts/freeze_first_year_additions.py: no capacity additions in the first model year, so the share starts from existing capacity. Other years keep the previous limit.

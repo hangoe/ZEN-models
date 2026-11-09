@@ -1,6 +1,6 @@
 """Pairwise projections of every solved point of the MGA run (see
-plots/mga_capex_periods_common.py), one figure per horizon: fig1a (2030) and
-fig1b (2050), each pairing that year's 8 axes plus total cost.
+plots/mga_capex_periods_common.py), one figure per horizon: fig1a (2030),
+fig1b (2038) and fig1c (2050), each pairing that year's axes plus total cost.
 
 Also holds the polytope and diagnostics loaders plot_mga_ts_resolution.py
 imports. Earlier versions of this script compared several modes and drew a
@@ -30,6 +30,7 @@ from plots.mga_capex_periods_common import (
     MODEL,
     NEAR_BLACK,
     POLY_PATH,
+    REGIONS,
     REPO_ROOT,
     RUN_LABEL,
     YEARS,
@@ -91,7 +92,8 @@ def _axis_label(name: str, unit: str) -> str:
     _, unit_label = display_unit(unit)
     if info.metric == "cost":
         return f"{METRIC_LABEL['cost']}\n[{unit_label}]"
-    return f"{info.region.capitalize()} {METRIC_LABEL[info.metric]}\n[{unit_label}]"
+    region = f"{info.region.capitalize()} " if len(REGIONS) > 1 else ""
+    return f"{region}{METRIC_LABEL[info.metric]}\n[{unit_label}]"
 
 
 def fig1_pairwise_points(poly: Polytope, year: str, fig_name: str) -> None:
@@ -146,7 +148,7 @@ def main() -> None:
     poly = load_polytope(POLY_PATH)
     print(f"Loaded {poly.X.shape[0]} points, {poly.n_axes} axes, "
           f"converged={poly.converged}, epsilon={poly.epsilon:g}")
-    for year, suffix in zip(YEARS, "ab"):
+    for year, suffix in zip(YEARS, "abc"):
         fig1_pairwise_points(poly, year, f"fig1{suffix}_pairwise_{year}")
 
 

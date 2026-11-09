@@ -79,9 +79,10 @@ the zen-europe versions of removed ones in archive/zen_europe/):
                                           cheapest cell (Full flexibility, 3 temp levels) giving each
                                           other cell's extra cost in % and bn EUR
   fig310_matrix_sized_delta_hatched_border — fig30 with box size set by the relative change to the
-                                          baseline, baseline block inside each box, increase hatched
-                                          blue, decrease hatched ETH bronze on white, thick border
-                                          around each whole box, no colourbar
+                                          baseline, blue baseline block inside each box, increase
+                                          solid light green, decrease solid light red, thick
+                                          border around each whole box with its numbers centred
+                                          in it, no colourbar
   fig31_matrix_tsa                     — fig30 with 10 / 20 representative time steps as rows instead
                                           of temperature resolution, ETH green cells
   fig20_cost_breakdown_sector_industry_heating — total system cost drilled down sector ->
@@ -2586,23 +2587,21 @@ def _fig30_matrix_panel(fig: plt.Figure, ax: plt.Axes, values: dict[tuple[int, i
 FIG300_BASE_SIDE, FIG300_MAX_SIDE = 0.6, 1.0
 # fig306-308 colour schemes, one hue each so they also hold in print: the
 # baseline block's colour + text colour, and the patch style of what's added to
-# it (increase) or missing from it (decrease). In fig308 the opposite diagonals
-# tell an increase from a decrease.
+# it (increase) or missing from it (decrease).
 _FIG306_LIGHT = _eth_tint(_ETH_BLUE, 0.7)
 _FIG306_DECREASE = dict(facecolor="white", edgecolor=_ETH_BLUE, hatch="////")
 FIG306_STYLE = dict(baseline=_ETH_BLUE, text="white", decrease=_FIG306_DECREASE,
                     increase=dict(facecolor=_FIG306_LIGHT, edgecolor="#1F2A3A"))
 FIG307_STYLE = dict(baseline=_FIG306_LIGHT, text="black", decrease=_FIG306_DECREASE,
                     increase=dict(facecolor=_ETH_BLUE, edgecolor="#1F2A3A"))
-FIG308_STYLE = dict(baseline=_FIG306_LIGHT, text="black",
-                    increase=dict(facecolor=_FIG306_LIGHT, edgecolor=_ETH_BLUE, hatch="////"),
-                    decrease=dict(facecolor=_FIG306_LIGHT, edgecolor=_ETH_BLUE, hatch="\\\\\\\\"))
 # fig309/310: `whole_border` is the linewidth of the border around each whole box,
 # so the numbers read as describing it rather than the baseline block inside.
 FIG309_STYLE = {**FIG307_STYLE, "whole_border": 2.6}
-# fig310's decrease is ETH bronze on white so it doesn't read as an increase.
-FIG310_STYLE = {**FIG308_STYLE, "whole_border": 2.6,
-                "decrease": dict(facecolor="white", edgecolor=_ETH_BRONZE, hatch="\\\\\\\\")}
+# fig310: blue baseline, solid light tints for the delta (green = increase, red =
+# decrease), light enough for the black numbers that run across block and delta.
+FIG310_STYLE = dict(baseline=_eth_tint(_ETH_BLUE, 0.8), text="black", whole_border=2.6,
+                    increase=dict(facecolor=_eth_tint(_ETH_GREEN, 0.68), edgecolor="none"),
+                    decrease=dict(facecolor=_eth_tint(_ETH_RED, 0.68), edgecolor="none"))
 
 
 def _fig306_legend(style: dict) -> list[Patch]:
@@ -2616,11 +2615,6 @@ def _fig306_legend(style: dict) -> list[Patch]:
         handles.append(Patch(facecolor="none", edgecolor="#1F2A3A", linewidth=whole,
                              label="Whole square = value shown"))
     return handles
-
-
-FIG300_CAPTION = ("Box side length grows linearly with the change relative to the baseline, "
-                  "scaled within each panel (largest change = largest box): "
-                  "sizes are not comparable between panels.")
 
 
 def _fig300_sized_panel(fig: plt.Figure, ax: plt.Axes, values: dict[tuple[int, int], float],
@@ -2646,8 +2640,9 @@ def _fig300_sized_panel(fig: plt.Figure, ax: plt.Axes, values: dict[tuple[int, i
     baseline block in every box instead of shading by value, anchored like the box,
     so the delta is what's left around it: the style's increase patch, or its decrease
     patch where the box is smaller than the block. No colourbar; text centred in
-    the block. Returns the colourbar, or None without one (see
-    _fig30_matrix_panel)."""
+    the whole box; labels at fixed slot positions and margins equal on all sides, so
+    every panel has the same geometry whatever its values. Returns the colourbar,
+    or None without one (see _fig30_matrix_panel)."""
     base_rc = (0, 0)
     base = values[base_rc]
     slot, gap = 1.0, 0.12
@@ -2691,15 +2686,15 @@ def _fig300_sized_panel(fig: plt.Figure, ax: plt.Axes, values: dict[tuple[int, i
                                        linewidth=whole, zorder=3))
             delta = c - base
             sign = "+" if delta >= 0 else "−"
-            lines = [(f"{value_fmt.format(c)} {unit}", dict(fontsize=11))]
+            lines = [(f"{value_fmt.format(c)} {unit}", dict(fontsize=12.5))]
             if rc == base_rc:
-                lines.append(("baseline", dict(fontsize=11.5, style="italic")))
+                lines.append(("baseline", dict(fontsize=12.5, style="italic")))
             else:
-                lines += [(f"({sign}{delta_fmt.format(abs(delta))} {delta_unit or unit})", dict(fontsize=11)),
-                          (f"{sign}{abs(delta) / base * 100:.2f} %", dict(fontsize=14, fontweight="bold"))]
-            y_first = dy0 + s_dark / 2 + (len(lines) - 1) * line / 2
+                lines += [(f"({sign}{delta_fmt.format(abs(delta))} {delta_unit or unit})", dict(fontsize=12.5)),
+                          (f"{sign}{abs(delta) / base * 100:.2f} %", dict(fontsize=15, fontweight="bold"))]
+            y_first = y0 + s / 2 + (len(lines) - 1) * line / 2
             for i, (txt, kw) in enumerate(lines):
-                ax.text(dx0 + s_dark / 2, y_first - i * line, txt, ha="center", va="center",
+                ax.text(x0 + s / 2, y_first - i * line, txt, ha="center", va="center",
                         color=baseline_delta["text"], zorder=4, **kw)
             continue
         if max_outline:
@@ -2754,22 +2749,23 @@ def _fig300_sized_panel(fig: plt.Figure, ax: plt.Axes, values: dict[tuple[int, i
                    key=lambda t: t[1])[0]
     label_y = max(corner(rc)[1] + side[rc] for rc in values if rc[0] == 0) + 0.06
     label_x = min(corner(rc)[0] for rc in values if rc[1] == 0) - 0.06
-    if max_outline:
+    if max_outline or baseline_delta:
         label_y, label_x = 2 * slot + gap + 0.06, -0.06
         x_center = lambda col: col * (slot + gap) + slot / 2
         y_center = lambda row: (1 - row) * (slot + gap) + slot / 2
     top_left = align == "top_left"  # labels flush with the shared top left corners
+    label_size = 13 if baseline_delta else 11
     for col, label in enumerate(col_names):
         ax.text(col * (slot + gap) if top_left else x_center(col), label_y, label,
-                ha="left" if top_left else "center", va="bottom", fontsize=11, color="black")
+                ha="left" if top_left else "center", va="bottom", fontsize=label_size, color="black")
     for row, label in enumerate(row_names if row_labels else []):
         y_top = (1 - row) * (slot + gap) + slot
         ax.text(label_x, y_top if top_left else y_center(row), label, ha="right",
-                va="top" if top_left else "center", rotation=90, fontsize=11, color="black")
+                va="top" if top_left else "center", rotation=90, fontsize=label_size, color="black")
 
     top_y = 2 * slot + gap
-    ax.set_xlim(-0.2, top_y + 0.02)
-    ax.set_ylim(-0.02, top_y + 0.2)
+    ax.set_xlim(-0.2, top_y + (0.2 if baseline_delta else 0.02))
+    ax.set_ylim(-0.2 if baseline_delta else -0.02, top_y + 0.2)
     ax.set_aspect("equal")
     ax.axis("off")
     if single_color or baseline_delta:
@@ -2918,15 +2914,17 @@ def fig30_matrix(no_flex_run: Run, no_flex_single_run: Run, full_run: Run,
 def fig310_matrix_sized_delta_hatched(no_flex_run: Run, no_flex_single_run: Run, full_run: Run,
                                       single_temp_run: Run) -> None:
     """fig30's matrices with the relative change encoded as box size too: the
-    baseline block sits in every box and the delta around it is hatched (see
-    _fig300_sized_panel, FIG310_STYLE).
+    baseline block sits in every box and the delta around it is solid green or
+    red (see _fig300_sized_panel, FIG310_STYLE). Box side length grows linearly with the
+    change relative to the baseline, scaled within each panel (largest change =
+    largest box): sizes are not comparable between panels.
     -> SI_results/fig310_matrix_sized_delta_hatched_border.svg
     """
     cells = {(0, 0): full_run, (0, 1): no_flex_run,
              (1, 0): single_temp_run, (1, 1): no_flex_single_run}
     _matrix_figure(cells, "fig310_matrix_sized_delta_hatched_border", panel_fn=_fig300_sized_panel,
-                   caption=FIG300_CAPTION, baseline_delta=FIG310_STYLE,
-                   legend=_fig306_legend(FIG310_STYLE))
+                   baseline_delta=FIG310_STYLE, legend=_fig306_legend(FIG310_STYLE),
+                   symmetric=True)
 
 
 def fig31_matrix_tsa(no_flex_run: Run, no_flex_20ts_run: Run, full_run: Run,
@@ -2949,40 +2947,51 @@ def fig31_matrix_tsa(no_flex_run: Run, no_flex_20ts_run: Run, full_run: Run,
 
 
 def _matrix_figure(cells: dict[tuple[int, int], Run], fig_name: str,
-                   panel_fn=_fig30_matrix_panel, caption: str | None = None,
-                   legend: list | None = None, **panel_kw) -> None:
+                   panel_fn=_fig30_matrix_panel, legend: list | None = None,
+                   symmetric: bool = False, **panel_kw) -> None:
     """fig30's body for any 2x2 `cells` (row, col) -> run, (0, 0) the
-    baseline; `panel_kw` goes to every `panel_fn`. `caption` replaces the
-    arrow-width note under the panels; `legend` handles go below it."""
+    baseline; `panel_kw` goes to every `panel_fn`. `legend` handles go below
+    the panels, centred on them; `symmetric` drops the column labels from the
+    bottom row of panels, moves that row's titles down into their place and
+    spaces the panels tightly and equally in both directions."""
     metrics = {rc: _fig43_metrics(r) for rc, r in cells.items()}
     vals = {k: {rc: m[k] for rc, m in metrics.items()} for k in FIG30_PANELS}
 
     # 2x2 grid of panels: cost | HP share over VRE | curtailment.
-    fig, axes = plt.subplots(2, 2, figsize=(15, 14))
+    fig, axes = plt.subplots(2, 2, figsize=(13.2, 13.2) if symmetric else (15, 14))
     panels = [(vals[k], *FIG30_PANELS[k]) for k in FIG30_PANELS]
     cbars = [panel_fn(fig, ax, vals, title, unit, cbar_label, row_labels=(i % 2 == 0),
+                      **({"col_names": ()} if symmetric and i >= 2 else {}),
                       **kw, **panel_kw)
              for i, (ax, (vals, title, unit, cbar_label, kw)) in enumerate(zip(axes.flat, panels))]
-    fig.subplots_adjust(hspace=0.1, wspace=0.12)
+    if symmetric:
+        fig.subplots_adjust(left=0.115, right=0.885, bottom=0.115, top=0.885, hspace=-0.02, wspace=-0.02)
+    else:
+        fig.subplots_adjust(hspace=0.1, wspace=0.12)
     # Centre each title over its cells + colourbar (incl. its label) — only
     # possible after a draw, since set_aspect("equal") shrinks each axes and
     # the colourbar label's extent is only known once rendered.
     fig.canvas.draw()
     renderer = fig.canvas.get_renderer()
     to_fig = fig.transFigure.inverted()
-    for ax, cbar, (_, title, *_rest) in zip(axes.flat, cbars, panels):
-        left = ax.transData.transform((0, 0))[0]  # left edge of the cells
-        right = cbar.ax.get_tightbbox(renderer).x1 if cbar else ax.get_window_extent(renderer).x1
+    for i, (ax, cbar, (_, title, *_rest)) in enumerate(zip(axes.flat, cbars, panels)):
+        extent = ax.get_window_extent(renderer)
+        # Cells + colourbar; without a colourbar the panel's margins are equal,
+        # so the axes centre is the matrix centre.
+        left = ax.transData.transform((0, 0))[0] if cbar else extent.x0
+        right = cbar.ax.get_tightbbox(renderer).x1 if cbar else extent.x1
         top = ax.get_window_extent(renderer).y1
+        if symmetric and i >= 2:  # where the column labels would be (0.2 margin, 0.06 offset)
+            top = ax.transData.transform((0, ax.get_ylim()[1] - 0.2 + 0.06))[1]
         x, y = to_fig.transform(((left + right) / 2, top))
-        fig.text(x, y + 0.003, title, ha="center", va="bottom", fontsize=12.5, fontweight="bold")
+        fig.text(x, y + 0.003, title, ha="center", va="bottom", fontsize=15 if symmetric else 12.5,
+                 fontweight="bold")
     bottom = to_fig.transform((0, axes[1, 0].get_window_extent(renderer).y0))[1]
     if legend:
-        fig.legend(handles=legend, loc="upper center", bbox_to_anchor=(0.5, bottom - 0.03), ncol=len(legend),
-                   frameon=False, fontsize=10.5)
-    if caption:
-        fig.text(0.5, bottom - 0.012, caption, ha="center", va="top", fontsize=10,
-                 style="italic", color="black")
+        x_mid = to_fig.transform(((axes[1, 0].get_window_extent(renderer).x0
+                                   + axes[1, 1].get_window_extent(renderer).x1) / 2, 0))[0]
+        fig.legend(handles=legend, loc="upper center", bbox_to_anchor=(x_mid, bottom), ncol=2,
+                   frameon=False, fontsize=12.5)
     elif FIG30_SHOW_ARROWS:
         fig.text(0.5, bottom - 0.012, "Arrow width is proportional to the size of the change relative to "
                  "the largest change within each panel.", ha="center", va="top", fontsize=10,
