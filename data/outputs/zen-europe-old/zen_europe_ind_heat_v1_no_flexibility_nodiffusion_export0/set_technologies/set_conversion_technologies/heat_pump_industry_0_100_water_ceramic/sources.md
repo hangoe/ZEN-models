@@ -167,3 +167,8 @@ The COP of 2.9012 is 50% of the Carnot COP between the source (15 °C) and the c
   - **potencia**: European Commission Joint Research Centre (2018). POTEnCIA Central scenario 2018 - technology cost and performance projections. European Commission, JRC POTEnCIA model. https://ec.europa.eu/jrc/potencia
   - **schmidt**: Oliver Schmidt, Sylvain Melchior, Adam Hawkes, Iain Staffell (2019). Projecting the Future Levelized Cost of Electricity Storage Technologies. Joule. https://doi.org/https://doi.org/10.1016/j.joule.2018.12.008
   - **victoria**: Marta Victoria, Elisabeth Zeyen, Tom Brown (2022). Speed of technological transformations required in Europe to achieve different climate goals. Joule. https://doi.org/https://doi.org/10.1016/j.joule.2022.04.016
+
+capacity_limit (first-year freeze)
+----------------------------------
+
+Set to 0 in 2022 by ZEN-models scripts/freeze_first_year_additions.py: no capacity additions in the first model year, so the share starts from existing capacity. Other years keep the previous limit.

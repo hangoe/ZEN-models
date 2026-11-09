@@ -72,3 +72,8 @@ conversion_factor
 
 Step 1
 The conversion factor of carbon storage is manually set to an empty list, as carbon storage has no dependent carrier (input carrier = output carrier = carbon).
+
+capacity_limit (first-year freeze)
+----------------------------------
+
+Set to 0 in 2022 by ZEN-models scripts/freeze_first_year_additions.py: no capacity additions in the first model year, so the share starts from existing capacity. Other years keep the previous limit.

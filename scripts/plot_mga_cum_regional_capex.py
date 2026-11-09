@@ -4,6 +4,7 @@ holds every axis's physical value at every solved point.
 
   fig10_crosseffects             how pushing one axis moves every other axis
   fig11_range_by_region          each axis's baseline and min/max, by region colour
+                                 (only made when the run has several regions)
   fig12_range_by_metric          the same figure, by metric colour
 
 fig10 colours cells by (value - baseline) / that axis's own min-max range, not
@@ -73,12 +74,12 @@ def _design_axes() -> list[str]:
 
 def _short_axis_label(name: str) -> str:
     info = parse_axis(name)
-    return f"{info.region} '{info.year[-2:]}"
+    return f"{info.region} '{info.year[-2:]}" if len(REGIONS) > 1 else info.year
 
 
 def _change_label(delta: float, metric: str) -> str:
     """Physical change as cell text; the unit is in the row label."""
-    decimals = 0 if metric in ("capex", "transport", "heating") else 1
+    decimals = 0 if metric in ("capex", "transport", "heating", "ccs") else 1
     if round(delta, decimals) == 0:
         return "0"
     return f"{delta:+,.{decimals}f}"
@@ -213,7 +214,7 @@ def _fig_ranges(poly, axis_idx, origin, phys, base, *, by_region: bool, name: st
                 tick_labels.append(year)
         ax.set_xticks(ticks)
         ax.set_xticklabels(tick_labels, fontsize=7.5)
-        for r_i, region in enumerate(REGIONS):
+        for r_i, region in enumerate(REGIONS if len(REGIONS) > 1 else []):
             ax.annotate(region.capitalize(), (x_regions[r_i], 0), xycoords=("data", "axes fraction"),
                         xytext=(0, -24), textcoords="offset points",
                         ha="center", va="top", fontsize=10, fontweight="bold")
@@ -241,7 +242,8 @@ def _fig_ranges(poly, axis_idx, origin, phys, base, *, by_region: bool, name: st
 def main() -> None:
     poly, axis_idx, origin, phys, base = load_data()
     fig_crosseffects(poly, axis_idx, origin, phys, base)
-    _fig_ranges(poly, axis_idx, origin, phys, base, by_region=True, name="fig11_range_by_region")
+    if len(REGIONS) > 1:
+        _fig_ranges(poly, axis_idx, origin, phys, base, by_region=True, name="fig11_range_by_region")
     _fig_ranges(poly, axis_idx, origin, phys, base, by_region=False, name="fig12_range_by_metric")
 
 

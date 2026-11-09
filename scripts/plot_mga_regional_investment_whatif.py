@@ -3,7 +3,7 @@ capped), with that region's cumulative CAPEX capped at absolute bn-EUR values,
 until 2030 in the upper block and until 2050 in the lower block. Within a block,
 rows are the affected region (north above south) and columns the affected metric
 (CAPEX, emissions, transport share, heating share). Answered from the polytope
-of the MGA run (see plots/mga_capex_periods_common.py), with no re-solving of
+of MGA run 21 (RUN21_* in plots/mga_capex_periods_common.py), with no re-solving of
 ZEN-garden.
 
 Every LP solves over the CONVEX HULL of poly.X (baseline, min/max solves and
@@ -31,16 +31,17 @@ from scipy.optimize import linprog
 from plots.figure_settings import apply_font_mode
 from plots.mga_capex_periods_common import (
     METRIC_COLOR,
-    METRIC_COLUMNS,
+    RUN21_METRIC_COLUMNS as METRIC_COLUMNS,
     METRIC_IS_CUMULATIVE,
     METRIC_LABEL,
-    POLY_PATH,
+    RUN21_POLY_PATH as POLY_PATH,
     REGION_COLOR,
-    REGIONS,
+    RUN21_REGIONS as REGIONS,
     REPO_ROOT,
-    YEARS,
+    RUN21_YEARS as YEARS,
     axis_name,
     display_unit,
+    RUN21_FIGURES_SUBDIR,
     savefig,
 )
 
@@ -311,7 +312,7 @@ def fig_region_abs_cap(poly, axis_idx, ranges, region: str, caps_by_year: dict, 
     fig.suptitle(f"{region.capitalize()} capped: effect of limiting its cumulative CAPEX",
                  fontsize=12, fontweight="bold", y=0.985)
     fig.legend(handles=left_col + right_col, loc="lower center", ncol=2, fontsize=9, frameon=False)
-    savefig(fig, fig_name)
+    savefig(fig, fig_name, RUN21_FIGURES_SUBDIR)
 
 
 def main() -> None:

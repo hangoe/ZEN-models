@@ -188,6 +188,17 @@ costs 5000 EUR/t in 2050, ~1275 EUR/t after discounting at 5%, so the slack buys
   sbatch --array=31 --time=4-00:00:00 --cpus-per-task=32 --mem-per-cpu=6G submit_euler_mga.sh
   sbatch --array=32 --time=5-00:00:00 --cpus-per-task=32 --mem-per-cpu=6G submit_euler_mga.sh
 
+task_id 33 added 2026-11-09: task_id 32 (as actually run, max_iterations 1200)
+on the dataset with a first-year freeze. Without diffusion limits the model
+built freely in 2022 (15.8 GW electrode boilers -> 35.5% electrified industrial
+heat from 0.4% existing; CCS use 2.6% vs 0.2%). scripts/freeze_first_year_additions.py
+set capacity_limit = 0 in 2022 for the axes' numerator technologies (industry
+electrode boilers and heat pumps, BEV) and carbon_storage, in place in
+zen-europe-old/..._export0 (also replaces the HPs' 2% first-year cap). ZEN-garden
+then fixes their 2022 capacity_addition to 0, so the three shares start from
+existing capacity. Later years are unchanged. Output folder suffix _FREEZE2022.
+  sbatch --array=33 --time=5-00:00:00 --cpus-per-task=32 --mem-per-cpu=6G submit_euler_mga.sh
+
 Requires the MGA install step in setup_euler_env.sh to have been run once
 (clones + installs ZEN-garden-plugins and near_optimal_tools/pyoNearOpt,
 incl. the "bbo" extra needed by batch bbo mode).

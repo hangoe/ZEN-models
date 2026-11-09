@@ -36,14 +36,15 @@ from scipy.optimize import linprog
 from plot_mga_regional_investment_whatif import _draw_ribbon, compute_ranges, load_data
 from plots.mga_capex_periods_common import (
     METRIC_COLOR,
-    METRIC_COLUMNS,
+    RUN21_METRIC_COLUMNS as METRIC_COLUMNS,
     METRIC_IS_CUMULATIVE,
     METRIC_LABEL,
     REGION_COLOR,
-    REGIONS,
-    YEARS,
+    RUN21_REGIONS as REGIONS,
+    RUN21_YEARS as YEARS,
     axis_name,
     display_unit,
+    RUN21_FIGURES_SUBDIR,
     savefig,
 )
 
@@ -183,7 +184,7 @@ def fig_share_limit(poly, axis_idx, ranges, limited, metric, sense, limit, marke
     fig.suptitle(f"{limited.capitalize()} limited: {SHARE_LABEL[metric]} {relation} {limit:.0%}",
                  fontsize=12, fontweight="bold", y=0.985)
     fig.legend(handles=handles, loc="lower center", ncol=3, fontsize=9, frameon=False)
-    savefig(fig, fig_name)
+    savefig(fig, fig_name, RUN21_FIGURES_SUBDIR)
 
 
 def main() -> None:
