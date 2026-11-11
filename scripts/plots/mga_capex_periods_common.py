@@ -1,6 +1,7 @@
 """Shared run definition, colours and helpers for the mga_tests figure scripts.
 
-fig1/3/4/10/12 read parameters_mga.csv task_id 32: one region (all), horizons
+fig1/3/4/10/12 read parameters_mga.csv task_id 33 (task 32 with 2022 additions
+frozen, _FREEZE2022): one region (all), horizons
 2030, 2038 and 2050, 13 axes (industrial heat electrification, passenger road
 electrification, CO2 storage utilisation, cumulative emissions, cost). To plot
 another run, change MODEL/RUN_SUFFIX/RUN_LABEL/REGIONS/YEARS/METRICS here.
@@ -26,11 +27,11 @@ MGA_ROOT = REPO_ROOT / "data" / "outputs" / "euler_outputs_mga"
 MODEL = "zen_europe_ind_heat_v1_no_flexibility_nodiffusion_export0"
 RUN_SUFFIX = (
     "2022_8a_4a_interval_1ts_MGA_AXES_OUTPUT_EXP0_1REG_CO2STORE"
-    "_batch_bbofast_minmax_batch16_tol015_eps007"
+    "_batch_bbofast_minmax_batch16_tol015_eps007_FREEZE2022"
 )
 RUN_DIR = MGA_ROOT / f"{MODEL}_{RUN_SUFFIX}"
 POLY_PATH = RUN_DIR / f"{MODEL}_batch_summary" / "polytope.npz"
-RUN_LABEL = "ZEN-Europe MGA, run 32"
+RUN_LABEL = "ZEN-Europe MGA, run 33"
 
 RUN21_SUFFIX = (
     "2022_8a_4a_interval_1ts_MGA_AXES_OUTPUT_EXP0_2REG_CO2FIX"
@@ -58,9 +59,10 @@ RUN21_METRIC_COLUMNS = ["capex", "emissions", "transport", "heating"]
 
 METRIC_COLOR = {
     "capex": _ETH_PETROL,
-    "transport": _ETH_GREEN,
-    "heating": _ETH_RED,
-    "ccs": _ETH_PURPLE,
+    # Technology colours used by every mga_tests figure: heat magenta, EVs blue, CCS green.
+    "transport": _ETH_BLUE,
+    "heating": _ETH_PURPLE,
+    "ccs": _ETH_GREEN,
     "emissions": _ETH_GREY,
     "cost": NEAR_BLACK,
 }
