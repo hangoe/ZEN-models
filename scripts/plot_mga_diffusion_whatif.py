@@ -1,6 +1,6 @@
-"""fig51a-c: what would holding a diffusion rate within a band do to emissions and cost?
+"""fig51: what would holding a diffusion rate within a band do to emissions and cost?
 
-In the no-diffusion MGA run (parameters_mga.csv task_id 32), the share of one
+In the no-diffusion MGA run (parameters_mga.csv task_id 33, 2022 additions frozen), the share of one
 technology group (industrial heat electrification, EVs or CCS) is held between the
 trajectories of two diffusion rates r_diff, in 2030, 2038 and 2050 jointly. The figure
 shows the range of cumulative emissions and the cheapest extra cost under that
@@ -11,7 +11,8 @@ to different designs. 2040 is not a model year, hence 2038.
 
 The bands set a floor and, in the years where the upper rate's trajectory is below
 100%, a ceiling, so their ranges are not nested and can sit apart. Each band is one
-shade of the mandated technology's hue, darkening with the rates.
+shade of the mandated technology's hue, darkening with the rates. The bands are
+<10%, 10-20%, 20-30%, 30-50% and 50-70%.
 
 The trajectory is ZEN-garden's global diffusion limit (see
 technology_diffusion_limit_constraint.py) reduced to share space:
@@ -26,11 +27,11 @@ technologies of a group are pooled and demand is taken as constant.
 
 The 2022 values are not polytope axes. The baseline and the ranges start from the
 run's baseline solve, computed like the axes and checked against the polytope's
-baseline point. Without diffusion limits the model chooses those freely: it builds
-15.8 GW of electrode boilers in 2022, giving 35.5% electrified heat from 0.4%
-existing. Heat and CCS mandates therefore start from existing capacity in the input
-data instead, and add the dataset's capacity_addition_unbounded as k_free. EV
-mandates start from the baseline's 2022 share, which follows from the input data.
+baseline point. Since run 33 freezes 2022 additions of the axes' technologies, the
+baseline's 2022 shares equal existing capacity (heat 0.35%, EV 1.05%, CCS 0.22%).
+Heat and CCS mandates start from existing capacity in the input data and add the
+dataset's capacity_addition_unbounded as k_free. EV mandates start from the
+baseline's 2022 share.
 
 Usage (zen-garden-plugins-env, PYTHONPATH=../ZEN-garden-plugins):
     python scripts/plot_mga_diffusion_whatif.py
@@ -47,19 +48,13 @@ from matplotlib.patches import Patch
 from scipy.optimize import linprog
 
 from plots.figure_settings import SCENARIO_PALETTE, apply_font_mode, eth_tint
-from plots.mga_capex_periods_common import MGA_ROOT, REPO_ROOT, savefig
+from plots.mga_capex_periods_common import METRIC_COLOR, MODEL, REPO_ROOT, RUN_DIR, savefig
 from zen_garden.postprocess.results import Results
 from zen_garden_plugins.mga.polytope_io import load_polytope
 
 apply_font_mode()
 
-MODEL = "zen_europe_ind_heat_v1_no_flexibility_nodiffusion_export0"
-RUN_SUFFIX = (
-    "2022_8a_4a_interval_1ts_MGA_AXES_OUTPUT_EXP0_1REG_CO2STORE"
-    "_batch_bbofast_minmax_batch16_tol015_eps007"
-)
-RUN_DIR = MGA_ROOT / f"{MODEL}_{RUN_SUFFIX}"
-RUN_32_PATH = RUN_DIR / f"{MODEL}_batch_summary" / "polytope.npz"
+RUN_PATH = RUN_DIR / f"{MODEL}_batch_summary" / "polytope.npz"
 BASELINE_PATH = RUN_DIR / MODEL
 DATASET_TECHNOLOGIES = REPO_ROOT / "data" / "outputs" / "zen-europe-old" / MODEL / "set_technologies"
 
@@ -70,10 +65,13 @@ KNOWLEDGE_DEPRECIATION = 0.1  # knowledge_depreciation_rate, per year
 BUDGET_MT = 23_838.8  # carbon_emissions_budget of the dataset, 23.8388 Gt
 SHOW_OUTER = False  # draw the outer bounds as dashed lines (always printed)
 
-RATE_BANDS = ((0.0, 0.05), (0.10, 0.15), (0.20, 0.25), (0.30, 0.35), (0.40, 0.45), (0.50, 0.55))
-BAND_TINTS = (0.8, 0.65, 0.5, 0.35, 0.2, 0.0)  # ETH tint per band
-BAND_ALPHA = 0.5
+# Contiguous bands; None = no upper rate (a minimum only).
+RATE_BANDS = ((0.0, 0.10), (0.10, 0.20), (0.20, 0.30), (0.30, 0.50), (0.50, 0.70))
+BAND_TINTS = (0.7, 0.52, 0.35, 0.17, 0.0)  # ETH tint per band
+BAND_ALPHA = 0.5  # band fills on the mandate panel
+BAR_ALPHA = 0.9  # emissions and cost bars, legend
 LABEL_MIN_GAP = 4.0  # percentage points between rate labels on the mandate panel
+LABEL_TOP_DROP = 6.0  # top rate label sits this far below 100%
 
 AXIS_PREFIX = {
     "heat": "all_industry_heat_electrification",
@@ -95,11 +93,11 @@ YLABEL = {
     "ccs": "% of CO$_2$ injection limit",
     "co2": "% of 2050 budget (23.8 Gt)",
 }
-BAND_FIGURES = {"heat": "fig51a_heat_diffusion_ranges", "ev": "fig51b_ev_diffusion_ranges",
-                "ccs": "fig51c_ccs_diffusion_ranges"}
+FIGURE_NAME = "fig51_diffusion_ranges"
+EMISSION_YEARS = (2030, 2050)  # horizons on the emissions panel
 
-_BLUE, _, _, _, _RED, _PURPLE, _GREY = SCENARIO_PALETTE
-MANDATE_COLOR = {"heat": _RED, "ev": _BLUE, "ccs": _PURPLE}
+_GREY = SCENARIO_PALETTE[6]
+MANDATE_COLOR = {"heat": METRIC_COLOR["heating"], "ev": METRIC_COLOR["transport"], "ccs": METRIC_COLOR["ccs"]}
 INK, MUTED = "#333333", "#6F6F6F"
 R_DIFF = r"$r^{\mathrm{diff}}$"
 
@@ -291,16 +289,31 @@ def draw_mandate_panel(ax, poly, axis_idx, metric: str, scenarios: list, context
     draw_context(ax, poly, axis_idx, metric, context)
     for year in YEARS:
         ax.axvline(year, color="#BBBBBB", linewidth=0.8, zorder=2)
-    label_floor = -LABEL_MIN_GAP
-    for scenario in scenarios:
+    # Rate labels beside the 2038 markers, spread downward from the top where lines run
+    # close together (several bands reach 100% by 2038).
+    # A band whose lower path is already at 100% in 2038 is labelled inside its ribbon in
+    # 2034 instead, where it is still distinct from the band below.
+    inside = {i for i, sc in enumerate(scenarios) if sc["path_upper"] and sc["path"][YEARS[1]] >= 0.999}
+    # The top label starts a little below 100%, clear of the line along the top.
+    label_ys, ceiling = {}, 100 - LABEL_TOP_DROP + LABEL_MIN_GAP
+    for i in reversed(range(len(scenarios))):
+        path, upper = scenarios[i]["path"], scenarios[i]["path_upper"]
+        if i in inside:
+            continue
+        value = 100 * (upper or path)[YEARS[1]]
+        label_ys[i] = ceiling = min(value, ceiling - LABEL_MIN_GAP)
+    for i, scenario in enumerate(scenarios):
         path, upper = scenario["path"], scenario["path_upper"]
         ax.plot(list(path), [100 * v for v in path.values()], color=scenario["color"], linewidth=2.2, zorder=8)
-        label_value = 100 * path[YEARS[1]]
         if upper:
             ax.plot(list(upper), [100 * v for v in upper.values()], color=scenario["color"], linewidth=2.2, zorder=8)
             ax.fill_between(list(path), [100 * v for v in path.values()], [100 * v for v in upper.values()],
                             color=scenario["fill"], alpha=scenario["alpha"], linewidth=0, zorder=7)
-            label_value = 100 * upper[YEARS[1]]
+        else:
+            # A minimum only: everything from its path up to 100% is allowed. Hatched, so
+            # the large open area does not hide the other bands.
+            ax.fill_between(list(path), [100 * v for v in path.values()], 100, facecolor="none",
+                            edgecolor=scenario["fill"], hatch="////", linewidth=0, alpha=0.55, zorder=6)
         reachable = scenario["ranges"] is not None
         ax.plot(YEARS, [100 * path[y] for y in YEARS], linestyle="none", marker="^", markersize=7,
                 markerfacecolor=scenario["color"] if reachable else "white",
@@ -310,18 +323,47 @@ def draw_mandate_panel(ax, poly, axis_idx, metric: str, scenarios: list, context
             ax.plot(capped, [100 * upper[y] for y in capped], linestyle="none", marker="v", markersize=7,
                     markerfacecolor=scenario["color"] if reachable else "white",
                     markeredgecolor=scenario["color"], zorder=9)
-        # Rate labels beside the 2038 markers, spread where the lines run close together.
-        label_y = max(label_value, label_floor + LABEL_MIN_GAP)
-        label_floor = label_y
-        ax.annotate(scenario["label"], xy=(YEARS[1], label_y), xytext=(7, 0), textcoords="offset points",
-                    ha="left", va="center", fontsize=8.5, color=INK, zorder=12, annotation_clip=False,
+        if i in inside:
+            mid_year = YEARS[1] - INTERVAL
+            xy, offset, ha = (mid_year, 50 * (path[mid_year] + upper[mid_year])), (0, 0), "center"
+        else:
+            xy, offset, ha = (YEARS[1], label_ys[i]), (7, 0), "left"
+        ax.annotate(scenario["label"], xy=xy, xytext=offset, textcoords="offset points",
+                    ha=ha, va="center", fontsize=8.5, color=INK, zorder=12, annotation_clip=False,
                     bbox={"facecolor": "white", "edgecolor": "none", "alpha": 0.8, "pad": 1})
     start = 100 * scenarios[0]["path"][REFERENCE_YEAR]
     ax.plot(REFERENCE_YEAR, start, marker="o", markersize=7, color=INK, zorder=10, clip_on=False)
-    ax.annotate("mandate\nstart", xy=(REFERENCE_YEAR, start), xytext=(6, 12), textcoords="offset points",
-                fontsize=8, color=MUTED, ha="left", va="bottom")
     ax.set_ylim(0, 105)
     style_axes(ax, TITLE[metric], YLABEL[metric])
+
+
+def draw_emissions_bars(ax, poly, axis_idx, scenarios: list, context: dict, years=EMISSION_YEARS,
+                        title: str | None = TITLE["co2"], ylabel: str | None = YLABEL["co2"]) -> None:
+    """Cumulative emissions range per horizon: the near-optimal range (grey), then one bar
+    per band side by side, and the baseline as a dashed tick across each group."""
+    n = len(scenarios) + 1
+    width = 0.84 / n
+    for i, year in enumerate(years):
+        bars = [(context["full"]["co2", year], _GREY, 0.35)] + [
+            (s["ranges"]["co2", year] if s["ranges"] else None, s["fill"], s["opacity"]) for s in scenarios]
+        for b, (span, color, alpha) in enumerate(bars):
+            x = i + (b - (n - 1) / 2) * width
+            if span is None:
+                ax.text(x, 5, "x", ha="center", va="bottom", fontsize=8, color=MUTED)
+                continue
+            ax.bar(x, span[1] - span[0], bottom=span[0], width=width * 0.86, color=color, alpha=alpha,
+                   edgecolor="white", linewidth=0.4, zorder=3)
+        baseline = to_display("co2", poly.z_star_phys[axis_idx[f"{AXIS_PREFIX['co2']}_{year}"]])
+        ax.plot([i - 0.45, i + 0.45], [baseline] * 2, color="black", linestyle="--", linewidth=1.0, zorder=6)
+    ax.axhline(100, color=INK, linewidth=0.8, zorder=5)
+    ax.text(0.5, 101.5, "budget", fontsize=8, color=MUTED, ha="center", va="bottom", zorder=7,
+            bbox={"facecolor": "white", "edgecolor": "none", "alpha": 0.8, "pad": 1})
+    ax.set_xticks(range(len(years)), [f"until {y}" for y in years], fontsize=9)
+    ax.set_xlim(-0.55, len(years) - 0.45)
+    ax.set_ylim(bottom=0)
+    ax.grid(axis="y", alpha=0.25)
+    style_axes(ax, title or "", ylabel)
+    ax.tick_params(axis="x", colors=INK)
 
 
 def extra_cost_bn(percent: float, c_star: float) -> float:
@@ -329,25 +371,26 @@ def extra_cost_bn(percent: float, c_star: float) -> float:
     return percent / 100 * c_star * 1e-3
 
 
-def draw_cost_panel(ax, scenarios: list, slack_pct: float, c_star: float) -> None:
+def draw_cost_dots(ax, scenarios: list, c_star: float, top: float, title: str | None) -> None:
+    """Cheapest extra cost of each band as a dot, labelled in bn EUR. The upper end is
+    left out: any band can always be met more expensively, up to the cost slack."""
     for position, scenario in enumerate(scenarios):
         if scenario["ranges"] is None:
-            ax.text(position, slack_pct / 2, "not\nreachable", ha="center", va="center", fontsize=8, color=MUTED)
+            ax.text(position, top / 2, "not\nreachable", ha="center", va="center", fontsize=8, color=MUTED)
             continue
-        low, high = scenario["ranges"]["cost"]
-        ax.bar(position, high - low, bottom=low, width=0.62, color=scenario["fill"], alpha=scenario["opacity"],
-               linewidth=0, zorder=3)
-        ax.text(position, low + 0.12, f"+{low:.2f}%\n+{extra_cost_bn(low, c_star):,.0f} bn", fontsize=8, color=INK,
-                ha="center", va="bottom", zorder=5,
-                bbox={"facecolor": "white", "edgecolor": "none", "alpha": 0.8, "pad": 1})
+        low = scenario["ranges"]["cost"][0]
+        ax.plot([position, position], [0, low], color=scenario["fill"], linewidth=2.0, zorder=3)
+        ax.plot(position, low, marker="o", markersize=9, color=scenario["fill"], markeredgecolor="white",
+                markeredgewidth=0.8, zorder=4)
+        ax.annotate(f"+{extra_cost_bn(low, c_star):,.0f} bn", xy=(position, low), xytext=(0, 8),
+                    textcoords="offset points", ha="center", va="bottom", fontsize=8, color=INK)
     ax.set_xticks(range(len(scenarios)), [s["label"] for s in scenarios], fontsize=9)
-    ax.set_xlabel(f"{R_DIFF} (label: cheapest extra cost, bn EUR)", fontsize=9, color=MUTED)
     ax.set_xlim(-0.6, len(scenarios) - 0.4)
-    ax.set_ylim(-slack_pct * 0.03, slack_pct * 1.1)
-    ax.set_yticks([0, slack_pct], [f"$C^*$\n{c_star * 1e-3:,.0f} bn EUR",
-                                   f"$C^*$ +{slack_pct:.0f}%\n+{extra_cost_bn(slack_pct, c_star):,.0f} bn EUR"])
-    ax.axhline(0, color="#BBBBBB", linewidth=0.8, zorder=2)
-    style_axes(ax, "Net present cost")
+    ax.set_ylim(0, top)
+    ax.set_yticks(np.arange(0, top, 0.5))
+    ax.yaxis.set_major_formatter(lambda v, _: "$C^*$" if v == 0 else f"+{v:.1f}%")
+    ax.grid(axis="y", alpha=0.25)
+    style_axes(ax, title or "", "Cost above optimum")
     ax.tick_params(axis="x", colors=INK)
 
 
@@ -393,65 +436,71 @@ def band_scenarios(poly, axis_idx, mandated: str, start: tuple[float, float]) ->
     hue = MANDATE_COLOR[mandated]
     scenarios = []
     for (low, high), tint in zip(RATE_BANDS, BAND_TINTS):
-        label = f"{low:.0%}".rstrip("%") + f"-{high:.0%}"
+        if high is None:
+            label = f">{low:.0%}"
+        elif low == 0:
+            label = f"<{high:.0%}"
+        else:
+            label = f"{low:.0%}".rstrip("%") + f"-{high:.0%}"
         scenarios.append(make_scenario(poly, axis_idx, mandated, start, low, high)
                          | {"label": label, "legend": f"{R_DIFF} {label}", "color": eth_tint(hue, tint),
-                            "fill": eth_tint(hue, tint), "alpha": BAND_ALPHA, "opacity": BAND_ALPHA})
+                            "fill": eth_tint(hue, tint), "alpha": BAND_ALPHA, "opacity": BAR_ALPHA})
     return scenarios
 
 
-def make_figure(poly, axis_idx, mandated: str, initial: dict, scenarios: list, title: str, range_note: str,
-                figure_name: str) -> None:
-    context = {"initial": initial, "full": solve_all(poly, axis_idx, [], [], inner_bound, (mandated, "co2"))}
-    report(poly, axis_idx, mandated, scenarios)
+def make_figure(poly, axis_idx, initial: dict, starts: dict) -> None:
+    """One row per technology group: band paths, cumulative emissions, cheapest extra cost.
+    Emissions and cost share their y-axis down the column."""
+    metrics = ("heat", "ev", "ccs")
+    rows = {}
+    for metric in metrics:
+        print(f"bands on {metric}: 2022 start {100 * starts[metric][0]:.2f}%, k_free {100 * starts[metric][1]:.2f}% per period")
+        scenarios = band_scenarios(poly, axis_idx, metric, starts[metric])
+        report(poly, axis_idx, metric, scenarios)
+        context = {"initial": initial, "full": solve_all(poly, axis_idx, [], [], inner_bound, (metric, "co2"))}
+        rows[metric] = (scenarios, context)
+    cheapest = max(s["ranges"]["cost"][0] for scenarios, _ in rows.values() for s in scenarios if s["ranges"])
+    cost_top = cheapest * 1.3
 
-    fig = plt.figure(figsize=(13.5, 5.4))
-    grid = fig.add_gridspec(1, 3, width_ratios=[1.15, 1, 1.1], left=0.06, right=0.98, top=0.84, bottom=0.27,
-                            wspace=0.3)
-    draw_mandate_panel(fig.add_subplot(grid[0]), poly, axis_idx, mandated, scenarios, context)
-    draw_ribbon_panel(fig.add_subplot(grid[1]), poly, axis_idx, "co2", scenarios, context)
-    draw_cost_panel(fig.add_subplot(grid[2]), scenarios, 100 * poly.epsilon, poly.c_star)
+    fig = plt.figure(figsize=(13.5, 12.5))
+    grid = fig.add_gridspec(3, 3, width_ratios=[1.15, 1, 1], left=0.07, right=0.98, top=0.93, bottom=0.1,
+                            wspace=0.3, hspace=0.38)
+    emission_axes = []
+    for r, metric in enumerate(metrics):
+        scenarios, context = rows[metric]
+        draw_mandate_panel(fig.add_subplot(grid[r, 0]), poly, axis_idx, metric, scenarios, context)
+        ax = fig.add_subplot(grid[r, 1], sharey=emission_axes[0] if emission_axes else None)
+        draw_emissions_bars(ax, poly, axis_idx, scenarios, context, title=TITLE["co2"] if r == 0 else None,
+                            ylabel=YLABEL["co2"])
+        emission_axes.append(ax)
+        draw_cost_dots(fig.add_subplot(grid[r, 2]), scenarios, poly.c_star, cost_top,
+                       "Cheapest extra cost" if r == 0 else None)
 
-    fig.suptitle(title, fontsize=13, fontweight="bold", color=INK, x=0.06, ha="left", y=0.965)
-    handles = [
-        Patch(facecolor=to_rgba(s["fill"], s["opacity"]), edgecolor=s["color"], label=s["legend"]) for s in scenarios
-    ] + [
-        Patch(facecolor=_GREY, alpha=0.13, label=f"Range without mandate (within {poly.epsilon:.0%} of optimal cost)"),
+    fig.suptitle("Diffusion rate bands: effect on emissions and cost", fontsize=14, fontweight="bold", color=INK,
+                 x=0.07, ha="left", y=0.985)
+    labels = [s["label"] for s in rows["heat"][0]]
+    handles = [Patch(facecolor=eth_tint(_GREY, tint), label=f"{R_DIFF} {label}")
+               for label, tint in zip(labels, BAND_TINTS)] + [
+        Patch(facecolor=_GREY, alpha=0.35, label="Near-optimal space"),
         Line2D([0], [0], color="black", linestyle="--", linewidth=1.0, label="Cost-optimal baseline"),
         Line2D([0], [0], marker="^", color="none", markerfacecolor=MUTED, markeredgecolor=MUTED, markersize=7,
                label="Imposed minimum"),
+        Line2D([0], [0], marker="v", color="none", markerfacecolor=MUTED, markeredgecolor=MUTED, markersize=7,
+               label="Imposed maximum"),
     ]
-    if any(s["path_upper"] for s in scenarios):
-        handles.append(Line2D([0], [0], marker="v", color="none", markerfacecolor=MUTED, markeredgecolor=MUTED,
-                              markersize=7, label="Imposed maximum"))
-    if any(s["ranges"] is None for s in scenarios):
-        handles.append(Line2D([0], [0], marker="^", color="none", markerfacecolor="white", markeredgecolor=MUTED,
-                              markersize=7, label=f"Not reachable within {poly.epsilon:.0%} of optimal cost"))
-    fig.legend(handles=handles, loc="lower center", ncol=-(-len(handles) // 2), fontsize=8.5, frameon=False,
-               bbox_to_anchor=(0.52, 0.1), columnspacing=1.4, handletextpad=0.6)
-    others = " and ".join(OTHER_NAME[m] for m in ("heat", "ev", "ccs") if m != mandated)
-    fig.text(0.06, 0.02, f"Not shown: {others} stay free between 0 and 100% under every band. Mandate path starts from "
-             "existing capacity in the input data (heat, CCS) or the no-diffusion baseline's 2022 share (EV).\n"
-             f"{range_note} Cumulative emissions plotted at 2038 run through 2041, likewise for the other years. Ribbon "
-             "edges come from separate LPs.\nCost labels: cheapest blend of solved designs, an upper limit on the true "
-             "extra cost.",
-             fontsize=8, color=MUTED, ha="left", va="bottom", linespacing=1.3)
-    savefig(fig, figure_name)
+    fig.legend(handles=handles, loc="lower center", ncol=5, fontsize=9, frameon=False, bbox_to_anchor=(0.52, 0.0),
+               columnspacing=1.6, handletextpad=0.6, title="Band shade, lighter = slower (hue per technology)",
+               title_fontsize=9)
+    savefig(fig, FIGURE_NAME)
 
 
 def main() -> None:
-    poly = load_polytope(RUN_32_PATH)
+    poly = load_polytope(RUN_PATH)
     print(f"loaded {poly.X.shape[0]} points, converged={poly.converged}, final_gap={poly.final_gap:.3f}")
     axis_idx = {name: i for i, name in enumerate(poly.names)}
     initial = initial_values(poly)
     print("baseline 2022:", {metric: round(value, 4) for metric, value in initial.items()})
-    starts = mandate_start(poly, initial)
-    for mandated, figure_name in BAND_FIGURES.items():
-        start = starts[mandated]
-        print(f"bands on {mandated}: 2022 start {100 * start[0]:.2f}%, k_free {100 * start[1]:.2f}% per period")
-        make_figure(poly, axis_idx, mandated, initial, band_scenarios(poly, axis_idx, mandated, start),
-                    f"Diffusion rate ranges on {MANDATE_NAME[mandated]}: effect on emissions and cost",
-                    "Share held between the two rates' trajectories.", figure_name)
+    make_figure(poly, axis_idx, initial, mandate_start(poly, initial))
 
 
 if __name__ == "__main__":
