@@ -6,8 +6,14 @@ trajectories of two diffusion rates r_diff, in 2030, 2038 and 2050 jointly. The 
 shows the range of cumulative emissions and the cheapest extra cost under that
 mandate; the other shares stay free between 0 and 100%, so they are not plotted.
 Like fig20 this is answered from the polytope, with no re-solving of ZEN-garden:
-every ribbon edge is one LP over the convex hull of the solved designs. Lower and upper edges generally belong
-to different designs. 2040 is not a model year, hence 2038.
+every ribbon edge is one LP over the convex hull of the solved designs (inner
+approximation). Lower and upper edges generally belong to different designs. With
+SHOW_OUTER the same LPs over the outer approximation (the polytope's cuts A z <= b) are
+drawn too: dashed outlines around the emission bars and open dots for the cost. The true
+near-optimal range lies between the two.
+
+fig52 (same bands, same LPs) shows what each mandate does to the other two shares,
+e.g. the EV share and CCS use under an industrial heat band, in 2030, 2038 and 2050. 2040 is not a model year, hence 2038.
 
 The bands set a floor and, in the years where the upper rate's trajectory is below
 100%, a ceiling, so their ranges are not nested and can sit apart. Each band is one
@@ -63,7 +69,7 @@ YEARS = (2030, 2038, 2050)
 PANEL_YEARS = [REFERENCE_YEAR, *YEARS]
 KNOWLEDGE_DEPRECIATION = 0.1  # knowledge_depreciation_rate, per year
 BUDGET_MT = 23_838.8  # carbon_emissions_budget of the dataset, 23.8388 Gt
-SHOW_OUTER = False  # draw the outer bounds as dashed lines (always printed)
+SHOW_OUTER = True  # draw the outer bounds: dashed bar outlines, open cost dots (always printed)
 
 # Contiguous bands; None = no upper rate (a minimum only).
 RATE_BANDS = ((0.0, 0.10), (0.10, 0.20), (0.20, 0.30), (0.30, 0.50), (0.50, 0.70))
@@ -94,6 +100,8 @@ YLABEL = {
     "co2": "% of 2050 budget (23.8 Gt)",
 }
 FIGURE_NAME = "fig51_diffusion_ranges"
+CROSS_FIGURE_NAME = "fig52_diffusion_cross_shares"  # effect on the other two shares
+SHARE_METRICS = ("heat", "ev", "ccs")
 EMISSION_YEARS = (2030, 2050)  # horizons on the emissions panel
 
 _GREY = SCENARIO_PALETTE[6]
@@ -337,31 +345,53 @@ def draw_mandate_panel(ax, poly, axis_idx, metric: str, scenarios: list, context
     style_axes(ax, TITLE[metric], YLABEL[metric])
 
 
-def draw_emissions_bars(ax, poly, axis_idx, scenarios: list, context: dict, years=EMISSION_YEARS,
-                        title: str | None = TITLE["co2"], ylabel: str | None = YLABEL["co2"]) -> None:
-    """Cumulative emissions range per horizon: the near-optimal range (grey), then one bar
-    per band side by side, and the baseline as a dashed tick across each group."""
+def draw_range_bars(ax, poly, axis_idx, metric: str, scenarios: list, context: dict, years) -> None:
+    """Range of `metric` per year: the near-optimal range (grey), then one bar per band side
+    by side, the outer approximation as dashed outlines (SHOW_OUTER), and the baseline as a
+    dashed tick across each group."""
     n = len(scenarios) + 1
     width = 0.84 / n
+    full_outer = context.get("full_outer")
     for i, year in enumerate(years):
-        bars = [(context["full"]["co2", year], _GREY, 0.35)] + [
-            (s["ranges"]["co2", year] if s["ranges"] else None, s["fill"], s["opacity"]) for s in scenarios]
-        for b, (span, color, alpha) in enumerate(bars):
+        bars = [(context["full"][metric, year], full_outer[metric, year] if full_outer else None,
+                 _GREY, 0.35, MUTED)] + [
+            (s["ranges"][metric, year] if s["ranges"] else None,
+             s["outer"][metric, year] if s.get("outer") else None, s["fill"], s["opacity"], s["color"])
+            for s in scenarios]
+        for b, (span, outer, color, alpha, edge) in enumerate(bars):
             x = i + (b - (n - 1) / 2) * width
+            if SHOW_OUTER and outer is not None:
+                ax.bar(x, outer[1] - outer[0], bottom=outer[0], width=width * 0.86, facecolor="none",
+                       edgecolor=edge, linestyle=(0, (2.5, 1.5)), linewidth=0.9, zorder=4)
             if span is None:
                 ax.text(x, 5, "x", ha="center", va="bottom", fontsize=8, color=MUTED)
                 continue
             ax.bar(x, span[1] - span[0], bottom=span[0], width=width * 0.86, color=color, alpha=alpha,
                    edgecolor="white", linewidth=0.4, zorder=3)
-        baseline = to_display("co2", poly.z_star_phys[axis_idx[f"{AXIS_PREFIX['co2']}_{year}"]])
+        baseline = to_display(metric, poly.z_star_phys[axis_idx[f"{AXIS_PREFIX[metric]}_{year}"]])
         ax.plot([i - 0.45, i + 0.45], [baseline] * 2, color="black", linestyle="--", linewidth=1.0, zorder=6)
+    ax.set_xticks(range(len(years)), [f"until {y}" if metric == "co2" else str(y) for y in years], fontsize=9)
+    ax.set_xlim(-0.55, len(years) - 0.45)
+    ax.grid(axis="y", alpha=0.25)
+
+
+def draw_emissions_bars(ax, poly, axis_idx, scenarios: list, context: dict, years=EMISSION_YEARS,
+                        title: str | None = TITLE["co2"], ylabel: str | None = YLABEL["co2"]) -> None:
+    """Cumulative emissions range per horizon, with the budget line."""
+    draw_range_bars(ax, poly, axis_idx, "co2", scenarios, context, years)
     ax.axhline(100, color=INK, linewidth=0.8, zorder=5)
     ax.text(0.5, 101.5, "budget", fontsize=8, color=MUTED, ha="center", va="bottom", zorder=7,
             bbox={"facecolor": "white", "edgecolor": "none", "alpha": 0.8, "pad": 1})
-    ax.set_xticks(range(len(years)), [f"until {y}" for y in years], fontsize=9)
-    ax.set_xlim(-0.55, len(years) - 0.45)
     ax.set_ylim(bottom=0)
-    ax.grid(axis="y", alpha=0.25)
+    style_axes(ax, title or "", ylabel)
+    ax.tick_params(axis="x", colors=INK)
+
+
+def draw_share_bars(ax, poly, axis_idx, metric: str, scenarios: list, context: dict,
+                    title: str | None, ylabel: str | None) -> None:
+    """Range of another share (not the mandated one) in each model year under each band."""
+    draw_range_bars(ax, poly, axis_idx, metric, scenarios, context, YEARS)
+    ax.set_ylim(0, 105)
     style_axes(ax, title or "", ylabel)
     ax.tick_params(axis="x", colors=INK)
 
@@ -373,8 +403,12 @@ def extra_cost_bn(percent: float, c_star: float) -> float:
 
 def draw_cost_dots(ax, scenarios: list, c_star: float, top: float, title: str | None) -> None:
     """Cheapest extra cost of each band as a dot, labelled in bn EUR. The upper end is
-    left out: any band can always be met more expensively, up to the cost slack."""
+    left out: any band can always be met more expensively, up to the cost slack. With
+    SHOW_OUTER the outer approximation's cheapest cost is an open dot (a lower bound)."""
     for position, scenario in enumerate(scenarios):
+        if SHOW_OUTER and scenario.get("outer"):
+            ax.plot(position, scenario["outer"]["cost"][0], marker="o", markersize=8, markerfacecolor="white",
+                    markeredgecolor=scenario["color"], markeredgewidth=1.4, linestyle="none", zorder=5, clip_on=False)
         if scenario["ranges"] is None:
             ax.text(position, top / 2, "not\nreachable", ha="center", va="center", fontsize=8, color=MUTED)
             continue
@@ -405,6 +439,9 @@ def report(poly, axis_idx, mandated: str, scenarios: list) -> None:
             print(f"    not reachable in the hull; outer approximation {'can' if scenario['outer'] else 'cannot either'}")
             continue
         low, high = scenario["ranges"]["cost"]
+        if scenario["outer"]:
+            print(f"    cheapest cost, outer approximation: {scenario['outer']['cost'][0]:.2f}% "
+                  f"({extra_cost_bn(scenario['outer']['cost'][0], poly.c_star):,.1f} bn EUR)")
         print(f"    cost above optimum: {low:.2f}% to {high:.2f}% "
               f"({extra_cost_bn(low, poly.c_star):,.1f} to {extra_cost_bn(high, poly.c_star):,.1f} bn EUR)")
         for key, (lo, hi) in scenario["ranges"].items():
@@ -426,9 +463,10 @@ def make_scenario(poly, axis_idx, mandated: str, start: tuple[float, float], rat
         floors.append((k, (path[year] - poly.offset[k]) / poly.scale[k]))
         if upper and upper[year] < 1.0:
             ceilings.append((k, (upper[year] - poly.offset[k]) / poly.scale[k]))
+    metrics = ("co2",) + tuple(m for m in SHARE_METRICS if m != mandated)
     return {"path": path, "path_upper": upper,
-            "ranges": solve_all(poly, axis_idx, floors, ceilings, inner_bound, ("co2",)),
-            "outer": solve_all(poly, axis_idx, floors, ceilings, outer_bound, ("co2",))}
+            "ranges": solve_all(poly, axis_idx, floors, ceilings, inner_bound, metrics),
+            "outer": solve_all(poly, axis_idx, floors, ceilings, outer_bound, metrics)}
 
 
 def band_scenarios(poly, axis_idx, mandated: str, start: tuple[float, float]) -> list[dict]:
@@ -448,7 +486,7 @@ def band_scenarios(poly, axis_idx, mandated: str, start: tuple[float, float]) ->
     return scenarios
 
 
-def make_figure(poly, axis_idx, initial: dict, starts: dict) -> None:
+def make_figure(poly, axis_idx, initial: dict, starts: dict) -> dict:
     """One row per technology group: band paths, cumulative emissions, cheapest extra cost.
     Emissions and cost share their y-axis down the column."""
     metrics = ("heat", "ev", "ccs")
@@ -457,7 +495,10 @@ def make_figure(poly, axis_idx, initial: dict, starts: dict) -> None:
         print(f"bands on {metric}: 2022 start {100 * starts[metric][0]:.2f}%, k_free {100 * starts[metric][1]:.2f}% per period")
         scenarios = band_scenarios(poly, axis_idx, metric, starts[metric])
         report(poly, axis_idx, metric, scenarios)
-        context = {"initial": initial, "full": solve_all(poly, axis_idx, [], [], inner_bound, (metric, "co2"))}
+        context = {"initial": initial,
+                   "full": solve_all(poly, axis_idx, [], [], inner_bound, (*SHARE_METRICS, "co2")),
+                   "full_outer": solve_all(poly, axis_idx, [], [], outer_bound, (*SHARE_METRICS, "co2"))
+                   if SHOW_OUTER else None}
         rows[metric] = (scenarios, context)
     cheapest = max(s["ranges"]["cost"][0] for scenarios, _ in rows.values() for s in scenarios if s["ranges"])
     cost_top = cheapest * 1.3
@@ -488,10 +529,49 @@ def make_figure(poly, axis_idx, initial: dict, starts: dict) -> None:
         Line2D([0], [0], marker="v", color="none", markerfacecolor=MUTED, markeredgecolor=MUTED, markersize=7,
                label="Imposed maximum"),
     ]
+    if SHOW_OUTER:
+        handles += [
+            Patch(facecolor="none", edgecolor=MUTED, linestyle=(0, (2.5, 1.5)), linewidth=0.9,
+                  label="Outer approximation (emissions)"),
+            Line2D([0], [0], marker="o", color="none", markerfacecolor="white", markeredgecolor=MUTED,
+                   markeredgewidth=1.4, markersize=8, label="Outer approximation (cost)"),
+        ]
     fig.legend(handles=handles, loc="lower center", ncol=5, fontsize=9, frameon=False, bbox_to_anchor=(0.52, 0.0),
                columnspacing=1.6, handletextpad=0.6, title="Band shade, lighter = slower (hue per technology)",
                title_fontsize=9)
     savefig(fig, FIGURE_NAME)
+    return rows
+
+
+def make_cross_figure(rows: dict, poly, axis_idx) -> None:
+    """fig52: one row per mandated group, one column per other share, bars per model year."""
+    fig, axes = plt.subplots(3, 2, figsize=(11, 12.5), sharey=True)
+    fig.subplots_adjust(left=0.13, right=0.98, top=0.9, bottom=0.11, wspace=0.12, hspace=0.42)
+    for r, mandated in enumerate(SHARE_METRICS):
+        scenarios, context = rows[mandated]
+        others = [m for m in SHARE_METRICS if m != mandated]
+        for c, other in enumerate(others):
+            draw_share_bars(axes[r, c], poly, axis_idx, other, scenarios, context,
+                            TITLE[other], YLABEL[other])
+        axes[r, 0].annotate(f"Band on {MANDATE_NAME[mandated]}", xy=(0, 0.5), xycoords="axes fraction",
+                            xytext=(-62, 0), textcoords="offset points", rotation=90, ha="center",
+                            va="center", fontsize=11, fontweight="bold", color=MANDATE_COLOR[mandated])
+    fig.suptitle("Diffusion rate bands: effect on the other shares", fontsize=14, fontweight="bold",
+                 color=INK, x=0.13, ha="left", y=0.975)
+    labels = [s["label"] for s in rows["heat"][0]]
+    handles = [Patch(facecolor=eth_tint(_GREY, tint), label=f"{R_DIFF} {label}")
+               for label, tint in zip(labels, BAND_TINTS)] + [
+        Patch(facecolor=_GREY, alpha=0.35, label="Near-optimal space"),
+        Line2D([0], [0], color="black", linestyle="--", linewidth=1.0, label="Cost-optimal baseline"),
+    ]
+    if SHOW_OUTER:
+        handles.append(Patch(facecolor="none", edgecolor=MUTED, linestyle=(0, (2.5, 1.5)), linewidth=0.9,
+                             label="Outer approximation"))
+    fig.legend(handles=handles, loc="lower center", ncol=4, fontsize=9, frameon=False, bbox_to_anchor=(0.55, 0.0),
+               columnspacing=1.6, handletextpad=0.6,
+               title="Bar shade = band on the row's technology, lighter = slower (hue per technology)",
+               title_fontsize=9)
+    savefig(fig, CROSS_FIGURE_NAME)
 
 
 def main() -> None:
@@ -500,7 +580,8 @@ def main() -> None:
     axis_idx = {name: i for i, name in enumerate(poly.names)}
     initial = initial_values(poly)
     print("baseline 2022:", {metric: round(value, 4) for metric, value in initial.items()})
-    make_figure(poly, axis_idx, initial, mandate_start(poly, initial))
+    rows = make_figure(poly, axis_idx, initial, mandate_start(poly, initial))
+    make_cross_figure(rows, poly, axis_idx)
 
 
 if __name__ == "__main__":

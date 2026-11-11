@@ -12,3 +12,5 @@ task_id,my_dataset,my_comment,conduct_time_series_aggregation,aggregated_time_st
 10,zen_europe_no_flex,2022_8a_4a_interval_20ts,,20,,,,,2,,,,
 11,zen_europe_ind_heat_v1_no_flexibility_nodiffusion_export0,2022_8a_4a_interval_1ts_TIMING_LP_FREEZE2022,True,1,2022,8,4,False,,,,,
 12,zen_europe_ind_heat_v1_no_flexibility_nodiffusion_export0,2022_15a_2a_interval_10ts_TIMING_LP_FREEZE2022,True,10,2022,15,2,False,,,,,
+13,zen_europe_ind_heat_v1_no_flexibility_nodiffusion_export0,2022_8a_4a_interval_10ts_TIMING_LP_FREEZE2022,True,10,2022,8,4,False,,,,,
+14,zen_europe_ind_heat_v1_no_flexibility_nodiffusion_export0,2022_8a_4a_interval_5ts_TIMING_LP_FREEZE2022,True,5,2022,8,4,False,,,,,
