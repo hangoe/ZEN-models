@@ -63,6 +63,7 @@ META_COLUMNS = {
     "my_dataset", "my_comment", "config", "normalisation", "batch_size",
     "n_workers", "axes_config", "tolerance_explore", "seed_rng",
     "solver_threads", "epsilon", "numeric_focus", "max_iterations",
+    "tolerance_prob", "n_samples",
     "solver_options", "cost_noise", "noise_seed", "flex_cost_fix",
 }
 
@@ -142,8 +143,10 @@ def apply_epsilon_override(run_config: dict, config_name: str, epsilon) -> None:
     mga_cfg["epsilon"] = epsilon
 
 
-def apply_batch_overrides(run_config: dict, config_name: str, batch_size, n_workers, tolerance_explore, seed_rng, max_iterations=None) -> None:
-    """Overwrite plugins.mga.batch.{batch_size,n_workers,tolerance_explore,seed_rng,max_iterations} in-place with the CSV row's values.
+def apply_batch_overrides(run_config: dict, config_name: str, batch_size, n_workers, tolerance_explore, seed_rng, max_iterations=None,
+                          tolerance_prob=None, n_samples=None) -> None:
+    """Overwrite plugins.mga.batch.{batch_size,n_workers,tolerance_explore,seed_rng,max_iterations,
+    tolerance_prob,n_samples} in-place with the CSV row's values.
 
     Same private-staged-copy pattern as apply_normalisation_override(): lets
     one config_mga_batch_*.yaml be swept over different batch_size/n_workers/
@@ -155,15 +158,19 @@ def apply_batch_overrides(run_config: dict, config_name: str, batch_size, n_work
     file. seed_rng left unset keeps batch_oracle's default nondeterministic
     seeding (see module docstring) -- set it to pin a row to a specific,
     reproducible draw, e.g. for an explicit random-seed comparison against
-    an unpinned row using the same config otherwise.
+    an unpinned row using the same config otherwise. tolerance_prob (CI target)
+    and n_samples (directions sampled per CI estimate) let a row tighten the
+    convergence check without editing the shared config (task_id 46).
     """
     if (batch_size is None and n_workers is None and tolerance_explore is None
-            and seed_rng is None and max_iterations is None):
+            and seed_rng is None and max_iterations is None
+            and tolerance_prob is None and n_samples is None):
         return
     batch_cfg = run_config.get("plugins", {}).get("mga", {}).get("batch")
     if batch_cfg is None:
         raise SystemExit(
-            f"[run_model] row sets batch_size/n_workers/tolerance_explore/seed_rng/max_iterations but "
+            f"[run_model] row sets batch_size/n_workers/tolerance_explore/seed_rng/max_iterations/"
+            f"tolerance_prob/n_samples but "
             f"{config_name} has no plugins.mga.batch block to apply them to."
         )
     if batch_size is not None:
@@ -176,6 +183,10 @@ def apply_batch_overrides(run_config: dict, config_name: str, batch_size, n_work
         batch_cfg["seed_rng"] = seed_rng
     if max_iterations is not None:
         batch_cfg["max_iterations"] = max_iterations
+    if tolerance_prob is not None:
+        batch_cfg["tolerance_prob"] = tolerance_prob
+    if n_samples is not None:
+        batch_cfg["n_samples"] = n_samples
 
 
 def apply_solver_threads_override(run_config: dict, config_name: str, solver_threads) -> None:
@@ -422,6 +433,8 @@ def main() -> None:
     tolerance_explore = native_cell("tolerance_explore")
     seed_rng = native_cell("seed_rng")
     max_iterations = native_cell("max_iterations")
+    tolerance_prob = native_cell("tolerance_prob")
+    n_samples = native_cell("n_samples")
     solver_threads = native_cell("solver_threads")
     numeric_focus = native_cell("numeric_focus")
     epsilon = native_cell("epsilon")
@@ -443,7 +456,8 @@ def main() -> None:
                 f"normalisation={normalisation}")
     logger.info(f"batch_size={batch_size}  n_workers={n_workers}  tolerance_explore={tolerance_explore}  "
           f"seed_rng={seed_rng}  solver_threads={solver_threads}  epsilon={epsilon}  "
-          f"numeric_focus={numeric_focus}  max_iterations={max_iterations}")
+          f"numeric_focus={numeric_focus}  max_iterations={max_iterations}  "
+          f"tolerance_prob={tolerance_prob}  n_samples={n_samples}")
     logger.info(f"solver_options={solver_options_str}  cost_noise={cost_noise}  "
           f"noise_seed={noise_seed}  flex_cost_fix={flex_cost_fix}")
     logger.info(f"system_overrides={system_overrides}")
@@ -454,7 +468,8 @@ def main() -> None:
     apply_axes_override(run_config, axes_config_path)
     if normalisation is not None:
         apply_normalisation_override(run_config, config_name, normalisation)
-    apply_batch_overrides(run_config, config_name, batch_size, n_workers, tolerance_explore, seed_rng, max_iterations)
+    apply_batch_overrides(run_config, config_name, batch_size, n_workers, tolerance_explore, seed_rng, max_iterations,
+                          tolerance_prob, n_samples)
     apply_solver_threads_override(run_config, config_name, solver_threads)
     apply_numeric_focus_override(run_config, config_name, numeric_focus)
     apply_solver_options_override(run_config, config_name, solver_options_str)

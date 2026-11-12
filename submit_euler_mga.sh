@@ -32,6 +32,7 @@
 #   sbatch --array=32 --time=5-00:00:00 --cpus-per-task=32 --mem-per-cpu=6G submit_euler_mga.sh # as 31, tol 0.15, 700 iterations
 #   sbatch --array=44 --cpus-per-task=128 --mem-per-cpu=5G submit_euler_mga.sh               # 5ts, batch16 x 8 threads, 640 GB -> bigmem/fat nodes only
 #   sbatch --array=45 --time=5-00:00:00 --cpus-per-task=32 --mem-per-cpu=6G submit_euler_mga.sh # as 44 with 1ts, 2 threads (run 33's profile)
+#   sbatch --array=46 --time=5-00:00:00 --cpus-per-task=32 --mem-per-cpu=6G submit_euler_mga.sh # as 45, CI target 0.95, 4000 samples
 # Refine a profile from `sacct -j <jobid> --format=JobID,Elapsed,MaxRSS,State`
 # of the previous run.
 ###############################################################################

@@ -217,6 +217,15 @@ a quick preview of run 44's results. Resources as task_id 33 (same 1-ts model,
 batch16 x 2 threads, 192 GB; axis count barely changes LP memory).
   sbatch --array=45 --time=5-00:00:00 --cpus-per-task=32 --mem-per-cpu=6G submit_euler_mga.sh
 
+task_id 46 added 2026-11-12: task_id 45 with a stricter convergence check,
+tolerance_prob 0.90 -> 0.95 and n_samples 1000 -> 4000 (new optional
+parameters_mga.csv columns, applied by run_model.py to plugins.mga.batch; blank
+= config value). Run 45 (job 20657485) climbed fast (CI lower 0.17 at iteration 3
+vs run 33's 0.003; 7 vs 13 axes), so 46 checks how much the result moves when
+95 % of directions must be within tol 0.1. 4000 samples narrow the CI to about
++/-1 pp so 0.95 is resolvable. Same resources as 45.
+  sbatch --array=46 --time=5-00:00:00 --cpus-per-task=32 --mem-per-cpu=6G submit_euler_mga.sh
+
 Requires the MGA install step in setup_euler_env.sh to have been run once
 (clones + installs ZEN-garden-plugins and near_optimal_tools/pyoNearOpt,
 incl. the "bbo" extra needed by batch bbo mode).
