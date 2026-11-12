@@ -30,6 +30,7 @@
 #   sbatch --array=30 --time=02:00:00 --cpus-per-task=8 --mem-per-cpu=6G submit_euler_mga.sh          # 1 region + CO2 storage, test
 #   sbatch --array=31 --time=4-00:00:00 --cpus-per-task=32 --mem-per-cpu=6G submit_euler_mga.sh # 1 region + CO2 storage, full (refine from task 30)
 #   sbatch --array=32 --time=5-00:00:00 --cpus-per-task=32 --mem-per-cpu=6G submit_euler_mga.sh # as 31, tol 0.15, 700 iterations
+#   sbatch --array=44 --cpus-per-task=128 --mem-per-cpu=5G submit_euler_mga.sh               # 5ts, batch16 x 8 threads, 640 GB -> bigmem/fat nodes only
 # Refine a profile from `sacct -j <jobid> --format=JobID,Elapsed,MaxRSS,State`
 # of the previous run.
 ###############################################################################

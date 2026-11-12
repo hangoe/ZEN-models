@@ -199,6 +199,19 @@ then fixes their 2022 capacity_addition to 0, so the three shares start from
 existing capacity. Later years are unchanged. Output folder suffix _FREEZE2022.
   sbatch --array=33 --time=5-00:00:00 --cpus-per-task=32 --mem-per-cpu=6G submit_euler_mga.sh
 
+task_id 44 added 2026-11-11: task_id 33 with 5 ts/yr, tolerance_explore 0.1,
+epsilon 0.01 and config_mga_axes_ind_heating_thesis.yaml (heat output share,
+CO2 storage utilisation, imported biomass at 2034/2050, plus cost). The first
+submission (job 20575193_44, 32 cpus x 6G = 192G, 2 threads/worker) was
+OOM-killed after 8h20 at ~200 GB in batch iteration 1. Sizing from the
+5-ts plain LP (parameters.csv row 14, job 20570071_14: MaxRSS 26 GiB, solve
+1256 s at 16 threads): batch16 needs ~16 x 26 GiB x 1.3 = ~550 GiB, so only
+bigmem (768 GB) or fat nodes fit. Updated 2026-11-12: solver_threads 2 -> 8
+(at 2 threads one iteration took ~1.5-3 h, i.e. >3 weeks for run 33's 361
+iterations) and max_iterations 2000 -> 300 so the run finishes inside the
+14-day limit (no SIGTERM handling -> a time-limit kill writes no results).
+  sbatch --array=44 --cpus-per-task=128 --mem-per-cpu=5G submit_euler_mga.sh
+
 Requires the MGA install step in setup_euler_env.sh to have been run once
 (clones + installs ZEN-garden-plugins and near_optimal_tools/pyoNearOpt,
 incl. the "bbo" extra needed by batch bbo mode).
