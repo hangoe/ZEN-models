@@ -204,6 +204,18 @@ EULER_SCENARIO_LABELS = {
 # against the six saturated extension-scenario colors.
 SCENARIO_PALETTE = ["#215CAF", "#007894", "#627313", "#8E6713", "#B7352D", "#A7117A", "#6F6F6F"]
 
+# Report figure size and typography: MT_report_HG text width (16 cm), so figures are
+# placed 1:1 and these are the printed font sizes. Same values as the report block in
+# generate_si_figures.py; other scripts use them via plt.rc_context(REPORT_RC).
+REPORT_WIDTH = 6.3  # in
+REPORT_RC = {
+    "font.size": 9, "axes.labelsize": 9, "axes.titlesize": 9.5,
+    "xtick.labelsize": 8, "ytick.labelsize": 8, "legend.fontsize": 8,
+    "legend.frameon": False, "axes.spines.top": False, "axes.spines.right": False,
+    "axes.linewidth": 0.6, "xtick.major.width": 0.6, "ytick.major.width": 0.6,
+    "xtick.major.size": 3, "ytick.major.size": 3, "hatch.linewidth": 0.5,
+}
+
 
 def eth_tint(hex_color: str, pct: float) -> str:
     """Blend hex_color toward white by pct (0=original, 1=white) — mirrors

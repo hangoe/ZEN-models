@@ -28,13 +28,15 @@ import numpy as np
 from matplotlib.lines import Line2D
 from matplotlib.patches import Patch
 
-from plots.figure_settings import SCENARIO_PALETTE, apply_font_mode, eth_tint
+from plots.figure_settings import REPORT_WIDTH, SCENARIO_PALETTE, apply_font_mode, eth_tint
 
 apply_font_mode()
 
+SHOW_TITLE = False  # figure suptitle; False for the report
+
 from plot_mga_diffusion_whatif import (
-    AXIS_PREFIX, INK, MANDATE_COLOR, MUTED, RUN_PATH, TITLE, YEARS, YLABEL, extra_cost_bn, inner_bound,
-    load_polytope, outer_bound, solve_all, style_axes, to_display,
+    AXIS_PREFIX, INK, MANDATE_COLOR, MUTED, RUN_PATH, S, TITLE, YEARS, YLABEL, extra_cost_bn, inner_bound,
+    load_polytope, outer_bound, report_style, solve_all, style_axes, to_display,
 )
 from plots.mga_capex_periods_common import METRIC_COLOR, RUN_LABEL, savefig
 
@@ -97,7 +99,7 @@ def _bar(ax, x, width, span, color, alpha, zorder):
                edgecolor="white", linewidth=0.4, zorder=zorder)
 
 
-def draw_metric(ax, poly, axis_idx, metric: str, results: dict, fmt: str) -> None:
+def draw_metric(ax, poly, axis_idx, metric: str, results: dict, fmt: str, title: str) -> None:
     keys = list(SCENARIOS)
     n = len(keys)
     width = 0.84 / n
@@ -119,27 +121,28 @@ def draw_metric(ax, poly, axis_idx, metric: str, results: dict, fmt: str) -> Non
             if i is not None:
                 for value, va, dy in ((i[0], "top", -2), (i[1], "bottom", 2)):
                     ax.annotate(fmt.format(value), (x, value), xytext=(0, dy), textcoords="offset points",
-                                ha="center", va=va, fontsize=6.5, color=INK, zorder=6)
+                                ha="center", va=va, fontsize=S["value"] - 1, color=INK, zorder=6)
         baseline = to_display(metric, poly.z_star_phys[axis_idx[f"{AXIS_PREFIX[metric]}_{year}"]])
         ax.plot([g - 0.45, g + 0.45], [baseline] * 2, color="black", linestyle="--", linewidth=1.0, zorder=5)
     if metric == "heat":
         for _, limits, _ in SCENARIOS.values():
             for low, high in set(limits.values()):
                 ax.axhspan(100 * low, 100 * high, color=MANDATE_COLOR["heat"], alpha=0.08, linewidth=0, zorder=1)
-    ax.set_xticks(ticks, tick_labels, fontsize=8)
+    ax.set_xticks(ticks, tick_labels, fontsize=S["tick"] - 1)
     for g, year in enumerate(YEARS):
-        ax.annotate(str(year), (g, 0), xycoords=("data", "axes fraction"), xytext=(0, -20),
-                    textcoords="offset points", ha="center", va="top", fontsize=9.5, fontweight="bold", color=INK)
+        ax.annotate(str(year), (g, 0), xycoords=("data", "axes fraction"), xytext=(0, -14),
+                    textcoords="offset points", ha="center", va="top", fontsize=S["tick"], fontweight="bold",
+                    color=INK)
     ax.set_xlim(-0.55, len(YEARS) - 0.45)
     ax.use_sticky_edges = False
     ax.margins(y=0.08)
     ax.set_ylim(bottom=min(0, ax.get_ylim()[0]))
     ax.grid(axis="y", alpha=0.25)
-    style_axes(ax, TITLE[metric], YLABEL[metric])
+    style_axes(ax, title, YLABEL[metric])
     ax.tick_params(axis="x", colors=INK)
 
 
-def draw_cost(ax, poly, results: dict) -> None:
+def draw_cost(ax, poly, results: dict, title: str) -> None:
     """Cheapest extra cost per scenario: the range between outer (lower) and inner (upper)
     limit, labelled in bn EUR."""
     slack = 100 * poly.epsilon
@@ -147,7 +150,7 @@ def draw_cost(ax, poly, results: dict) -> None:
         outer, inner = results[key]["outer"], results[key]["inner"]
         color = scenario_color(key, "cost")
         if outer is None:
-            ax.text(x, slack / 2, "not\nreachable", ha="center", va="center", fontsize=8, color=MUTED)
+            ax.text(x, slack / 2, "not\nreachable", ha="center", va="center", fontsize=S["value"], color=MUTED)
             continue
         low = outer["cost"][0]
         high = inner["cost"][0] if inner else slack
@@ -156,14 +159,14 @@ def draw_cost(ax, poly, results: dict) -> None:
         label = (f"+{max(0.0, extra_cost_bn(low, poly.c_star)):,.0f} to "
                  f"+{max(0.0, extra_cost_bn(high, poly.c_star)):,.0f} bn")
         ax.annotate(label, (x, high), xytext=(0, 3), textcoords="offset points", ha="center", va="bottom",
-                    fontsize=7.5, color=INK)
+                    fontsize=S["value"], color=INK)
     ax.axhline(slack, color=INK, linewidth=0.8, linestyle=":", zorder=2)
-    ax.set_xticks(range(len(SCENARIOS)), [TICK_LABEL[key] for key in SCENARIOS], fontsize=9)
+    ax.set_xticks(range(len(SCENARIOS)), [TICK_LABEL[key] for key in SCENARIOS], fontsize=S["tick"])
     ax.set_xlim(-0.6, len(SCENARIOS) - 0.4)
     ax.set_ylim(0, slack * 1.08)
     ax.yaxis.set_major_formatter(lambda v, _: "$C^*$" if v == 0 else f"+{v:g}%")
     ax.grid(axis="y", alpha=0.25)
-    style_axes(ax, "Cheapest extra cost", "Cost above optimum")
+    style_axes(ax, title, "Cost above optimum")
     ax.tick_params(axis="x", colors=INK)
 
 
@@ -174,23 +177,26 @@ def main() -> None:
     results = {key: scenario_ranges(poly, axis_idx, limits) for key, (_, limits, _) in SCENARIOS.items()}
     report(results, poly)
 
-    fig, axes = plt.subplots(1, 4, figsize=(15, 4.9), gridspec_kw={"width_ratios": [1, 1, 1, 0.75]})
-    fig.subplots_adjust(left=0.05, right=0.99, top=0.84, bottom=0.25, wspace=0.32)
-    for ax, metric, fmt in zip(axes, METRICS, ("{:.0f}", "{:.0f}", "{:,.0f}")):
-        draw_metric(ax, poly, axis_idx, metric, results, fmt)
-    draw_cost(axes[3], poly, results)
-    fig.suptitle(f"{RUN_LABEL}: industrial heat electrification limited to 99-100% or 0-1%, effect on the other axes",
-                 fontsize=13, fontweight="bold", color=INK, x=0.05, ha="left")
-    # Scenarios are named under each bar; the legend spells them out (no swatch, since the
-    # colour depends on the panel: full colour = A, light shade = B, grey = none).
-    handles = [Line2D([0], [0], color="none", label=label) for label, _, _ in SCENARIOS.values()] + [
-        Patch(facecolor=GREY, alpha=OUTER_ALPHA, label="wide light bar: outer approximation (widest possible)"),
-        Patch(facecolor=GREY, label="narrow dark bar: hull of solved designs (certainly reachable)"),
-        Line2D([0], [0], color="black", linestyle="--", linewidth=1.0, label="Cost-optimal baseline"),
-    ]
-    fig.legend(handles=handles, loc="lower center", ncol=2, fontsize=8.5, frameon=False, bbox_to_anchor=(0.5, 0.0),
-               handlelength=1.2, columnspacing=3.0)
-    savefig(fig, "fig61_heat_mandate_effects")
+    with report_style():  # report figure: REPORT_WIDTH, report font sizes, 2 x 2 panels
+        height = 5.4
+        fig, axes = plt.subplots(2, 2, figsize=(REPORT_WIDTH, height))
+        fig.subplots_adjust(left=0.1, right=0.99, top=0.95, bottom=0.92 / height, wspace=0.38, hspace=0.5)
+        for ax, letter, metric, fmt in zip(axes.flat, "abc", METRICS, ("{:.0f}", "{:.0f}", "{:,.0f}")):
+            draw_metric(ax, poly, axis_idx, metric, results, fmt, f"({letter}) {TITLE[metric]}")
+        draw_cost(axes[1, 1], poly, results, "(d) Cheapest extra cost")
+        if SHOW_TITLE:  # off for the thesis figures (caption carries the title)
+            fig.suptitle(f"{RUN_LABEL}: industrial heat electrification limited to 99-100% or 0-1%, "
+                         "effect on the other axes", fontsize=11, fontweight="bold", color=INK, x=0.1, ha="left")
+        # Scenarios are named under each bar; the legend spells them out (no swatch, since the
+        # colour depends on the panel: full colour = A, light shade = B, grey = none).
+        handles = [Line2D([0], [0], color="none", label=label) for label, _, _ in SCENARIOS.values()] + [
+            Patch(facecolor=GREY, alpha=OUTER_ALPHA, label="Wide light bar: outer approximation"),
+            Patch(facecolor=GREY, label="Narrow dark bar: hull of solved designs"),
+            Line2D([0], [0], color="black", linestyle="--", linewidth=1.0, label="Cost-optimal baseline"),
+        ]
+        fig.legend(handles=handles, loc="lower center", ncol=2, fontsize=S["legend"], frameon=False,
+                   bbox_to_anchor=(0.5, 0.0), handlelength=1.2, handletextpad=0.5, columnspacing=2.0)
+        savefig(fig, "fig61_heat_mandate_effects")
 
 
 if __name__ == "__main__":

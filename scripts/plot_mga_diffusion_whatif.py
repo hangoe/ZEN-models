@@ -52,17 +52,21 @@ import numpy as np
 import pandas as pd
 import yaml
 
+from contextlib import contextmanager
+
 from matplotlib.colors import to_rgba
 from matplotlib.lines import Line2D
 from matplotlib.patches import Patch
 from scipy.optimize import linprog
 
-from plots.figure_settings import SCENARIO_PALETTE, apply_font_mode, eth_tint
+from plots.figure_settings import REPORT_RC, REPORT_WIDTH, SCENARIO_PALETTE, apply_font_mode, eth_tint
 from plots.mga_capex_periods_common import METRIC_COLOR, MODEL, REPO_ROOT, RUN_DIR, savefig
 from zen_garden.postprocess.results import Results
 from zen_garden_plugins.mga.polytope_io import load_polytope
 
 apply_font_mode()
+
+SHOW_TITLE = False  # figure suptitle; False for the report
 
 RUN_PATH = RUN_DIR / f"{MODEL}_batch_summary" / "polytope.npz"
 BASELINE_PATH = RUN_DIR / MODEL
@@ -108,6 +112,31 @@ _GREY = SCENARIO_PALETTE[6]
 MANDATE_COLOR = {"heat": METRIC_COLOR["heating"], "ccs": METRIC_COLOR["ccs"]}
 INK, MUTED = "#333333", "#6F6F6F"
 R_DIFF = r"$r^{\mathrm{diff}}$"
+
+# Sizes of the drawing functions. fig51/52 are screen figures; fig51b (and fig61) are
+# report figures at REPORT_WIDTH and use the report sizes (see report_style()).
+SIZES = {
+    "screen": dict(report=False, title=11, label=9, tick=9, band_label=8.5, value=8, line=2.2, marker=7,
+                   dot=9, legend=9),
+    "report": dict(report=True, title=9.5, label=9, tick=8, band_label=7, value=7, line=1.4, marker=4,
+                   dot=5.5, legend=8),
+}
+S = dict(SIZES["screen"])
+
+
+@contextmanager
+def report_style():
+    """Report sizes and REPORT_RC for the figures built (and saved) inside the block."""
+    S.update(SIZES["report"])
+    try:
+        with plt.rc_context(REPORT_RC):
+            yield
+    finally:
+        S.update(SIZES["screen"])
+
+
+def panel_title(ax, text: str) -> None:
+    ax.set_title(text, fontsize=S["title"], fontweight="bold", color=INK, loc="left")
 
 
 def diffusion_trajectory(r_diff: float, s0: float, delta: float = KNOWLEDGE_DEPRECIATION,
@@ -243,10 +272,10 @@ def solve_all(poly, axis_idx, floors, ceilings, bound, metrics: tuple[str, ...])
 
 
 def style_axes(ax, title: str, ylabel: str | None = None) -> None:
-    ax.set_title(title, fontsize=11, fontweight="bold", color=INK, loc="left")
+    panel_title(ax, title)
     if ylabel:
-        ax.set_ylabel(ylabel, fontsize=9, color=MUTED)
-    ax.tick_params(labelsize=9, colors=MUTED)
+        ax.set_ylabel(ylabel, fontsize=S["label"], color=MUTED)
+    ax.tick_params(labelsize=S["tick"], colors=MUTED)
     ax.spines[["top", "right"]].set_visible(False)
     ax.spines[["left", "bottom"]].set_color("#BBBBBB")
 
@@ -283,9 +312,9 @@ def draw_mandate_panel(ax, poly, axis_idx, metric: str, scenarios: list, context
         label_ys[i] = ceiling = min(value, ceiling - LABEL_MIN_GAP)
     for i, scenario in enumerate(scenarios):
         path, upper = scenario["path"], scenario["path_upper"]
-        ax.plot(list(path), [100 * v for v in path.values()], color=scenario["color"], linewidth=2.2, zorder=8)
+        ax.plot(list(path), [100 * v for v in path.values()], color=scenario["color"], linewidth=S["line"], zorder=8)
         if upper:
-            ax.plot(list(upper), [100 * v for v in upper.values()], color=scenario["color"], linewidth=2.2, zorder=8)
+            ax.plot(list(upper), [100 * v for v in upper.values()], color=scenario["color"], linewidth=S["line"], zorder=8)
             ax.fill_between(list(path), [100 * v for v in path.values()], [100 * v for v in upper.values()],
                             color=scenario["fill"], alpha=scenario["alpha"], linewidth=0, zorder=7)
         else:
@@ -294,12 +323,12 @@ def draw_mandate_panel(ax, poly, axis_idx, metric: str, scenarios: list, context
             ax.fill_between(list(path), [100 * v for v in path.values()], 100, facecolor="none",
                             edgecolor=scenario["fill"], hatch="////", linewidth=0, alpha=0.55, zorder=6)
         reachable = scenario["ranges"] is not None
-        ax.plot(YEARS, [100 * path[y] for y in YEARS], linestyle="none", marker="^", markersize=7,
+        ax.plot(YEARS, [100 * path[y] for y in YEARS], linestyle="none", marker="^", markersize=S["marker"],
                 markerfacecolor=scenario["color"] if reachable else "white",
                 markeredgecolor=scenario["color"], zorder=9)
         if upper:
             capped = [y for y in YEARS if upper[y] < 1.0]
-            ax.plot(capped, [100 * upper[y] for y in capped], linestyle="none", marker="v", markersize=7,
+            ax.plot(capped, [100 * upper[y] for y in capped], linestyle="none", marker="v", markersize=S["marker"],
                     markerfacecolor=scenario["color"] if reachable else "white",
                     markeredgecolor=scenario["color"], zorder=9)
         if i in inside:
@@ -308,10 +337,10 @@ def draw_mandate_panel(ax, poly, axis_idx, metric: str, scenarios: list, context
         else:
             xy, offset, ha = (LABEL_YEAR, label_ys[i]), (7, 0), "left"
         ax.annotate(scenario["label"], xy=xy, xytext=offset, textcoords="offset points",
-                    ha=ha, va="center", fontsize=8.5, color=INK, zorder=12, annotation_clip=False,
+                    ha=ha, va="center", fontsize=S["band_label"], color=INK, zorder=12, annotation_clip=False,
                     bbox={"facecolor": "white", "edgecolor": "none", "alpha": 0.8, "pad": 1})
     start = 100 * scenarios[0]["path"][REFERENCE_YEAR]
-    ax.plot(REFERENCE_YEAR, start, marker="o", markersize=7, color=INK, zorder=10, clip_on=False)
+    ax.plot(REFERENCE_YEAR, start, marker="o", markersize=S["marker"], color=INK, zorder=10, clip_on=False)
     ax.set_ylim(0, 105)
     style_axes(ax, TITLE[metric], YLABEL[metric])
 
@@ -341,7 +370,7 @@ def draw_range_bars(ax, poly, axis_idx, metric: str, scenarios: list, context: d
                    edgecolor="white", linewidth=0.4, zorder=3)
         baseline = to_display(metric, poly.z_star_phys[axis_idx[f"{AXIS_PREFIX[metric]}_{year}"]])
         ax.plot([i - 0.45, i + 0.45], [baseline] * 2, color="black", linestyle="--", linewidth=1.0, zorder=6)
-    ax.set_xticks(range(len(years)), [str(y) for y in years], fontsize=9)
+    ax.set_xticks(range(len(years)), [str(y) for y in years], fontsize=S["tick"])
     ax.set_xlim(-0.55, len(years) - 0.45)
     ax.grid(axis="y", alpha=0.25)
 
@@ -384,29 +413,31 @@ def draw_cost_dots(ax, scenarios: list, c_star: float, top: float, title: str | 
             ax.plot(position, scenario["outer"]["cost"][0], marker="o", markersize=8, markerfacecolor="white",
                     markeredgecolor=scenario["color"], markeredgewidth=1.4, linestyle="none", zorder=5, clip_on=False)
         if scenario["ranges"] is None:
-            ax.text(position, top / 2, "not\nreachable", ha="center", va="center", fontsize=8, color=MUTED)
+            ax.text(position, top / 2, "not\nreachable", ha="center", va="center", fontsize=S["value"], color=MUTED)
             continue
         low = scenario["ranges"]["cost"][0]
-        ax.plot([position, position], [0, low], color=scenario["fill"], linewidth=2.0, zorder=3)
-        ax.plot(position, low, marker="o", markersize=9, color=scenario["fill"], markeredgecolor="white",
-                markeredgewidth=0.8, zorder=4)
-        label, label_xy = f"+{max(0.0, extra_cost_bn(low, c_star)):,.0f} bn", (position, low)
         if show_inner:
+            # fig51b: like fig61, one bar from the outer approximation's cheapest cost (lower
+            # limit) to the inner hull's (upper limit); the true minimum lies in between.
             inner = scenario["inner"]
-            x = position + INNER_OFFSET
             if inner is None:
-                ax.text(x, low, "hull:\nn/a", ha="left", va="bottom", fontsize=7, color=MUTED)
-            else:
-                high = inner["cost"][0]
-                ax.plot([x, x], [0, high], color=scenario["color"], linewidth=1.3, linestyle="--", zorder=3)
-                ax.plot(x, high, marker="o", markersize=8, markerfacecolor="white", markeredgecolor=scenario["color"],
-                        markeredgewidth=1.4, linestyle="none", zorder=5)
-                label = (f"+{max(0.0, extra_cost_bn(low, c_star)):,.0f} / "
-                         f"+{max(0.0, extra_cost_bn(high, c_star)):,.0f} bn")
-                label_xy = (position + INNER_OFFSET / 2, max(low, high))
-        ax.annotate(label, xy=label_xy, xytext=(0, 8), textcoords="offset points", ha="center", va="bottom",
-                    fontsize=8, color=INK)
-    ax.set_xticks(range(len(scenarios)), [s["label"] for s in scenarios], fontsize=9)
+                ax.text(position, low, "hull:\nn/a", ha="center", va="bottom", fontsize=S["value"] - 1, color=MUTED)
+                continue
+            high = inner["cost"][0]
+            ax.bar(position, max(high - low, top * 0.01), bottom=low, width=0.5, color=scenario["fill"], alpha=0.8,
+                   edgecolor=scenario["color"], linewidth=0.8, zorder=3)
+            # (two lines at report width, where five one-line labels would collide)
+            label = (f"+{max(0.0, extra_cost_bn(low, c_star)):,.0f} to" + ("\n" if S["report"] else " ")
+                     + f"+{max(0.0, extra_cost_bn(high, c_star)):,.0f} bn")
+            ax.annotate(label, xy=(position, max(low, high)), xytext=(0, 3), textcoords="offset points",
+                        ha="center", va="bottom", fontsize=S["value"], color=INK, linespacing=1.0)
+            continue
+        ax.plot([position, position], [0, low], color=scenario["fill"], linewidth=S["line"], zorder=3)
+        ax.plot(position, low, marker="o", markersize=S["dot"], color=scenario["fill"], markeredgecolor="white",
+                markeredgewidth=0.8, zorder=4)
+        ax.annotate(f"+{max(0.0, extra_cost_bn(low, c_star)):,.0f} bn", xy=(position, low), xytext=(0, 8),
+                    textcoords="offset points", ha="center", va="bottom", fontsize=S["value"], color=INK)
+    ax.set_xticks(range(len(scenarios)), [s["label"] for s in scenarios], fontsize=S["tick"])
     ax.set_xlim(-0.6, len(scenarios) - 0.4)
     ax.set_ylim(0, top)
     step = next(step for step in (0.05, 0.1, 0.25, 0.5, 1.0) if top / step <= 6)
@@ -504,55 +535,79 @@ def make_figure(rows: dict, poly, axis_idx, with_biomass: bool = True, name: str
     cost_top = max(cheapest * 1.3, 0.1)  # outer costs can all be ~0
 
     n_cols = 3 if with_biomass else 2
-    fig = plt.figure(figsize=(13.5 if with_biomass else 10.0, 9.0))
-    left = 0.07 if with_biomass else 0.09
-    grid = fig.add_gridspec(len(metrics), n_cols, width_ratios=[1.15, 1, 1][:n_cols], left=left, right=0.98,
-                            top=0.91, bottom=0.16 if with_biomass else 0.19, wspace=0.3, hspace=0.38)
+    n_legend_rows = 3 if show_inner or SHOW_OUTER else 2
+    if S["report"]:  # report width; legend rows of 0.2 in under the x tick labels
+        height, row_in = 5.6, 0.2
+        layout = dict(left=0.1, right=0.99, top=0.95, bottom=(0.42 + n_legend_rows * row_in) / height,
+                      wspace=0.42, hspace=0.42)
+        fig = plt.figure(figsize=(REPORT_WIDTH, height))
+    else:
+        height, row_in = 9.0, 0.315
+        left = 0.07 if with_biomass else 0.09
+        layout = dict(left=left, right=0.98, top=0.91, bottom=0.16 if with_biomass else 0.19, wspace=0.3, hspace=0.38)
+        fig = plt.figure(figsize=(13.5 if with_biomass else 10.0, height))
+    grid = fig.add_gridspec(len(metrics), n_cols, width_ratios=[1.15, 1, 1][:n_cols], **layout)
     biomass_axes = []
+    letters = iter("abcdefgh")
     for r, metric in enumerate(metrics):
         scenarios, context = rows[metric]
-        draw_mandate_panel(fig.add_subplot(grid[r, 0]), poly, axis_idx, metric, scenarios, context)
+        ax = fig.add_subplot(grid[r, 0])
+        draw_mandate_panel(ax, poly, axis_idx, metric, scenarios, context)
+        if S["report"]:
+            panel_title(ax, f"({next(letters)}) {TITLE[metric]}")
         if with_biomass:
             ax = fig.add_subplot(grid[r, 1], sharey=biomass_axes[0] if biomass_axes else None)
             draw_biomass_bars(ax, poly, axis_idx, scenarios, context, title=TITLE["biomass"] if r == 0 else None)
             biomass_axes.append(ax)
         cost_title = "Cheapest extra cost" if show_inner else f"Cheapest extra cost{COST_NOTE}"
+        if S["report"]:  # every panel gets its "(x) ..." header
+            cost_title = f"({next(letters)}) {cost_title}"
+        elif r:
+            cost_title = None
         draw_cost_dots(fig.add_subplot(grid[r, n_cols - 1]), scenarios, poly.c_star, cost_top,
-                       cost_title if r == 0 else None, show_inner=show_inner)
+                       cost_title, show_inner=show_inner)
 
     effect = "biomass imports and cost" if with_biomass else "cost"
     approximations = f"{RANGE_NAME}; cost also inner hull" if show_inner else RANGE_NAME
-    fig.suptitle(f"Diffusion rate bands: effect on {effect} ({approximations})", fontsize=14, fontweight="bold",
-                 color=INK, x=left, ha="left", y=0.985)
+    if SHOW_TITLE:  # off for the thesis figures (caption carries the title)
+        fig.suptitle(f"Diffusion rate bands: effect on {effect} ({approximations})", fontsize=14, fontweight="bold",
+                     color=INK, x=layout["left"], ha="left", y=0.985)
     labels = [s["label"] for s in rows["heat"][0]]
-    handles = [Patch(facecolor=eth_tint(_GREY, tint), label=f"{R_DIFF} {label}")
-               for label, tint in zip(labels, BAND_TINTS)] + [
-        Patch(facecolor=_GREY, alpha=0.35, label=f"Near-optimal space ({RANGE_NAME})"),
-        Line2D([0], [0], color="black", linestyle="--", linewidth=1.0, label="Cost-optimal baseline"),
-        Line2D([0], [0], marker="^", color="none", markerfacecolor=MUTED, markeredgecolor=MUTED, markersize=7,
-               label="Imposed minimum"),
-        Line2D([0], [0], marker="v", color="none", markerfacecolor=MUTED, markeredgecolor=MUTED, markersize=7,
-               label="Imposed maximum"),
+    # Legend in rows: diffusion rate bands / context and imposed limits / cost markers.
+    legend_rows = [
+        [Patch(facecolor=eth_tint(_GREY, tint), label=f"{R_DIFF} {label}")
+         for label, tint in zip(labels, BAND_TINTS)],
+        [
+            Patch(facecolor=_GREY, alpha=0.35, label=f"Near-optimal space ({RANGE_NAME})"),
+            Line2D([0], [0], color="black", linestyle="--", linewidth=1.0, label="Cost-optimal baseline"),
+            Line2D([0], [0], marker="^", color="none", markerfacecolor=MUTED, markeredgecolor=MUTED, markersize=S["marker"],
+                   label="Imposed minimum"),
+            Line2D([0], [0], marker="v", color="none", markerfacecolor=MUTED, markeredgecolor=MUTED, markersize=S["marker"],
+                   label="Imposed maximum"),
+        ],
+        [],
     ]
     if show_inner:
-        handles += [
-            Line2D([0], [0], marker="o", color=MUTED, markerfacecolor=MUTED, markeredgecolor="white", markersize=8,
-                   linewidth=2.0, label=f"Cost, {RANGE_NAME} (lower limit)"),
-            Line2D([0], [0], marker="o", color=MUTED, markerfacecolor="white", markeredgecolor=MUTED,
-                   markeredgewidth=1.4, markersize=8, linewidth=1.3, linestyle="--",
-                   label="Cost, inner hull (upper limit); label: lower / upper"),
+        legend_rows[2] += [
+            Patch(facecolor=eth_tint(_GREY, 0.35), edgecolor=MUTED, linewidth=0.8,
+                  label="Cheapest extra cost: from outer approximation (lower limit) "
+                        "to inner hull (upper limit)"),
         ]
     if SHOW_OUTER:
-        handles += [
+        legend_rows[2] += [
             Patch(facecolor="none", edgecolor=MUTED, linestyle=(0, (2.5, 1.5)), linewidth=0.9,
                   label="Outer approximation (biomass)"),
         ] * with_biomass + [
             Line2D([0], [0], marker="o", color="none", markerfacecolor="white", markeredgecolor=MUTED,
                    markeredgewidth=1.4, markersize=8, label="Outer approximation (cost)"),
         ]
-    fig.legend(handles=handles, loc="lower center", ncol=5 if with_biomass else 3, fontsize=9, frameon=False,
-               bbox_to_anchor=(0.52, 0.0), columnspacing=1.6, handletextpad=0.6,
-               title="Band shade, lighter = slower (hue per technology)", title_fontsize=9)
+    legend_rows = [row for row in legend_rows if row]
+    row_height = row_in / height
+    for i, row in enumerate(legend_rows):
+        fig.legend(handles=row, loc="lower center", ncol=len(row), fontsize=S["legend"], frameon=False,
+                   bbox_to_anchor=(0.52, row_height * (len(legend_rows) - 1 - i)),
+                   columnspacing=1.2 if S["report"] else 1.6, handlelength=1.2 if S["report"] else 2.0,
+                   handletextpad=0.5 if S["report"] else 0.6)
     savefig(fig, name)
 
 
@@ -594,7 +649,8 @@ def main() -> None:
     print("baseline 2022:", {metric: round(value, 4) for metric, value in initial.items()})
     rows = solve_bands(poly, axis_idx, initial, mandate_start(poly, initial))
     make_figure(rows, poly, axis_idx)
-    make_figure(rows, poly, axis_idx, with_biomass=False, name=COMPACT_FIGURE_NAME)
+    with report_style():  # fig51b is a report figure
+        make_figure(rows, poly, axis_idx, with_biomass=False, name=COMPACT_FIGURE_NAME)
     make_cross_figure(rows, poly, axis_idx)
 
 
