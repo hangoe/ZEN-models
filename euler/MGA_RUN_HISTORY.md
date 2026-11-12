@@ -212,6 +212,11 @@ iterations) and max_iterations 2000 -> 300 so the run finishes inside the
 14-day limit (no SIGTERM handling -> a time-limit kill writes no results).
   sbatch --array=44 --cpus-per-task=128 --mem-per-cpu=5G submit_euler_mga.sh
 
+task_id 45 added 2026-11-12: task_id 44 with 1 ts/yr and solver_threads 2 --
+a quick preview of run 44's results. Resources as task_id 33 (same 1-ts model,
+batch16 x 2 threads, 192 GB; axis count barely changes LP memory).
+  sbatch --array=45 --time=5-00:00:00 --cpus-per-task=32 --mem-per-cpu=6G submit_euler_mga.sh
+
 Requires the MGA install step in setup_euler_env.sh to have been run once
 (clones + installs ZEN-garden-plugins and near_optimal_tools/pyoNearOpt,
 incl. the "bbo" extra needed by batch bbo mode).

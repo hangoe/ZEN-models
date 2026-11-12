@@ -85,6 +85,7 @@ the zen-europe versions of removed ones in archive/zen_europe/):
                                           in it, no colourbar
   fig31_matrix_tsa                     — fig30 with 10 / 20 representative time steps as rows instead
                                           of temperature resolution, ETH green cells
+  fig311_matrix_tsa_sized_delta_border — fig310's layout for fig31's matrix, bronze baseline block
   fig20_cost_breakdown_sector_industry_heating — total system cost drilled down sector ->
                                           industries -> low-temperature heat
   fig40_flex_scenarios                 — flexibility scenarios (DSM pessimistic/DSM only/TES only/
@@ -2602,13 +2603,16 @@ FIG309_STYLE = {**FIG307_STYLE, "whole_border": 2.6}
 FIG310_STYLE = dict(baseline=_eth_tint(_ETH_BLUE, 0.8), text="black", whole_border=2.6,
                     increase=dict(facecolor=_eth_tint(_ETH_GREEN, 0.68), edgecolor="none"),
                     decrease=dict(facecolor=_eth_tint(_ETH_RED, 0.68), edgecolor="none"))
+# fig311: fig310 with a light ETH bronze baseline block instead of blue (the
+# ETH swatch's closest to yellow), so the TSA matrix reads apart from fig310.
+FIG311_STYLE = {**FIG310_STYLE, "baseline": _eth_tint(_ETH_BRONZE, 0.6)}
 
 
-def _fig306_legend(style: dict) -> list[Patch]:
+def _fig306_legend(style: dict, baseline_label: str = f"{FULL}, 3 temp. levels") -> list[Patch]:
     """Legend handles for a FIG30x_STYLE."""
     whole = style.get("whole_border")
     handles = [Patch(facecolor=style["baseline"], edgecolor="none" if whole else "#1F2A3A",
-                     label=f"Baseline ({FULL}, 3 temp. levels)"),
+                     label=f"Baseline ({baseline_label})"),
                Patch(**style["increase"], label="Increase over baseline"),
                Patch(**style["decrease"], label="Decrease below baseline")]
     if whole:
@@ -2625,7 +2629,8 @@ def _fig300_sized_panel(fig: plt.Figure, ax: plt.Axes, values: dict[tuple[int, i
                         row_names: tuple[str, str] = ("3 temp. levels", "Single temp. level"),
                         align: str = "inner", arrows: bool = False,
                         single_color: str | None = None, max_outline: bool = False,
-                        baseline_delta: dict | None = None):
+                        baseline_delta: dict | None = None,
+                        placeholders: frozenset = frozenset()):
     """_fig30_matrix_panel with the relative change also encoded as box size
     (see FIG300_BASE_SIDE). Same colours and colourbar, unless `single_color`
     fills every box with that colour and drops the colourbar. `align` "inner":
@@ -2641,7 +2646,9 @@ def _fig300_sized_panel(fig: plt.Figure, ax: plt.Axes, values: dict[tuple[int, i
     so the delta is what's left around it: the style's increase patch, or its decrease
     patch where the box is smaller than the block. No colourbar; text centred in
     the whole box; labels at fixed slot positions and margins equal on all sides, so
-    every panel has the same geometry whatever its values. Returns the colourbar,
+    every panel has the same geometry whatever its values. `placeholders` (only
+    with `baseline_delta`) hatches those boxes and marks them "placeholder" (fig311).
+    Returns the colourbar,
     or None without one (see _fig30_matrix_panel)."""
     base_rc = (0, 0)
     base = values[base_rc]
@@ -2684,6 +2691,11 @@ def _fig300_sized_panel(fig: plt.Figure, ax: plt.Axes, values: dict[tuple[int, i
             if whole:
                 ax.add_patch(Rectangle((x0, y0), s, s, fill=False, edgecolor="#1F2A3A",
                                        linewidth=whole, zorder=3))
+            if rc in placeholders:
+                ax.add_patch(Rectangle((x0, y0), s, s, fill=False, edgecolor="#1F2A3A",
+                                       linewidth=0, hatch="//", alpha=0.35, zorder=3))
+                ax.text(x0 + s / 2, y0 + 0.08, "placeholder", ha="center", va="center",
+                        fontsize=10, style="italic", color=baseline_delta["text"], zorder=4)
             delta = c - base
             sign = "+" if delta >= 0 else "−"
             lines = [(f"{value_fmt.format(c)} {unit}", dict(fontsize=12.5))]
@@ -2943,6 +2955,23 @@ def fig31_matrix_tsa(no_flex_run: Run, no_flex_20ts_run: Run, full_run: Run,
     _matrix_figure(cells, "fig31_matrix_tsa",
                    ramp=(_eth_tint(_ETH_GREEN, 0.85), _ETH_GREEN, "#2F3709"),
                    row_names=("10 time steps", "20 time steps"),
+                   placeholders=frozenset({(1, 1)} if no_flex_20ts_placeholder else ()))
+
+
+def fig311_matrix_tsa_sized_delta(no_flex_run: Run, no_flex_20ts_run: Run, full_run: Run,
+                                  full_20ts_run: Run, no_flex_20ts_placeholder: bool = False) -> None:
+    """fig310's sized-delta layout for fig31's time-series-aggregation matrix:
+    rows 10 / 20 representative time steps, baseline Full flexibility 10 ts,
+    light bronze baseline block instead of blue (FIG311_STYLE), green/red delta.
+    `no_flex_20ts_placeholder` as in fig31.
+    -> SI_results/fig311_matrix_tsa_sized_delta_border.svg
+    """
+    cells = {(0, 0): full_run, (0, 1): no_flex_run,
+             (1, 0): full_20ts_run, (1, 1): no_flex_20ts_run}
+    _matrix_figure(cells, "fig311_matrix_tsa_sized_delta_border", panel_fn=_fig300_sized_panel,
+                   baseline_delta=FIG311_STYLE,
+                   legend=_fig306_legend(FIG311_STYLE, f"{FULL}, 10 time steps"),
+                   symmetric=True, row_names=("10 time steps", "20 time steps"),
                    placeholders=frozenset({(1, 1)} if no_flex_20ts_placeholder else ()))
 
 
@@ -4936,8 +4965,9 @@ def main() -> None:
     run_if([FULL, DSM_NO_COST_SCENARIO[1]],
            fig51_capacity_and_storage_dsm_no_cost_vs_full_flex, full, dsm_no_cost)
     # No flexibility 20 ts missing -> 10 ts run as a marked placeholder.
-    run_if([NO_FLEX, FULL, FULL_FLEX_20TS_SCENARIO[1]], fig31_matrix_tsa,
-           no_flex, no_flex_20ts or no_flex, full, full_20ts, no_flex_20ts is None)
+    for fn in (fig31_matrix_tsa, fig311_matrix_tsa_sized_delta):
+        run_if([NO_FLEX, FULL, FULL_FLEX_20TS_SCENARIO[1]], fn,
+               no_flex, no_flex_20ts or no_flex, full, full_20ts, no_flex_20ts is None)
     run_if([FULL, FULL_FLEX_20TS_SCENARIO[1]], fig60_full_flex_20ts_vs_10ts,
            full, full_20ts)
     run_if([FULL, FULL_FLEX_20TS_SCENARIO[1]],
