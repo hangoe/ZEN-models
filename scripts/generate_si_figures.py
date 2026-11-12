@@ -57,6 +57,10 @@ the zen-europe versions of removed ones in archive/zen_europe/):
   fig15a_heat_supply_output_no_flexibility_twh — standalone copy of fig9's top ("Industry heat
                                           supply") panel only, in TWh
   fig15b_heat_supply_output_full_flexibility_twh — same as fig15a, for the Full flexibility scenario
+  fig70_rq1_electrification_ripple     — RQ1 summary (meant to replace fig12 + fig15a): heat supply share
+                                          No-Flex + electrified share of all scenarios, and No-Flex − Legacy
+                                          Δ electricity consumption by cause, Δ capacity, Δ storage discharge.
+                                          `python scripts/generate_si_figures.py fig70` builds only this one
   fig12_capacity_and_storage_base_and_delta — power generation capacity & storage annual energy
                                           discharged at 2030/2040/2050, as ZEN-Europe base (absolute
                                           stack) + a floating Δ No flexibility bar per year
@@ -4171,6 +4175,254 @@ def _capacity_and_storage_base_and_delta(base_run: Run, no_flex_run: Run, base_l
     savefig(fig, fig_name)
 
 
+# ── 70: RQ1 summary figure — heat electrification -> power-system ripple ─────
+# One figure meant to replace fig12 + fig15a for RQ1. Four rows, shared time
+# axis, read top to bottom as cause -> effect:
+#   (a) industrial heat supply share in No-Flex (aggregated categories) plus
+#       the electrified share of every other scenario as thin lines (robustness)
+#   (b) Δ electricity consumption vs. Legacy, split by cause
+#   (c) Δ power generation capacity vs. Legacy
+#   (d) Δ storage discharge vs. Legacy
+# Cause groups for (b) come from Δ flow_conversion_input[electricity] by
+# technology (No-Flex − Legacy). The generic heat_pump/electrode_boiler
+# (carrier "heat") grow by about the same amount as DAC's extra heat
+# consumption (the exogenous heat demand is the same in both runs), so they
+# are counted under carbon removal together with DAC itself.
+
+RQ1_HEAT_CATEGORIES = {
+    "Heat pumps": [t for t in HEAT_SUPPLY_STACK_ORDER if t.startswith("heat_pump_industry")],
+    "Electrode boilers": ["electrode_boiler_industry"],
+    "Biomass boilers": ["biomass_boiler_industry"],
+    "Fossil & waste boilers": ["natural_gas_boiler_industry", "coal_boiler_industry",
+                               "oil_boiler_industry", "waste_boiler_industry"],
+}
+RQ1_HEAT_COLORS = {
+    "Heat pumps": _ETH_BLUE,
+    "Electrode boilers": _ETH_GREEN,
+    "Biomass boilers": _eth_tint(_ETH_GREEN, 0.55),
+    "Fossil & waste boilers": _ETH_GREY,
+}
+
+RQ1_ELEC_CAUSES = {
+    "Industrial heat <200 °C": lambda t: t.startswith("heat_pump_industry") or t == "electrode_boiler_industry",
+    "New industry sectors": lambda t: t in {"paper_production", "food_production", "ceramic_production",
+                                            "glass_production", "electricity_to_kilnfuel"},
+    "Carbon removal (DAC + its heat)": lambda t: t in {"DAC", "heat_pump", "electrode_boiler"},
+    # No-Flex electrifies passenger cars in 2034 instead of 2038 (same 2050 stock)
+    "Transport (earlier EVs)": lambda t: t == "BEV",
+}
+RQ1_ELEC_OTHER = "Other"
+RQ1_ELEC_COLORS = {
+    "Industrial heat <200 °C": _ETH_BLUE,
+    "New industry sectors": _ETH_BRONZE,
+    "Carbon removal (DAC + its heat)": _ETH_PURPLE,
+    "Transport (earlier EVs)": _ETH_RED,
+    RQ1_ELEC_OTHER: _eth_tint(_ETH_GREY, 0.45),
+}
+
+RQ1_CAP_GROUPS = {
+    "Solar PV": ["photovoltaics"],
+    "Wind": ["wind_onshore", "wind_offshore"],
+}
+RQ1_CAP_COLORS = {"Solar PV": _SOLAR_YELLOW, "Wind": _eth_tint(_ETH_BLUE, 0.55),
+                  "Other": _eth_tint(_ETH_GREY, 0.45)}
+RQ1_STO_GROUPS = {
+    "Battery": ["battery"],
+    "Natural gas storage": ["natural_gas_storage"],
+    "Hydrogen (salt cavern)": ["salt_cavern_storage"],
+}
+RQ1_STO_COLORS = {"Battery": _ETH_BLUE, "Natural gas storage": _ETH_TURQUOISE,
+                  "Hydrogen (salt cavern)": _ETH_PURPLE, "Other": _eth_tint(_ETH_GREY, 0.45)}
+
+
+def _group_rows(df: pd.DataFrame, groups: dict[str, list[str]], other: str = "Other") -> pd.DataFrame:
+    """Sum the rows of `df` (index = technology) into `groups`; the rest -> `other`."""
+    out, used = {}, set()
+    for name, techs in groups.items():
+        present = [t for t in techs if t in df.index]
+        out[name] = df.loc[present].sum() if present else pd.Series(0.0, index=df.columns)
+        used.update(present)
+    rest = [t for t in df.index if t not in used]
+    out[other] = df.loc[rest].sum() if rest else pd.Series(0.0, index=df.columns)
+    return pd.DataFrame(out).T
+
+
+def _delta(base: pd.DataFrame, other: pd.DataFrame) -> pd.DataFrame:
+    """other − base on the union of rows/columns (missing -> 0)."""
+    idx = base.index.union(other.index)
+    cols = [c for c in other.columns if c in base.columns]
+    return other.reindex(idx, fill_value=0.0)[cols] - base.reindex(idx, fill_value=0.0)[cols]
+
+
+def _electricity_consumption_twh(r: Run) -> pd.DataFrame:
+    """Electricity consumed by conversion technologies, TWh, index=technology."""
+    fi = _cached_total(r.results, "flow_conversion_input")
+    return fi.xs("electricity", level="carrier").groupby("technology").sum() / 1000.0
+
+
+def _electricity_by_cause(df: pd.DataFrame) -> pd.DataFrame:
+    rows, used = {}, set()
+    for cause, member in RQ1_ELEC_CAUSES.items():
+        techs = [t for t in df.index if member(t)]
+        rows[cause] = df.loc[techs].sum() if techs else pd.Series(0.0, index=df.columns)
+        used.update(techs)
+    rows[RQ1_ELEC_OTHER] = df.loc[[t for t in df.index if t not in used]].sum()
+    return pd.DataFrame(rows).T
+
+
+def _total_electricity_twh(r: Run) -> pd.Series:
+    """Conversion-technology input + exogenous electricity demand, TWh per year."""
+    total = _electricity_consumption_twh(r).sum()
+    try:
+        total = total + r.results.get_total("demand").xs("electricity", level="carrier").sum() / 1000.0
+    except KeyError:
+        pass
+    return total
+
+
+def _signed_stacked_bars(ax: plt.Axes, df: pd.DataFrame, colors: dict, x: np.ndarray,
+                         width: float = 0.7) -> tuple[np.ndarray, np.ndarray]:
+    """Stack positive values upwards and negative values downwards from 0.
+    df: index = category (bottom to top), columns = years. Returns (top, bottom)."""
+    pos = np.zeros(len(df.columns))
+    neg = np.zeros(len(df.columns))
+    for cat in df.index:
+        v = df.loc[cat].to_numpy(dtype=float)
+        vp, vn = np.clip(v, 0, None), np.clip(v, None, 0)
+        ax.bar(x, vp, width, bottom=pos, color=colors[cat], edgecolor="white", linewidth=0.5, label=cat)
+        ax.bar(x, vn, width, bottom=neg, color=colors[cat], edgecolor="white", linewidth=0.5)
+        pos += vp
+        neg += vn
+    return pos, neg
+
+
+def _label_delta_totals(ax: plt.Axes, x: np.ndarray, delta: pd.Series, base_total: pd.Series,
+                        top: np.ndarray, unit: str, fontsize: float = 7.5) -> None:
+    """'+X unit' and '(+Y %)' above each bar (only where the change is noticeable)."""
+    span = max(top.max(), 1e-9)
+    for xi, year, t in zip(x, delta.index, top):
+        d, b = delta[year], base_total[year]
+        if abs(d) < 0.02 * span:
+            continue
+        pct = f"\n({d / b * 100:+.0f} %)" if b else ""
+        ax.text(xi, t + 0.02 * span, f"{d:+,.0f}{pct}", ha="center", va="bottom", fontsize=fontsize)
+
+
+def fig70_rq1_electrification_ripple(base_run: Run, no_flex_run: Run, other_runs: list[Run]) -> None:
+    """RQ1 summary: industrial heat electrifies in every scenario (a), which,
+    together with the rest of the industry extension, raises electricity
+    demand (b), met by more PV/wind (c) and more storage (d). (b)–(d) are
+    No-Flex − Legacy.
+    -> SI_results/fig70_rq1_electrification_ripple.svg
+    """
+    years = [y for y in get_available_years(no_flex_run.results)
+             if y in get_available_years(base_run.results)]
+    x = np.arange(len(years))
+
+    # (a) heat supply shares, No-Flex
+    heat = _output_annual_twh(no_flex_run, INDUSTRY_HEAT_TECHS_BOILERS_HP)
+    heat_share = 100 * _group_rows(heat, RQ1_HEAT_CATEGORIES).drop(index="Other") \
+        .div(heat.sum(), axis=1)[years]
+    electrified = {r.label: _electrification_stack(r).sum(axis=1).reindex(years)
+                   for r in other_runs}
+    nf_elec = heat_share.loc[["Heat pumps", "Electrode boilers"]].sum()
+    all_2050 = [nf_elec[years[-1]]] + [s[years[-1]] for s in electrified.values()]
+
+    # (b) Δ electricity consumption by cause
+    elec_delta = _electricity_by_cause(_delta(_electricity_consumption_twh(base_run),
+                                              _electricity_consumption_twh(no_flex_run)))[years]
+    elec_base_total = _total_electricity_twh(base_run)[years]
+
+    # (c) Δ capacity
+    cap_b = get_capacity(base_run.results, POWER_GEN_TECHS, "power")
+    cap_n = get_capacity(no_flex_run.results, POWER_GEN_TECHS, "power")
+    cap_delta = _group_rows(_delta(cap_b, cap_n), RQ1_CAP_GROUPS)[years]
+    cap_base_total = cap_b.sum()[years]
+
+    # (d) Δ storage discharge
+    sto_techs = BULK_STORAGE_TECHS + INDUSTRY_TES_TECHS
+    sto_b = get_storage_flows(base_run.results, sto_techs, "flow_storage_discharge") / 1000.0
+    sto_n = get_storage_flows(no_flex_run.results, sto_techs, "flow_storage_discharge") / 1000.0
+    sto_delta = _group_rows(_delta(sto_b, sto_n), RQ1_STO_GROUPS)[years]
+    sto_base_total = sto_b.sum()[years]
+
+    print("  fig70 numbers (No-Flex − Legacy):")
+    print("    Δ electricity [TWh]\n" + elec_delta.round(0).to_string())
+    print("    Δ capacity [GW]\n" + cap_delta.round(0).to_string())
+    print("    Δ storage discharge [TWh]\n" + sto_delta.round(0).to_string())
+    print("    electrified share 2050 [%]: " + ", ".join(
+        f"{k}: {v:.1f}" for k, v in zip([no_flex_run.label, *electrified], all_2050)))
+
+    fig, axes = plt.subplots(4, 1, figsize=(9, 12), sharex=True,
+                             gridspec_kw={"height_ratios": [1.1, 1, 1, 1]})
+    title_kw = dict(loc="left", fontsize=11, fontweight="bold")
+
+    # (a)
+    ax = axes[0]
+    bottom = np.zeros(len(years))
+    for cat in RQ1_HEAT_CATEGORIES:
+        v = heat_share.loc[cat].to_numpy()
+        ax.bar(x, v, 0.7, bottom=bottom, color=RQ1_HEAT_COLORS[cat], edgecolor="white",
+               linewidth=0.5, label=f"{cat} ({no_flex_run.label})")
+        bottom += v
+    for i, s in enumerate(electrified.values()):
+        ax.plot(x, s.to_numpy(), color="black", linewidth=0.8, alpha=0.55, marker="o", markersize=2.5,
+                label=f"Electrified share, other scenarios (n={len(electrified)})" if i == 0 else None,
+                zorder=3)
+    ax.set_ylim(0, 105)
+    ax.set_ylabel("Share of industrial\nheat supply (%)")
+    ax.set_title("(a) Industrial heat <200 °C is electrified, in every scenario", **title_kw)
+    lo = min(all_2050)
+    share_txt = "100 %" if lo >= 99.5 else f"≥{lo:.0f} %"
+    ax.text(x[-1] + 0.45, 50, f"{share_txt} electrified\nin 2050 in all\n"
+            f"{len(all_2050)} scenarios", ha="left", va="center", fontsize=8.5)
+
+    # (b)-(d)
+    panels = [
+        (axes[1], elec_delta, RQ1_ELEC_COLORS, elec_base_total, "TWh", "Δ electricity\nconsumption (TWh)",
+         "(b) ... which raises electricity consumption"),
+        (axes[2], cap_delta, RQ1_CAP_COLORS, cap_base_total, "GW", "Δ generation\ncapacity (GW)",
+         "(c) ... met by more solar PV and wind"),
+        (axes[3], sto_delta, RQ1_STO_COLORS, sto_base_total, "TWh", "Δ storage\ndischarge (TWh)",
+         "(d) ... and more storage"),
+    ]
+    for ax, df, colors, base_total, unit, ylabel, title in panels:
+        top, bot = _signed_stacked_bars(ax, df, colors, x)
+        _label_delta_totals(ax, x, df.sum(), base_total, top, unit)
+        span = top.max() - min(bot.min(), 0)
+        ax.set_ylim(min(bot.min(), 0) - 0.05 * span, top.max() + 0.3 * span)
+        ax.axhline(0, color="black", linewidth=0.6)
+        ax.set_ylabel(ylabel)
+        ax.set_title(title, **title_kw)
+
+    for ax in axes:
+        handles, labels = ax.get_legend_handles_labels()
+        if ax is not axes[0]:
+            handles, labels = handles[::-1], labels[::-1]
+        ax.legend(handles, labels, bbox_to_anchor=(1.01, 1), loc="upper left", fontsize=8, frameon=False)
+        ax.spines[["top", "right"]].set_visible(False)
+    axes[0].legend_.set_bbox_to_anchor((1.01, 0.0))
+    axes[0].legend_.set_loc("lower left")
+    axes[-1].set_xticks(x)
+    axes[-1].set_xticklabels([str(y) for y in years])
+    fig.text(0.01, 0.005, f"(b)–(d): {no_flex_run.label} minus {base_run.label}; "
+             "labels give the absolute and relative change of the total.", fontsize=7.5, color="#555555")
+    fig.tight_layout(rect=(0, 0.015, 1, 1))
+    savefig(fig, "fig70_rq1_electrification_ripple")
+
+
+def main_fig70() -> None:
+    """Build only fig70 (loads just the runs it needs)."""
+    runs = load_scenarios()
+    base = load_base_scenario()
+    extras = [load_no_flex_single_temp_scenario(), load_dsm_no_cost_scenario(),
+              load_extra_scenario(FULL_FLEX_20TS_SCENARIO), load_extra_scenario(NO_FLEX_20TS_SCENARIO)]
+    no_flex = by_label(runs, NO_FLEX)
+    others = [r for r in runs if r.label != NO_FLEX] + [r for r in extras if r is not None]
+    FIGURES_DIR.mkdir(parents=True, exist_ok=True)
+    fig70_rq1_electrification_ripple(base, no_flex, others)
+
+
 # ── 11: MGA method schematic (no data) ──────────────────────────────────────
 # Purely illustrative 2D geometry, hand-picked below (not derived from any
 # solved model). Left panel: a toy feasible region under a linear objective,
@@ -4945,6 +5197,9 @@ def main() -> None:
     run_if([NO_FLEX], fig8a_diffusion_mechanisms_heat_pumps, runs)
     run_if([NO_FLEX, FULL], fig9_heat_supply_trajectory, no_flex, full)
     run_if(["base", NO_FLEX], fig12_capacity_and_storage_base_and_delta, base, no_flex)
+    run_if(["base", NO_FLEX], fig70_rq1_electrification_ripple, base, no_flex,
+           [r for r in runs if r.label != NO_FLEX]
+           + [r for r in (no_flex_single, dsm_no_cost, full_20ts, no_flex_20ts) if r is not None])
     single_temp_set = [NO_FLEX, NO_FLEX_SINGLE_TEMP_SCENARIO[1], FULL, SINGLE_TEMP]
     for fn in (fig14a_heat_supply_electrification_singletemp_vs_full,
                fig14b_cost_and_emissions_totals_singletemp_vs_full, fig30_matrix,
@@ -4984,4 +5239,8 @@ def main() -> None:
     print(f"Done. Figures in {FIGURES_DIR.relative_to(REPO_ROOT)}/")
 
 if __name__ == "__main__":
-    main()
+    import sys
+    if sys.argv[1:] == ["fig70"]:
+        main_fig70()
+    else:
+        main()
