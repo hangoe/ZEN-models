@@ -45,7 +45,7 @@ SI_results/ (results; removed/superseded figures are kept in SI_results/archive/
 the zen-europe versions of removed ones in archive/zen_europe/):
   fig1_cost_composition (was fig0a)            — CAPEX/OPEX/carrier/carbon-cost breakdown of each v7_0
                                           scenario's cost increase vs ZEN-Europe base
-  fig2_emissions_source_comparison (was fig0b) — Full flex vs ZEN-Europe base, year 2025: where the
+  fig2_emissions_by_source_and_carbon_budget (was fig0b) — Full flex vs ZEN-Europe base, year 2025: where the
                                           emissions increase comes from vs. only a modest cost delta
   fig5b_dsm_discharge_by_product        — annual DSM throughput per product: optimistic vs pessimistic
   fig6_heat_pathway (was fig3b)        — direct vs temp-conversion heat production, 2050
@@ -54,14 +54,10 @@ the zen-europe versions of removed ones in archive/zen_europe/):
   fig9_heat_supply_trajectory_noflex_vs_fullflex — industry heat output / capacity stock / capacity
                                           additions over every modeled year, No flexibility (left) next
                                           to Full flexibility (right); replaces the former fig9 + fig9b
-  fig15a_heat_supply_output_no_flexibility_twh — standalone copy of fig9's top ("Industry heat
+  fig15a_heat_supply_no_flex — standalone copy of fig9's top ("Industry heat
                                           supply") panel only, in TWh
   fig15b_heat_supply_output_full_flexibility_twh — same as fig15a, for the Full flexibility scenario
-  fig70_rq1_electrification_ripple     — RQ1 summary (meant to replace fig12 + fig15a): heat supply share
-                                          No-Flex + electrified share of all scenarios, and No-Flex − Legacy
-                                          Δ electricity consumption by cause, Δ capacity, Δ storage discharge.
-                                          `python scripts/generate_si_figures.py fig70` builds only this one
-  fig12_capacity_and_storage_base_and_delta — power generation capacity & storage annual energy
+  fig12_capacity_and_storage_legacy_vs_no_flex — power generation capacity & storage annual energy
                                           discharged at 2030/2040/2050, as ZEN-Europe base (absolute
                                           stack) + a floating Δ No flexibility bar per year
   fig14a_heat_supply_electrification_singletemp_vs_full — "electrified" industry heat share (heat
@@ -82,14 +78,14 @@ the zen-europe versions of removed ones in archive/zen_europe/):
                                           curtailment as in fig43), cells shaded by value, with arrows from the
                                           cheapest cell (Full flexibility, 3 temp levels) giving each
                                           other cell's extra cost in % and bn EUR
-  fig310_matrix_sized_delta_hatched_border — fig30 with box size set by the relative change to the
+  fig310_matrix_temperature_levels — fig30 with box size set by the relative change to the
                                           baseline, blue baseline block inside each box, increase
                                           solid light green, decrease solid light red, thick
                                           border around each whole box with its numbers centred
                                           in it, no colourbar
   fig31_matrix_tsa                     — fig30 with 10 / 20 representative time steps as rows instead
                                           of temperature resolution, ETH green cells
-  fig311_matrix_tsa_sized_delta_border — fig310's layout for fig31's matrix, bronze baseline block
+  fig311_matrix_time_steps — fig310's layout for fig31's matrix, bronze baseline block
   fig20_cost_breakdown_sector_industry_heating — total system cost drilled down sector ->
                                           industries -> low-temperature heat
   fig40_flex_scenarios                 — flexibility scenarios (DSM pessimistic/DSM only/TES only/
@@ -99,7 +95,7 @@ the zen-europe versions of removed ones in archive/zen_europe/):
                                           shaded by the difference to Full flexibility (per column)
   fig42_flex_decomposition             — fig40's data as steps No flexibility -> TES only / DSM only
                                           -> Full flexibility, per metric
-  fig43_flex_scenarios_table_curtailment — fig41 transposed plus a 2050 curtailment row (derived:
+  fig43_flexibility_scenarios_table — fig41 transposed plus a 2050 curtailment row (derived:
                                           capacity * max_load - output, see _curtailment_twh)
   fig50_dsm_no_cost_vs_full_flex       — Full flexibility vs. DSM no cost (336 h) on fig43's metrics
                                           + cost excl. DSM storage cost; difference column shaded by %
@@ -110,7 +106,7 @@ the zen-europe versions of removed ones in archive/zen_europe/):
   fig61_capacity_and_storage_full_flex_20ts_vs_10ts — fig51 for Full flexibility 10 ts vs. 20 ts
 
 SI_results/method/ (no results — methodological/context only; removed ones in archive/method/):
-  fig2_industry_fuel_demand_comparison (was fig4b) — new-sector heat/fuel demand vs. pre-existing cement/steel fuel mix
+  fig2_industry_energy_input_by_carrier (was fig4b) — new-sector heat/fuel demand vs. pre-existing cement/steel fuel mix
   fig3_industry_sector_emissions_context (was fig8) — European industry CO2 emissions by
                                           subsector (JRC-IDEES-2023), colored by ZEN-Europe scope
   fig4_model_scope_coverage (was fig9)  — ZEN-Europe's (+ its industry-heat extension's) share of
@@ -222,7 +218,8 @@ Streamlit dashboard (`figure_settings.py`, `figures_by_run.py`,
 re-deriving them.
 
 Usage:
-    python scripts/generate_si_figures.py
+    python scripts/generate_si_figures.py          # all figures (non-report ones -> SI_results/archive/)
+    python scripts/generate_si_figures.py report   # only the report figures (REPORT_FIGURES)
 """
 
 import json
@@ -275,6 +272,7 @@ from plots.figure_settings import (
     eth_tint,
     get_available_years,
     load_results,
+    report_text_pass,
 )
 
 # Font family (Arial for presentations vs. cmr10/Computer Modern matching
@@ -485,6 +483,25 @@ def by_label(runs: list[Run], label: str) -> Run:
     return next(r for r in runs if r.label == label)
 
 
+# Figures used in MT_report_HG (Results + Appendix) or planned for it. Only these
+# are written to SI_results/ itself; every other results figure goes to
+# SI_results/archive/ (the code for all of them stays in this script).
+# `python scripts/generate_si_figures.py report` regenerates only these.
+REPORT_FIGURES = {
+    "fig2_emissions_by_source_and_carbon_budget",
+    "fig5b_dsm_discharge_by_product",                  # planned
+    "fig12_capacity_and_storage_legacy_vs_no_flex",
+    "fig15a_heat_supply_no_flex",
+    "fig15b_heat_supply_zen_europe",
+    "fig20_cost_breakdown_sector_industry_heating",
+    "fig310_matrix_temperature_levels",
+    "fig311_matrix_time_steps",
+    "fig43_flexibility_scenarios_table",
+}
+# method/ figures used in the report (built in `report` mode as well).
+REPORT_METHOD_FIGURE_FUNCS = {"fig4b_industry_fuel_demand_comparison", "fig13_mga_axis_construction"}
+
+
 def savefig(fig: plt.Figure, name: str, subdir: str | None = None, extra_artists=None) -> None:
     """subdir=None writes straight into FIGURES_DIR (SI_results/) as before;
     subdir="method" (or "archive") writes into that subfolder instead — see
@@ -500,9 +517,12 @@ def savefig(fig: plt.Figure, name: str, subdir: str | None = None, extra_artists
     documented fix: it folds these into that same bbox calculation. Found via
     fig7_retrofit_ccs_comparison's two side-by-side (Scenario/Year) legends
     being clipped despite fitting comfortably within the figure's own size."""
+    if subdir is None and name not in REPORT_FIGURES:
+        subdir = "archive"  # not used in the report -> keep SI_results/ clean
     directory = FIGURES_DIR / subdir if subdir else FIGURES_DIR
     directory.mkdir(parents=True, exist_ok=True)
     path = directory / f"{name}.svg"
+    report_text_pass(fig)  # cmr10-safe text + cmb10/cmti10 for bold/italic (report font mode only)
     fig.savefig(path, bbox_inches="tight", bbox_extra_artists=extra_artists)
     plt.close(fig)
     print(f"  wrote {path.relative_to(REPO_ROOT)}")
@@ -644,53 +664,166 @@ def fig0a_cost_composition(components_with_base: pd.DataFrame) -> None:
 _eth_tint = eth_tint  # alias -- eth_tint itself now lives in figure_settings.py
 
 
-# Print-figure-specific palette (does NOT touch the shared, dashboard-wide
-# COLOR_MAP in figure_settings.py) — see plot_stacked_bars(color_map=...).
-# Heat supply: heat source (water vs. waste heat) sets the hue — blue vs.
-# turquoise — since that is the more physically meaningful distinction (waste
-# heat is a byproduct/free input, water is an ambient draw); temperature band
-# sets the shade within that hue, lighter for lower bands; ALL heat pumps
-# get a hatch, so "textured = heat pump" reads at a glance regardless of hue.
-# Boilers: each fuel gets its OWN hue from the full 7-color ETH swatch
-# (SCENARIO_PALETTE) rather than tints of a single red family — an earlier
-# version tinted coal/oil/natural_gas/biomass/waste all within the same red
-# hue (15/28/0/55/70% tints), which read as near-identical at print size
-# (user feedback: "coal, oil and NG look very similar, and waste and biomass
-# aswell"). Now: electrode=green (electricity), natural_gas=red (its
-# original base color, kept as the "reference" fossil boiler),
-# coal=grey (ETH's neutral swatch — coal has no natural fossil-red
-# association the way gas/oil do), oil=bronze (also "crude oil (carrier)"'s
-# color in fig0b's EMISSIONS_COLOR_MAP — cross-figure consistency),
-# waste=purple (ditto, matches "waste (carrier)" there). Biomass reuses
-# electrode's green hue (both are the "non-fossil" boilers) but as a light
-# tint PLUS a hatch, so it can't be confused with electrode's solid green.
 _ETH_BLUE, _ETH_TURQUOISE, _ETH_GREEN, _ETH_RED = "#215CAF", "#007894", "#627313", "#B7352D"
 _ETH_BRONZE, _ETH_PURPLE, _ETH_GREY = "#8E6713", "#A7117A", "#6F6F6F"  # full 7-color ETH swatch (SCENARIO_PALETTE)
-_HP_HATCH = "/"  # subtle, sparse diagonal — repeat the character (e.g. "//") for denser hatching
-_BIOMASS_HATCH = "xx"  # denser/different pattern from the HP hatch, so the two hatched families stay distinguishable
-HEAT_SUPPLY_COLOR_MAP = {
-    # water source: ETH blue, darker at higher temperature
-    "heat_pump_industry_150_200_water": _ETH_BLUE,
-    "heat_pump_industry_100_150_water": _eth_tint(_ETH_BLUE, 0.3),
-    "heat_pump_industry_0_100_water": _eth_tint(_ETH_BLUE, 0.55),
-    # waste heat source: ETH turquoise/petrol, darker at higher temperature
-    "heat_pump_industry_150_200_waste_heat": _ETH_TURQUOISE,
-    "heat_pump_industry_100_150_waste_heat": _eth_tint(_ETH_TURQUOISE, 0.3),
-    "heat_pump_industry_0_100_waste_heat": _eth_tint(_ETH_TURQUOISE, 0.55),
-    # boilers: one distinct ETH hue per fuel (see comment above) — no two
-    # boilers now share a hue, let alone a tint of the same hue.
-    "electrode_boiler_industry": _ETH_GREEN,
-    "natural_gas_boiler_industry": _ETH_RED,
-    "coal_boiler_industry": _ETH_GREY,
-    "oil_boiler_industry": _ETH_BRONZE,
-    "biomass_boiler_industry": _eth_tint(_ETH_GREEN, 0.55),
-    "waste_boiler_industry": _ETH_PURPLE,
+_SOLAR_YELLOW = "#FFCA3A"  # the one non-ETH colour (ETH has no yellow; solar reads wrong in any other hue)
+
+
+# ── Report figure style (every REPORT_FIGURES figure) ───────────────────────
+# One colour system, one set of names, one typography for all report figures.
+# Width = MT_report_HG text width (16 cm), so figures are placed 1:1 and the
+# font sizes below are the printed sizes (report body text: 12 pt).
+REPORT_WIDTH = 6.3  # in
+plt.rcParams.update({
+    "font.size": 9, "axes.labelsize": 9, "axes.titlesize": 9.5,
+    "xtick.labelsize": 8, "ytick.labelsize": 8, "legend.fontsize": 8,
+    "legend.frameon": False, "axes.spines.top": False, "axes.spines.right": False,
+    "axes.linewidth": 0.6, "xtick.major.width": 0.6, "ytick.major.width": 0.6,
+    "xtick.major.size": 3, "ytick.major.size": 3, "hatch.linewidth": 0.5,
+})
+REPORT_VALUE_SIZE = 7.5  # numbers written on/above bars
+
+
+def _panel_title(ax, text: str) -> None:
+    """Short left-aligned panel header, "(a) ...", instead of a figure title."""
+    ax.set_title(text, loc="left", fontsize=9.5, fontweight="bold", pad=5)
+
+
+def _report_legend(ax_or_fig, handles, labels=None, **kw):
+    """Frameless legend, outside right of the axes unless `kw` says otherwise."""
+    kw = {"loc": "upper left", "bbox_to_anchor": (1.01, 1.0), "fontsize": 8, "frameon": False,
+          "handlelength": 1.2, "handleheight": 0.9, "borderaxespad": 0.0, **kw}
+    if labels is None:
+        return ax_or_fig.legend(handles=handles, **kw)
+    return ax_or_fig.legend(handles, labels, **kw)
+
+
+def _signed_stacked_bars(ax: plt.Axes, df: pd.DataFrame, colors: dict, x: np.ndarray,
+                         width: float = 0.7, label_fn=None) -> tuple[np.ndarray, np.ndarray]:
+    """Stack positive values upwards and negative values downwards from 0 (the
+    report figures' stacked-bar helper: colour only, no hatches).
+    df: index = category (bottom to top), columns = years. `label_fn` maps a
+    category to its legend label. Returns (top, bottom)."""
+    pos = np.zeros(len(df.columns))
+    neg = np.zeros(len(df.columns))
+    for cat in df.index:
+        v = df.loc[cat].to_numpy(dtype=float)
+        vp, vn = np.clip(v, 0, None), np.clip(v, None, 0)
+        ax.bar(x, vp, width, bottom=pos, color=colors[cat], edgecolor="white", linewidth=0.4,
+               label=label_fn(cat) if label_fn else cat)
+        ax.bar(x, vn, width, bottom=neg, color=colors[cat], edgecolor="white", linewidth=0.4)
+        pos += vp
+        neg += vn
+    return pos, neg
+
+
+def _comma_axis(ax, axis: str = "y") -> None:
+    """Thousands separators on an axis' tick labels (5,000 instead of 5000)."""
+    getattr(ax, f"{axis}axis").set_major_formatter(plt.FuncFormatter(lambda v, _: f"{v:,.0f}"))
+
+
+# Colours by ENERGY CARRIER / TECHNOLOGY (heat, power, storage, fuel emissions).
+_HP_WASTE_BLUE = "#48658F"  # desaturated ETH blue: waste-heat heat pumps
+CARRIER_COLORS = {
+    "natural_gas": _ETH_TURQUOISE, "lng": _eth_tint(_ETH_TURQUOISE, 0.5),
+    "natural_gas_ccs": _eth_tint(_ETH_TURQUOISE, 0.3),
+    "oil": _ETH_BRONZE,
+    "hard_coal": _ETH_GREY, "lignite": _eth_tint(_ETH_GREY, 0.45),
+    "biomass": _eth_tint(_ETH_GREEN, 0.5), "biomass_ccs": _eth_tint(_ETH_GREEN, 0.25),
+    "electrode_boiler": _ETH_GREEN,
+    "waste": _ETH_RED,
+    "nuclear": _ETH_PURPLE,
+    "hydrogen": _eth_tint(_ETH_PURPLE, 0.5),
+    "solar": _SOLAR_YELLOW,
+    "wind_onshore": _eth_tint(_ETH_BLUE, 0.6), "wind_offshore": _eth_tint(_ETH_BLUE, 0.4),
+    "hydro_reservoir": "#1A3F78", "hydro_ror": _eth_tint(_ETH_BLUE, 0.2),
+    "battery": _ETH_BLUE, "pumped_hydro": _eth_tint(_ETH_BLUE, 0.35),
+    "carbon_storage": _eth_tint(_ETH_GREEN, 0.6),
+    "tes": _eth_tint(_ETH_PURPLE, 0.7),
+    # heat pumps: one blue family, darker = hotter; waste-heat source = desaturated blue
+    "hp_water_150_200": _ETH_BLUE, "hp_water_100_150": _eth_tint(_ETH_BLUE, 0.35),
+    "hp_water_0_100": _eth_tint(_ETH_BLUE, 0.65),
+    "hp_waste_150_200": _HP_WASTE_BLUE, "hp_waste_100_150": _eth_tint(_HP_WASTE_BLUE, 0.35),
+    "hp_waste_0_100": _eth_tint(_HP_WASTE_BLUE, 0.65),
 }
-HEAT_SUPPLY_HATCH_MAP = {tech: _HP_HATCH for tech in [
-    "heat_pump_industry_150_200_water", "heat_pump_industry_100_150_water", "heat_pump_industry_0_100_water",
-    "heat_pump_industry_150_200_waste_heat", "heat_pump_industry_100_150_waste_heat", "heat_pump_industry_0_100_waste_heat",
-]}
-HEAT_SUPPLY_HATCH_MAP["biomass_boiler_industry"] = _BIOMASS_HATCH
+# Colours by SECTOR (industry branches, process emissions, DSM products).
+SECTOR_COLORS = {
+    "steel": _ETH_BLUE, "primary_steel": _ETH_BLUE, "secondary_steel": _eth_tint(_ETH_BLUE, 0.45),
+    "cement": _ETH_GREY, "clinker": _ETH_GREY,
+    "chemicals": _ETH_PURPLE, "ammonia": _ETH_PURPLE, "methanol": _eth_tint(_ETH_PURPLE, 0.35),
+    "olefin": _eth_tint(_ETH_PURPLE, 0.6),
+    "paper": _ETH_TURQUOISE, "food": _ETH_GREEN,
+    "glass": _ETH_BRONZE, "ceramic": _eth_tint(_ETH_BRONZE, 0.45),
+}
+
+# Model identifier -> name used in the report (MT_report_HG appendix,
+# Table "Model identifiers"). Every report-figure label goes through display_name().
+DISPLAY_NAMES = {
+    # industrial heat supply
+    "heat_pump_industry_0_100_water": "Water-source heat pump, 0–100 °C",
+    "heat_pump_industry_100_150_water": "Water-source heat pump, 100–150 °C",
+    "heat_pump_industry_150_200_water": "Water-source heat pump, 150–200 °C",
+    "heat_pump_industry_0_100_waste_heat": "Waste-heat heat pump, 0–100 °C",
+    "heat_pump_industry_100_150_waste_heat": "Waste-heat heat pump, 100–150 °C",
+    "heat_pump_industry_150_200_waste_heat": "Waste-heat heat pump, 150–200 °C",
+    "electrode_boiler_industry": "Electrode boiler",
+    "natural_gas_boiler_industry": "Natural gas boiler",
+    "coal_boiler_industry": "Hard coal boiler",
+    "oil_boiler_industry": "Oil boiler",
+    "biomass_boiler_industry": "Biomass boiler",
+    "waste_boiler_industry": "Waste boiler",
+    "industry_TES": "Thermal energy storage",
+    # power generation
+    "photovoltaics": "Photovoltaics", "wind_onshore": "Onshore wind", "wind_offshore": "Offshore wind",
+    "reservoir_hydro": "Reservoir hydro", "run-of-river_hydro": "Run-of-river hydro",
+    "nuclear": "Nuclear", "natural_gas_turbine": "Natural gas turbine",
+    "natural_gas_turbine_CCS": "Natural gas turbine with CCS", "hard_coal_plant": "Hard coal plant",
+    "lignite_coal_plant": "Lignite plant", "oil_plant": "Oil plant", "biomass_plant": "Biomass plant",
+    "biomass_plant_CCS": "Biomass plant with CCS", "waste_plant": "Waste plant",
+    # storage
+    "battery": "Battery", "pumped_hydro": "Pumped hydro", "natural_gas_storage": "Natural gas storage",
+    "oil_storage": "Oil storage", "salt_cavern_storage": "Hydrogen storage (salt cavern)",
+    # emissions: carriers (combustion) and technologies (process, capture)
+    "crude_oil": "Crude oil", "natural_gas": "Natural gas", "lng": "LNG", "hard_coal": "Hard coal",
+    "lignite": "Lignite", "waste": "Waste", "biomass": "Biomass", "diesel": "Diesel", "petrol": "Petrol",
+    "glass_production": "Glass production", "ceramic_production": "Ceramic production",
+    "paper_production": "Paper production", "food_production": "Food production",
+    "cement_kiln": "Cement clinker plant", "BF_BOF": "Blast furnace",
+    "BF_BOF_CCS": "Blast furnace with CCS", "EAF": "Electric arc furnace", "NG_DRI": "Natural gas direct reduction",
+    "NG_DRI_CCS": "Natural gas direct reduction with CCS", "H2_DRI": "Hydrogen direct reduction", "carbon_storage": "Carbon storage",
+    # DSM products
+    "ammonia_DSM": "Ammonia", "ceramic_DSM": "Ceramic", "clinker_DSM": "Clinker", "food_DSM": "Food",
+    "glass_DSM": "Glass", "methanol_DSM": "Methanol", "olefin_DSM": "Olefins", "paper_DSM": "Paper",
+    "primary_steel_DSM": "Primary steel", "secondary_steel_DSM": "Secondary steel",
+}
+
+
+def display_name(identifier: str) -> str:
+    """Report name of a model identifier; unknown ones get "_" -> " ", capitalised."""
+    if identifier in DISPLAY_NAMES:
+        return DISPLAY_NAMES[identifier]
+    s = identifier.replace("_", " ")
+    return s[:1].upper() + s[1:]
+
+
+HEAT_SUPPLY_COLOR_MAP = {
+    "heat_pump_industry_150_200_water": CARRIER_COLORS["hp_water_150_200"],
+    "heat_pump_industry_100_150_water": CARRIER_COLORS["hp_water_100_150"],
+    "heat_pump_industry_0_100_water": CARRIER_COLORS["hp_water_0_100"],
+    "heat_pump_industry_150_200_waste_heat": CARRIER_COLORS["hp_waste_150_200"],
+    "heat_pump_industry_100_150_waste_heat": CARRIER_COLORS["hp_waste_100_150"],
+    "heat_pump_industry_0_100_waste_heat": CARRIER_COLORS["hp_waste_0_100"],
+    "electrode_boiler_industry": CARRIER_COLORS["electrode_boiler"],
+    "natural_gas_boiler_industry": CARRIER_COLORS["natural_gas"],
+    "coal_boiler_industry": CARRIER_COLORS["hard_coal"],
+    "oil_boiler_industry": CARRIER_COLORS["oil"],
+    "biomass_boiler_industry": CARRIER_COLORS["biomass"],
+    "waste_boiler_industry": CARRIER_COLORS["waste"],
+}
+# No hatches in any figure any more (colour only); kept as empty maps for the
+# archived figures that still pass them on.
+_HP_HATCH = ""
+HEAT_SUPPLY_HATCH_MAP: dict[str, str] = {}
 # Explicit stack order (bottom → top, per user request): waste boiler at the
 # very bottom, then coal/oil/biomass/natural-gas/electrode boilers, then heat
 # pumps ordered high→low temperature band (150-200, then 100-150, then 0-100
@@ -931,21 +1064,27 @@ def _output_annual_twh(r: Run, techs: list[str]) -> pd.DataFrame:
 
 
 def fig15_heat_supply_output_twh_for(runs: list[Run], label: str, fig_name: str) -> None:
-    """Standalone version of fig9's top ("Industry heat supply") row for a
-    single scenario, in annual TWh (see _output_annual_twh). Parameterized
-    over `label`/`fig_name` so the same panel can be produced for both "No flexibility" (fig15a) and "Full
-    flexibility" (fig15b)."""
+    """Industrial heat supply by technology for one scenario, annual TWh
+    (see _output_annual_twh): fig15a = No-Flex, fig15b = ZEN-Europe. Report
+    style: colour only (HEAT_SUPPLY_COLOR_MAP), report names, legend below."""
     r = by_label(runs, label)
     years = get_available_years(r.results)
     output_df = _stack_ordered(_output_annual_twh(r, INDUSTRY_HEAT_TECHS_BOILERS_HP),
                                HEAT_SUPPLY_STACK_ORDER, years)
+    output_df = output_df[output_df.abs().max(axis=1) > 1e-3]
 
-    fig, ax = plt.subplots(1, 1, figsize=(0.8 * len(output_df.columns) + 3, 6))
-    with plt.rc_context({"hatch.linewidth": 0.5}):
-        plot_stacked_bars(output_df, f"Industry heat supply (TWh) - {label}",
-                          "TWh supplied", ax, show_segment_labels=False, show_legend=True,
-                          color_map=HEAT_SUPPLY_COLOR_MAP, hatch_map=HEAT_SUPPLY_HATCH_MAP)
-    plt.setp(ax.get_xticklabels(), rotation=0)
+    fig, ax = plt.subplots(figsize=(REPORT_WIDTH, 3.2))
+    x = np.arange(len(output_df.columns))
+    # (no total labels: the heat demand, and so every bar's height, is the same each year)
+    top, _ = _signed_stacked_bars(ax, output_df, HEAT_SUPPLY_COLOR_MAP, x, width=0.72,
+                                  label_fn=display_name)
+    ax.set_ylim(0, top.max() * 1.03)
+    ax.set_xticks(x)
+    ax.set_xticklabels([str(y) for y in output_df.columns])
+    ax.set_xlim(-0.6, len(x) - 0.4)
+    ax.set_ylabel("Industrial heat supply (TWh)")
+    handles, labels = ax.get_legend_handles_labels()
+    _report_legend(ax, handles[::-1], labels[::-1], loc="upper left", bbox_to_anchor=(1.01, 1.0))
     fig.tight_layout()
     savefig(fig, fig_name)
 
@@ -1295,15 +1434,13 @@ def fig5b_dsm_discharge_by_product(runs: list[Run]) -> None:
     # Companion to fig5: absolute annual DSM throughput per product over the
     # whole horizon, stacked by product, optimistic vs pessimistic. Charge and
     # discharge are identical (no storage losses), so only discharge is shown.
-    # Products keep their ETH COLOR_MAP colors; ammonia/methanol are stored in
-    # GWh and converted to kt via DSM_LHV_MWH_PER_T (hatched as in fig5 to
-    # flag that they are LHV-derived).
+    # Products in their SECTOR_COLORS; ammonia/methanol are stored in GWh and
+    # converted to kt via DSM_LHV_MWH_PER_T (marked with * in the legend).
     scenarios = [FULL, NO_TES_DSM_PESS]
-    titles = {FULL: f"Optimistic ({FULL})",
-              NO_TES_DSM_PESS: f"Pessimistic ({NO_TES_DSM_PESS})"}
-    pretty = lambda t: t.replace("_DSM", "").replace("_", " ")
-    color_map = {pretty(t): COLOR_MAP[t] for t in INDUSTRY_DSM_TECHS}
-    hatch_map = {pretty(t): "//" for t in DSM_ENERGY_CARRIER_TECHS}
+    titles = {FULL: f"(a) Optimistic DSM categories ({FULL})",
+              NO_TES_DSM_PESS: f"(b) Pessimistic DSM categories ({NO_TES_DSM_PESS})"}
+    color_map = {t: SECTOR_COLORS[t.replace("_DSM", "")] for t in INDUSTRY_DSM_TECHS}
+    label_fn = lambda t: display_name(t) + ("*" if t in DSM_ENERGY_CARRIER_TECHS else "")
 
     dfs = []
     for label in scenarios:
@@ -1314,23 +1451,31 @@ def fig5b_dsm_discharge_by_product(runs: list[Run]) -> None:
         for t, mwh_per_t in DSM_LHV_MWH_PER_T.items():
             if t in df.index:
                 df.loc[t] = df.loc[t] / mwh_per_t
-        df.index = [pretty(t) for t in df.index]
         dfs.append(df)
-    # Stack order: largest total over both scenarios at the bottom.
-    order = pd.concat(dfs).groupby(level=0).sum().sum(axis=1).sort_values(ascending=False).index
-    dfs = [d.reindex([t for t in order if t in d.index]) for d in dfs]
+    # Stack order: sector groups (steel, cement, chemicals, glass & ceramics, paper, food),
+    # products without discharge in both scenarios dropped.
+    order = ["primary_steel_DSM", "secondary_steel_DSM", "clinker_DSM", "ammonia_DSM", "methanol_DSM",
+             "olefin_DSM", "glass_DSM", "ceramic_DSM", "paper_DSM", "food_DSM"]
+    keep = [t for t in order if any(t in d.index and d.loc[t].abs().max() > 1e-6 for d in dfs)]
+    dfs = [d.reindex(keep).fillna(0.0) for d in dfs]
 
-    fig, axes = plt.subplots(2, 1, figsize=(0.8 * len(dfs[0].columns) + 3, 11))
-    with plt.rc_context({"hatch.linewidth": 0.5}):
-        for i, (ax, df, label) in enumerate(zip(axes, dfs, scenarios)):
-            plot_stacked_bars(df, f"DSM Charge/Discharge by Product - {titles[label]}",
-                              "Annual charge = discharge (kt product)",
-                              ax, show_segment_labels=False, show_legend=(i == 0),
-                              color_map=color_map, hatch_map=hatch_map)
-    _apply_shared_ylim(list(axes), dfs)
+    fig, axes = plt.subplots(2, 1, figsize=(REPORT_WIDTH, 5.2), sharex=True)
+    x = np.arange(len(dfs[0].columns))
+    tops = []
+    for ax, df, label in zip(axes, dfs, scenarios):
+        top, _ = _signed_stacked_bars(ax, df, color_map, x, width=0.72, label_fn=label_fn)
+        tops.append(top.max())
+        _panel_title(ax, titles[label])
+        ax.set_ylabel("DSM discharge (kt/a)")
+        _comma_axis(ax)
     for ax in axes:
-        plt.setp(ax.get_xticklabels(), rotation=0)
-        ax.set_ylabel(ax.get_ylabel(), fontsize=10)
+        ax.set_ylim(0, max(tops) * 1.05)
+    axes[-1].set_xticks(x)
+    axes[-1].set_xticklabels([str(y) for y in dfs[0].columns])
+    handles, labels = axes[0].get_legend_handles_labels()
+    _report_legend(axes[0], handles[::-1], labels[::-1])
+    axes[1].text(1.01, 0.0, "* converted from GWh\n   with the lower\n   heating value",
+                 transform=axes[1].transAxes, fontsize=7, va="bottom", ha="left")
     fig.tight_layout()
     savefig(fig, "fig5b_dsm_discharge_by_product")
 
@@ -1439,17 +1584,19 @@ HEAT_DEMAND_SECTOR_LABELS = {"glass": "Glass", "ceramic": "Ceramic", "paper": "P
 # different supply pathway) each get their own solid ETH color, with the
 # consolidated blended "fuel to process" as a neutral light grey;
 # electricity is ETH blue (drawio system-overview convention).
-HEAT_DEMAND_BAND_LABELS = {"0_100": "0-100 °C", "100_150": "100-150 °C", "150_200": "150-200 °C"}
-HEAT_BAND_COLORS = {"0_100": _eth_tint(_ETH_RED, 0.6), "100_150": _eth_tint(_ETH_RED, 0.3), "150_200": _ETH_RED}
-# waste = purple as in the boiler/emission figures (per user); all 7 ETH hues
-# are taken here, so hydrogen gets a light ETH-blue tint.
-FUEL_CARRIER_COLORS = {"natural_gas": _ETH_TURQUOISE, "hard_coal": _ETH_GREY, "oil": _ETH_BRONZE,
-                       "biomass": _ETH_GREEN, "waste": _ETH_PURPLE, "hydrogen": _eth_tint(_ETH_BLUE, 0.55),
-                       "naphtha": _eth_tint(_ETH_BRONZE, 0.5), "methanol": _eth_tint(_ETH_PURPLE, 0.5),
-                       "fuel_to_process": _eth_tint(_ETH_GREY, 0.6)}
+HEAT_DEMAND_BAND_LABELS = {"0_100": "0–100 °C", "100_150": "100–150 °C", "150_200": "150–200 °C"}
+HEAT_BAND_COLORS = {"0_100": _eth_tint(_ETH_RED, 0.72), "100_150": _eth_tint(_ETH_RED, 0.45),
+                    "150_200": _eth_tint(_ETH_RED, 0.2)}
+# Fuels in the report carrier colours (CARRIER_COLORS); the blended kiln/process
+# fuel is natural gas in practice, so a light natural-gas tint.
+FUEL_CARRIER_COLORS = {"natural_gas": CARRIER_COLORS["natural_gas"], "hard_coal": CARRIER_COLORS["hard_coal"],
+                       "oil": CARRIER_COLORS["oil"], "biomass": CARRIER_COLORS["biomass"],
+                       "waste": CARRIER_COLORS["waste"], "hydrogen": CARRIER_COLORS["hydrogen"],
+                       "naphtha": _eth_tint(_ETH_BRONZE, 0.5), "methanol": _eth_tint(_ETH_PURPLE, 0.25),
+                       "fuel_to_process": _eth_tint(_ETH_TURQUOISE, 0.6)}
 FUEL_CARRIER_LABELS = {"natural_gas": "Natural gas", "hard_coal": "Hard coal", "oil": "Oil", "biomass": "Biomass",
                        "waste": "Waste", "hydrogen": "Hydrogen", "naphtha": "Naphtha", "methanol": "Methanol",
-                       "fuel_to_process": "Natural gas\n(fuel shift possible)"}
+                       "fuel_to_process": "Kiln fuel (natural gas,\nfuel shift possible)"}
 
 # fuel_to_kiln (glass/ceramic, ZEN-creator commit 1687533) is an
 # intermediate, blended-fuel hub carrier produced from natural gas (in
@@ -1521,8 +1668,8 @@ FIG4B_SECTOR_GROUPS = [
     # alternative pathways with fixed inputs, so their carriers keep their own
     # colours — switching means building H2_DRI, not substituting fuel in
     # NG_DRI (per user).
-    ("Primary steel (BF-BOF/DRI)", ["BF_BOF", "NG_DRI", "H2_DRI"], None),
-    ("Secondary steel (EAF)", ["EAF"], None),
+    ("Primary steel", ["BF_BOF", "NG_DRI", "H2_DRI"], None),
+    ("Secondary steel", ["EAF"], None),
     # Chemicals: real per-carrier inputs (no blending hub, no merge). The
     # carbon feedstock of methanol_from_hydrogen isn't an energy carrier and
     # is dropped by the segment list in fig4b.
@@ -1591,34 +1738,32 @@ def fig4b_industry_fuel_demand_comparison(runs: list[Run]) -> None:
     totals = np.array([sum(v.get(c, 0.0) for c, _ in present) for _, v in rows])
     min_label = 0.035 * totals.max()
 
-    fig, ax = plt.subplots(figsize=(11, 7.0))
+    fig, ax = plt.subplots(figsize=(REPORT_WIDTH, 4.4))
     left = np.zeros(len(rows))
+    min_label = 0.05 * totals.max()
     for carrier, color in present:
         vals = np.array([v.get(carrier, 0.0) for _, v in rows])
-        ax.barh(y, vals, 0.62, left=left, color=color, edgecolor="white", linewidth=0.8)
+        ax.barh(y, vals, 0.66, left=left, color=color, edgecolor="white", linewidth=0.5)
         for yi, li, vi in zip(y, left, vals):
             if vi >= min_label:
-                ax.text(li + vi / 2, yi, f"{vi:.1f}", ha="center", va="center", fontsize=7.5,
+                ax.text(li + vi / 2, yi, f"{vi:.1f}", ha="center", va="center", fontsize=6.5,
                         color=_text_color_for_bg(color))
         left += vals
     for yi, total in zip(y, totals):
-        ax.text(total + 0.006 * totals.max(), yi, f"{total:.1f}", ha="left", va="center",
-                fontsize=9, fontweight="bold")
+        ax.text(total + 0.008 * totals.max(), yi, f"{total:.1f}", ha="left", va="center",
+                fontsize=7.5, fontweight="bold")
 
     ax.set_yticks(y)
-    ax.set_yticklabels([label for label, _ in rows], fontsize=9.5)
+    ax.set_yticklabels([label for label, _ in rows], fontsize=8)
     ax.invert_yaxis()
     ax.set_xlim(0, totals.max() * 1.08)
     ax.axhline(n_new, color="black", linewidth=0.6, alpha=0.6)
-    for y_text, text in ((-0.6, "Additional in extended model"), (n_new + 0.4, "Base model sectors")):
+    for y_text, text in ((-0.75, "New industry sectors"), (n_new + 0.25, "Sectors of ZEN-Europe-Legacy")):
         ax.text(-0.01, y_text, text, transform=ax.get_yaxis_transform(), ha="right", va="center",
-                fontsize=8.5, fontstyle="italic", color=_ETH_GREY)
-    ax.set_ylim(len(rows) + 0.5, -1.0)
+                fontsize=7.5, fontstyle="italic", color=_ETH_GREY)
+    ax.set_ylim(len(rows) + 0.5, -1.1)
 
-    ax.set_xlabel("Average energy input [GW]")
-    ax.set_title(f"Industrial energy input by carrier in {year}", fontsize=12, fontweight="bold", loc="left", pad=20)
-    ax.text(0, 1.015, NO_FLEX,
-            transform=ax.transAxes, fontsize=9, color=_ETH_GREY, va="bottom")
+    ax.set_xlabel(f"Average energy input in {year} (GW), {NO_FLEX}")
     for spine in ("top", "right", "left"):
         ax.spines[spine].set_visible(False)
     ax.tick_params(axis="y", length=0)
@@ -1629,7 +1774,7 @@ def fig4b_industry_fuel_demand_comparison(runs: list[Run]) -> None:
         return Patch(facecolor="none", edgecolor="none", label=text)
 
     present_carriers = {c for c, _ in present}
-    headers = ["Heat (<200 °C)", "Other fuel"]
+    headers = ["Process heat", "Fuels"]
     handles = [header(headers[0])]
     handles += [Patch(facecolor=HEAT_BAND_COLORS[b], label=HEAT_DEMAND_BAND_LABELS[b])
                 for b in HEAT_BAND_COLORS if f"heat_industry_{b}" in present_carriers]
@@ -1637,15 +1782,13 @@ def fig4b_industry_fuel_demand_comparison(runs: list[Run]) -> None:
     handles += [Patch(facecolor=FUEL_CARRIER_COLORS[c], label=FUEL_CARRIER_LABELS[c])
                 for c in FUEL_CARRIER_COLORS if c in present_carriers]
     handles += [header(""), Patch(facecolor=_ELECTRICITY_COLOR, label=_ELECTRICITY_LABEL)]
-    # Anchored above the axes so the legend clears the long primary-steel bar.
-    leg = ax.legend(handles=handles, fontsize=8.5, frameon=False, loc="upper right",
-                    bbox_to_anchor=(1.0, 1.1), handlelength=1.4, handleheight=1.0, labelspacing=0.35)
+    leg = _report_legend(ax, handles, fontsize=7.5, labelspacing=0.3)
     for t in leg.get_texts():
         if t.get_text() in headers:
             t.set_fontweight("bold")
 
     fig.tight_layout()
-    savefig(fig, "fig2_industry_fuel_demand_comparison", subdir="method")
+    savefig(fig, "fig2_industry_energy_input_by_carrier", subdir="method")
 
 
 # ── 6: Technology-diffusion / capacity-growth mechanisms ───────────────────
@@ -2054,21 +2197,20 @@ def fig8a_diffusion_mechanisms_heat_pumps(runs: list[Run]) -> None:
 # lookup internally — fig0b strips it from the displayed legend text (per
 # user request, it was legend clutter given the tint already carries the
 # same distinction visually).
-EMISSIONS_COLOR_MAP = {
-    # Carriers (fuel combustion)
-    "crude oil (carrier)": _ETH_BRONZE,
-    "natural gas (carrier)": _ETH_TURQUOISE,
-    "lng (carrier)": _ETH_GREEN,
-    "hard coal (carrier)": _ETH_GREY,
-    "lignite (carrier)": _ETH_RED,
-    "waste (carrier)": _ETH_PURPLE,
-    # Technologies (process + carbon capture)
-    "glass production (tech)": _ETH_BLUE,
-    "cement kiln (tech)": _eth_tint(_ETH_BRONZE, 0.45),
-    "BF BOF (tech)": _eth_tint(_ETH_GREY, 0.35),
-    "EAF (tech)": _eth_tint(_ETH_BLUE, 0.45),
-    "NG DRI (tech)": _eth_tint(_ETH_TURQUOISE, 0.45),
-    "carbon storage (tech)": _eth_tint(_ETH_GREEN, 0.45),
+EMISSIONS_COLOR_MAP = {  # stack order bottom -> top; "c:" carrier (combustion), "t:" technology
+    "c:hard_coal": CARRIER_COLORS["hard_coal"],
+    "c:lignite": CARRIER_COLORS["lignite"],
+    "c:crude_oil": CARRIER_COLORS["oil"],
+    "c:natural_gas": CARRIER_COLORS["natural_gas"],
+    "c:lng": CARRIER_COLORS["lng"],
+    "c:waste": CARRIER_COLORS["waste"],
+    "t:BF_BOF": SECTOR_COLORS["steel"],
+    "t:EAF": _eth_tint(SECTOR_COLORS["steel"], 0.45),
+    "t:NG_DRI": _eth_tint(SECTOR_COLORS["steel"], 0.7),
+    "t:cement_kiln": _eth_tint(SECTOR_COLORS["cement"], 0.7),  # lighter than hard coal/lignite
+    "t:glass_production": _eth_tint(SECTOR_COLORS["glass"], 0.45),  # lighter than crude oil
+    "t:ceramic_production": _eth_tint(SECTOR_COLORS["glass"], 0.75),
+    "t:carbon_storage": CARRIER_COLORS["carbon_storage"],
 }
 
 
@@ -2194,130 +2336,92 @@ def fig0b_emissions_source_comparison(base_run: Run, no_flex_run: Run, full_run:
                            & set(get_available_years(br)))
     panel_a_years = [y for y in COMPARISON_YEARS if y in years_common]
 
-    # cmr10 (this module's serif font, see the plt.rcParams block up top) has
-    # no underscore glyph, so raw "_"-joined category names render as a
-    # garbled substitute character — display labels use spaces instead.
-    def disp(name: str) -> str:
-        return name.replace("_", " ")
-
     # Panel A: full emissions composition per run PER YEAR (carrier +
-    # technology stacked together, suffix-disambiguated) so each bar's
-    # height reproduces that run's true net total for that year — grouped
-    # model-major/year-minor ("base 2030/2040/2050, no-flex 2030/2040/2050,
-    # full 2030/2040/2050"), same convention as fig1b/fig4b.
-    composition_series = []
+    # technology stacked together) so each bar's height reproduces that run's
+    # true net total for that year — grouped scenario-major/year-minor.
+    # Keys: "c:<carrier>" (combustion) / "t:<technology>" (process, capture).
+    comp = {}
     for run, results in [(base_run, br), (no_flex_run, nfr), (full_run, fr)]:
         for year in panel_a_years:
             carrier = get_emissions_by_carrier(results, year)
             # H2_DRI is dropped: its emissions are ~0 in every run/year here
-            # (no delta to show), so it only adds clutter to the legend.
             tech = get_emissions_by_technology(results, year).drop("H2_DRI", errors="ignore")
-            key = f"{run.label}__{year}"
-            composition_series.append((key, pd.concat([carrier.rename(lambda c: f"{disp(c)} (carrier)"),
-                                                         tech.rename(lambda t: f"{disp(t)} (tech)")])))
-    composition = build_comparison_df(composition_series)
+            comp[(run.label, year)] = pd.concat([carrier.rename(lambda c: f"c:{c}"),
+                                                 tech.rename(lambda t: f"t:{t}")])
+    composition = pd.DataFrame(comp).fillna(0.0)
+    composition = composition[composition.abs().max(axis=1) > 1e-3]
+    order = [k for k in EMISSIONS_COLOR_MAP if k in composition.index] + \
+        [k for k in composition.index if k not in EMISSIONS_COLOR_MAP]
+    composition = composition.loc[order]
+    colors = {k: EMISSIONS_COLOR_MAP.get(k, _eth_tint(_ETH_GREY, 0.7)) for k in composition.index}
 
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 7), gridspec_kw={"width_ratios": [1.4, 1.3]})
-    # bar_width=0.85 (vs. the shared 0.6 default) packs the now-9 bars (was
-    # 6, before the 3rd scenario was added) closer together per user request.
-    plot_stacked_bars(composition, "Emissions Composition by Source",
-                      "Mton CO$_2$eq", ax1, show_segment_labels=False,
-                      color_map=EMISSIONS_COLOR_MAP, bar_width=0.85)
-    # Strip the " (carrier)"/" (tech)" disambiguation suffix from the legend
-    # text only — EMISSIONS_COLOR_MAP's keys (and the color/tint they drive)
-    # still need it, but the tint already distinguishes carrier vs. tech
-    # visually, so the suffix is legend clutter per user request.
-    legend = ax1.get_legend()
-    if legend is not None:
-        for text in legend.get_texts():
-            text.set_text(text.get_text().replace(" (carrier)", "").replace(" (tech)", ""))
-    _year_group_labels(ax1, 3, [base_run.label, no_flex_run.label, full_run.label], panel_a_years)
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(REPORT_WIDTH, 6.8),
+                                   gridspec_kw={"height_ratios": [1.15, 1]})
+    n_years = len(panel_a_years)
+    x = np.array([i * (n_years + 1) + j for i in range(3) for j in range(n_years)], dtype=float)
+    top, bot = _signed_stacked_bars(ax1, composition, colors, x, width=0.8,
+                                    label_fn=lambda k: display_name(k.split(":", 1)[1]))
+    net = composition.sum().to_numpy()
+    for xi, t, n in zip(x, top, net):
+        ax1.text(xi, t + 0.01 * top.max(), f"{n:,.0f}".replace("-", "−"), ha="center", va="bottom",
+                 fontsize=6.5)
+    ax1.axhline(0, color="black", linewidth=0.6)
+    ax1.set_xticks(x)
+    ax1.set_xticklabels([str(y) for _ in range(3) for y in panel_a_years], fontsize=7)
+    for i, run in enumerate([base_run, no_flex_run, full_run]):
+        ax1.annotate(run.label, xy=(i * (n_years + 1) + (n_years - 1) / 2, 0),
+                     xycoords=("data", "axes fraction"), xytext=(0, -16), textcoords="offset points",
+                     ha="center", va="top", fontsize=8)
+    ax1.set_ylim(min(bot.min(), 0) * 1.1, top.max() * 1.1)
+    ax1.set_ylabel("Emissions (Mt CO$_2$-eq/a)")
+    _comma_axis(ax1)
+    _panel_title(ax1, "(a) Emissions by source")
+    h, l = ax1.get_legend_handles_labels()
+    _report_legend(ax1, h[::-1], l[::-1])
 
-    # Panel B: cumulative emissions vs. each run's own carbon budget, 2025-2070.
+    # Panel B: cumulative emissions vs. each run's own carbon budget.
     def _series(r, name):
-        s = r.get_total(name)
-        return {int(k): float(v) for k, v in s.items()}
+        s_ = r.get_total(name)
+        return {int(k): float(v) for k, v in s_.items()}
 
-    cum_full = _series(fr, "carbon_emissions_cumulative")
-    cum_no_flex = _series(nfr, "carbon_emissions_cumulative")
-    cum_base = _series(br, "carbon_emissions_cumulative")
-    budget_full = float(fr.get_total("carbon_emissions_budget").iloc[0])
-    budget_no_flex = float(nfr.get_total("carbon_emissions_budget").iloc[0])
-    budget_base = float(br.get_total("carbon_emissions_budget").iloc[0])
-    years = sorted(cum_full)
-    base_vals = [cum_base[y] for y in years]
-    no_flex_vals = [cum_no_flex[y] for y in years]
-    full_vals = [cum_full[y] for y in years]
-
-    # Per-run identity color for this panel only — the requested
-    # grey/dark-blue/magenta ETH triad, NOT each run's globally assigned
-    # SCENARIO_PALETTE slot (see docstring).
+    cum = {run.label: _series(run.results, "carbon_emissions_cumulative")
+           for run in (base_run, no_flex_run, full_run)}
+    budget = {run.label: float(run.results.get_total("carbon_emissions_budget").iloc[0])
+              for run in (base_run, no_flex_run, full_run)}
+    years = sorted(cum[full_run.label])
+    vals = {lab: [c[y] for y in years] for lab, c in cum.items()}
+    # Scenario colours of this panel: Legacy grey, No-Flex blue, ZEN-Europe purple.
     panel_b_color = {base_run.label: _ETH_GREY, no_flex_run.label: _ETH_BLUE,
-                      full_run.label: _ETH_PURPLE}
-
-    # Transient mid-horizon excess above each run's OWN budget line — real,
-    # but costs nothing except at the final year (see docstring). Shown
-    # muted/shared so it doesn't read as "this is the penalised amount".
-    for label, vals, budget, legend_label in [
-        (base_run.label, base_vals, budget_base, "excess above own budget, not yet repaid"),
-        (no_flex_run.label, no_flex_vals, budget_no_flex, "_nolegend_"),
-        (full_run.label, full_vals, budget_full, "_nolegend_"),
-    ]:
-        over = np.array([v > budget for v in vals])
-        ax2.fill_between(years, vals, budget, where=over, color=panel_b_color[label],
-                          alpha=0.12, interpolate=True, label=legend_label)
-
-    # "No flexibility" and "Full flexibility" turn out to have nearly
-    # identical cumulative-emissions trajectories AND budgets (same industry
-    # sectors/demand scope, only the flexibility options differ — base gets
-    # a different budget because it lacks those sectors entirely). Solid,
-    # same-width lines would make one fully occlude the other, so each run
-    # also gets its own marker/linestyle (not just color) and "No
-    # flexibility" is drawn last/on top with a dashed line so the overlap
-    # itself stays visible instead of erasing one run.
+                     full_run.label: _ETH_PURPLE}
+    for lab in (base_run.label, no_flex_run.label, full_run.label):
+        over = np.array([v > budget[lab] for v in vals[lab]])
+        ax2.fill_between(years, vals[lab], budget[lab], where=over, color=panel_b_color[lab],
+                         alpha=0.12, interpolate=True, linewidth=0)
+    # No-Flex and ZEN-Europe nearly coincide: own markers, No-Flex dashed and on top.
     line_style = {base_run.label: dict(marker="o", linestyle="-"),
                   full_run.label: dict(marker="^", linestyle="-"),
-                  no_flex_run.label: dict(marker="s", linestyle="--", markersize=5)}
+                  no_flex_run.label: dict(marker="s", linestyle="--")}
     budget_style = {base_run.label: "--", full_run.label: "--", no_flex_run.label: ":"}
-    for label, vals, budget in [
-        (base_run.label, base_vals, budget_base),
-        (full_run.label, full_vals, budget_full),
-        (no_flex_run.label, no_flex_vals, budget_no_flex),
-    ]:
-        color = panel_b_color[label]
-        ax2.plot(years, vals, color=color, linewidth=2,
-                  label=f"{label} - cumulative emissions", **line_style[label])
-        ax2.axhline(budget, color=color, linestyle=budget_style[label], linewidth=1.5,
-                    label=f"{label} - carbon budget ({budget:,.0f} Mton)")
+    for lab in (base_run.label, full_run.label, no_flex_run.label):
+        ax2.plot(years, vals[lab], color=panel_b_color[lab], linewidth=1.2, markersize=3,
+                 **line_style[lab])
+        ax2.axhline(budget[lab], color=panel_b_color[lab], linestyle=budget_style[lab], linewidth=1.0)
 
-    # Budget delta: the two runs are handed DIFFERENT total carbon budgets
-    # (carbon_emissions_budget) by ZEN-creator to begin with — a distinct
-    # number from Panel A's net-emissions comparison (a single year's actual
-    # combustion/process emissions), this is the two dashed BUDGET lines'
-    # own gap, i.e. how much more headroom "Full flexibility" was allotted
-    # over the run's full horizon before even solving. Placed near the left
-    # edge (early years), where the rising cumulative-emissions lines are
-    # still well clear of both dashed budget lines.
-    delta_budget = budget_full - budget_base
-    sign = "+" if delta_budget >= 0 else ""
-    bracket_x = years[0] + 0.03 * (years[-1] - years[0])  # far left, where both cumulative-emissions lines are still near 0
-    ax2.annotate("", xy=(bracket_x, budget_full), xytext=(bracket_x, budget_base),
-                 arrowprops=dict(arrowstyle="<->", color="black", linewidth=1.0))
-    ax2.text(bracket_x + 0.015 * (years[-1] - years[0]), (budget_full + budget_base) / 2,
-             f"$\\Delta$ budget = {sign}{delta_budget:,.0f} Mton",
-             ha="left", va="center", fontsize=8.5, fontweight="bold")
-
-    ax2.set_xlabel("Year")
-    ax2.set_ylabel("Cumulative carbon emissions [Mton CO$_2$eq]")
-    ax2.set_title("Cumulative Emissions vs. Carbon Budget", fontsize=11, fontweight="bold")
-    ax2.set_ylim(top=max(base_vals + no_flex_vals + full_vals) * 1.1)
-    ax2.legend(fontsize=7.5, loc="upper left")
-    ax2.grid(alpha=0.3)
-
-    fig.suptitle("Emission Increase Attributable to the Newly Implemented Industry Sectors",
-                 fontsize=13, fontweight="bold")
-    fig.tight_layout(rect=[0, 0, 1, 0.95])
-    savefig(fig, "fig2_emissions_source_comparison")
+    y_top = max(max(v) for v in vals.values()) * 1.1
+    ax2.set_ylabel("Cumulative emissions (Mt CO$_2$-eq)")
+    ax2.set_ylim(top=y_top)
+    _comma_axis(ax2)
+    ax2.grid(alpha=0.3, linewidth=0.5)
+    _panel_title(ax2, "(b) Cumulative emissions and carbon budget")
+    handles = [Line2D([], [], color=panel_b_color[lab], linewidth=1.2, label=lab, **line_style[lab],
+                      markersize=3)
+               for lab in (base_run.label, no_flex_run.label, full_run.label)]
+    handles += [Line2D([], [], color="black", linewidth=1.2, label="Cumulative emissions"),
+                Line2D([], [], color="black", linewidth=1.0, linestyle="--", label="Carbon budget"),
+                Patch(facecolor="black", alpha=0.12, label="Above own budget,\nnot yet repaid")]
+    _report_legend(ax2, handles)
+    fig.tight_layout(h_pad=1.5)
+    savefig(fig, "fig2_emissions_by_source_and_carbon_budget")
 
 
 def _grey_delta_bar(ax, labels: list[str], values: dict[str, float], base_for: dict[str, str],
@@ -2602,14 +2706,40 @@ FIG307_STYLE = dict(baseline=_FIG306_LIGHT, text="black", decrease=_FIG306_DECRE
 # fig309/310: `whole_border` is the linewidth of the border around each whole box,
 # so the numbers read as describing it rather than the baseline block inside.
 FIG309_STYLE = {**FIG307_STYLE, "whole_border": 2.6}
-# fig310: blue baseline, solid light tints for the delta (green = increase, red =
-# decrease), light enough for the black numbers that run across block and delta.
-FIG310_STYLE = dict(baseline=_eth_tint(_ETH_BLUE, 0.8), text="black", whole_border=2.6,
-                    increase=dict(facecolor=_eth_tint(_ETH_GREEN, 0.68), edgecolor="none"),
-                    decrease=dict(facecolor=_eth_tint(_ETH_RED, 0.68), edgecolor="none"))
-# fig311: fig310 with a light ETH bronze baseline block instead of blue (the
-# ETH swatch's closest to yellow), so the TSA matrix reads apart from fig310.
-FIG311_STYLE = {**FIG310_STYLE, "baseline": _eth_tint(_ETH_BRONZE, 0.6)}
+# Report matrix/table scheme (fig310, fig311, fig43): baseline grey, increase
+# ETH green, decrease ETH red. Two variants: light fills + black text, or
+# saturated fills + white text. MATRIX_DARK picks the one written to
+# SI_results/; with MATRIX_PREVIEW_BOTH the other one also goes to
+# SI_results/preview/ (*_light / *_dark) for comparison.
+MATRIX_DARK = False
+MATRIX_PREVIEW_BOTH = False
+MATRIX_STYLE_LIGHT = dict(baseline=_eth_tint(_ETH_GREY, 0.72), text="black", whole_border=1.1,
+                          increase=dict(facecolor=_eth_tint(_ETH_GREEN, 0.55), edgecolor="none"),
+                          decrease=dict(facecolor=_eth_tint(_ETH_RED, 0.55), edgecolor="none"))
+MATRIX_STYLE_DARK = dict(baseline=_ETH_GREY, text="white", whole_border=1.1,
+                         increase=dict(facecolor=_ETH_GREEN, edgecolor="none"),
+                         decrease=dict(facecolor=_ETH_RED, edgecolor="none"))
+
+
+def _matrix_style(dark: bool | None = None) -> dict:
+    return MATRIX_STYLE_DARK if (MATRIX_DARK if dark is None else dark) else MATRIX_STYLE_LIGHT
+
+
+FIG310_STYLE = _matrix_style()
+FIG311_STYLE = FIG310_STYLE
+
+
+def _matrix_variants() -> list[tuple[bool, str | None]]:
+    """(dark, subdir) pairs to render: the chosen variant into SI_results/, the
+    other one into SI_results/preview/ while MATRIX_PREVIEW_BOTH is set."""
+    out = [(MATRIX_DARK, None)]
+    if MATRIX_PREVIEW_BOTH:
+        out.append((not MATRIX_DARK, "preview"))
+    return out
+
+
+def _variant_suffix(dark: bool, subdir: str | None) -> str:
+    return "" if subdir is None else ("_dark" if dark else "_light")
 
 
 def _fig306_legend(style: dict, baseline_label: str = f"{FULL}, 3 temp. levels") -> list[Patch]:
@@ -2621,7 +2751,7 @@ def _fig306_legend(style: dict, baseline_label: str = f"{FULL}, 3 temp. levels")
                Patch(**style["decrease"], label="Decrease below baseline")]
     if whole:
         handles.append(Patch(facecolor="none", edgecolor="#1F2A3A", linewidth=whole,
-                             label="Whole square = value shown"))
+                             label="Whole square: value shown"))
     return handles
 
 
@@ -2699,19 +2829,27 @@ def _fig300_sized_panel(fig: plt.Figure, ax: plt.Axes, values: dict[tuple[int, i
                 ax.add_patch(Rectangle((x0, y0), s, s, fill=False, edgecolor="#1F2A3A",
                                        linewidth=0, hatch="//", alpha=0.35, zorder=3))
                 ax.text(x0 + s / 2, y0 + 0.08, "placeholder", ha="center", va="center",
-                        fontsize=10, style="italic", color=baseline_delta["text"], zorder=4)
+                        fontsize=7, style="italic", color=baseline_delta["text"], zorder=4)
             delta = c - base
             sign = "+" if delta >= 0 else "−"
-            lines = [(f"{value_fmt.format(c)} {unit}", dict(fontsize=12.5))]
+            # units are in the panel title; only a differing delta unit (pp) is written
+            lines = [(f"{value_fmt.format(c)}", dict(fontsize=7.5))]
             if rc == base_rc:
-                lines.append(("baseline", dict(fontsize=12.5, style="italic")))
+                lines.append(("baseline", dict(fontsize=7.5, style="italic")))
             else:
-                lines += [(f"({sign}{delta_fmt.format(abs(delta))} {delta_unit or unit})", dict(fontsize=12.5)),
-                          (f"{sign}{abs(delta) / base * 100:.2f} %", dict(fontsize=15, fontweight="bold"))]
-            y_first = y0 + s / 2 + (len(lines) - 1) * line / 2
+                d_unit = f" {delta_unit}" if delta_unit else ""
+                lines += [(f"({sign}{delta_fmt.format(abs(delta))}{d_unit})", dict(fontsize=7.5)),
+                          (f"{sign}{abs(delta) / base * 100:.2f} %", dict(fontsize=9, fontweight="bold"))]
+            bline = 0.15
+            y_first = y0 + s / 2 + (len(lines) - 1) * bline / 2
+            # white text only where the (saturated) fill is behind it: a box smaller
+            # than the text falls back to black, which reads on the light fills too
+            text_color = baseline_delta["text"]
+            if text_color == "white" and max(s, FIG300_BASE_SIDE) < 0.45:
+                text_color = "black"
             for i, (txt, kw) in enumerate(lines):
-                ax.text(x0 + s / 2, y_first - i * line, txt, ha="center", va="center",
-                        color=baseline_delta["text"], zorder=4, **kw)
+                ax.text(x0 + s / 2, y_first - i * bline, txt, ha="center", va="center",
+                        color=text_color, zorder=4, **kw)
             continue
         if max_outline:
             ax.add_patch(Rectangle((rc[1] * (slot + gap), (1 - rc[0]) * (slot + gap)), slot, slot,
@@ -2770,7 +2908,7 @@ def _fig300_sized_panel(fig: plt.Figure, ax: plt.Axes, values: dict[tuple[int, i
         x_center = lambda col: col * (slot + gap) + slot / 2
         y_center = lambda row: (1 - row) * (slot + gap) + slot / 2
     top_left = align == "top_left"  # labels flush with the shared top left corners
-    label_size = 13 if baseline_delta else 11
+    label_size = 8.5 if baseline_delta else 11
     for col, label in enumerate(col_names):
         ax.text(col * (slot + gap) if top_left else x_center(col), label_y, label,
                 ha="left" if top_left else "center", va="bottom", fontsize=label_size, color="black")
@@ -2890,14 +3028,14 @@ def _fig43_metrics(r: Run) -> dict[str, float]:
 # -> (title, unit, colourbar label, _fig30_matrix_panel kwargs). Bottom right
 # is FIG30_YEAR renewable curtailment, computed as in fig43 (_curtailment_twh).
 FIG30_PANELS = {
-    "cost": ("Total cumulative costs in bn €", "bn €",
+    "cost": ("Total cumulative cost (bn EUR)", "bn €",
              "Discounted total system cost [bn EUR]", {}),
-    "hp_share": (f"Heat-pump share of industrial heat {FIG30_YEAR} in %", "%",
+    "hp_share": (f"Heat-pump share {FIG30_YEAR} (%)", "%",
                  f"Heat-pump share of industry heat output {FIG30_YEAR} [%]",
                  dict(value_fmt="{:.1f}", delta_unit="pp")),
-    "vre": (f"Variable renewable capacity {FIG30_YEAR} in GW", "GW",
+    "vre": (f"Variable renewables {FIG30_YEAR} (GW)", "GW",
             f"Solar + wind + hydro capacity {FIG30_YEAR} [GW]", {}),
-    "curtailment": (f"Curtailment {FIG30_YEAR} in TWh", "TWh",
+    "curtailment": (f"Curtailment {FIG30_YEAR} (TWh)", "TWh",
                     f"Renewable curtailment {FIG30_YEAR} [TWh]", {}),
 }
 
@@ -2927,20 +3065,22 @@ def fig30_matrix(no_flex_run: Run, no_flex_single_run: Run, full_run: Run,
     _matrix_figure(cells, "fig30_matrix")
 
 
-def fig310_matrix_sized_delta_hatched(no_flex_run: Run, no_flex_single_run: Run, full_run: Run,
+def fig310_matrix_temperature_levels(no_flex_run: Run, no_flex_single_run: Run, full_run: Run,
                                       single_temp_run: Run) -> None:
     """fig30's matrices with the relative change encoded as box size too: the
     baseline block sits in every box and the delta around it is solid green or
     red (see _fig300_sized_panel, FIG310_STYLE). Box side length grows linearly with the
     change relative to the baseline, scaled within each panel (largest change =
     largest box): sizes are not comparable between panels.
-    -> SI_results/fig310_matrix_sized_delta_hatched_border.svg
+    -> SI_results/fig310_matrix_temperature_levels.svg
     """
     cells = {(0, 0): full_run, (0, 1): no_flex_run,
              (1, 0): single_temp_run, (1, 1): no_flex_single_run}
-    _matrix_figure(cells, "fig310_matrix_sized_delta_hatched_border", panel_fn=_fig300_sized_panel,
-                   baseline_delta=FIG310_STYLE, legend=_fig306_legend(FIG310_STYLE),
-                   symmetric=True)
+    for dark, subdir in _matrix_variants():
+        style = _matrix_style(dark)
+        _matrix_figure(cells, "fig310_matrix_temperature_levels" + _variant_suffix(dark, subdir),
+                       panel_fn=_fig300_sized_panel, baseline_delta=style,
+                       legend=_fig306_legend(style), symmetric=True, subdir=subdir)
 
 
 def fig31_matrix_tsa(no_flex_run: Run, no_flex_20ts_run: Run, full_run: Run,
@@ -2962,26 +3102,29 @@ def fig31_matrix_tsa(no_flex_run: Run, no_flex_20ts_run: Run, full_run: Run,
                    placeholders=frozenset({(1, 1)} if no_flex_20ts_placeholder else ()))
 
 
-def fig311_matrix_tsa_sized_delta(no_flex_run: Run, no_flex_20ts_run: Run, full_run: Run,
+def fig311_matrix_time_steps(no_flex_run: Run, no_flex_20ts_run: Run, full_run: Run,
                                   full_20ts_run: Run, no_flex_20ts_placeholder: bool = False) -> None:
     """fig310's sized-delta layout for fig31's time-series-aggregation matrix:
     rows 10 / 20 representative time steps, baseline Full flexibility 10 ts,
     light bronze baseline block instead of blue (FIG311_STYLE), green/red delta.
     `no_flex_20ts_placeholder` as in fig31.
-    -> SI_results/fig311_matrix_tsa_sized_delta_border.svg
+    -> SI_results/fig311_matrix_time_steps.svg
     """
     cells = {(0, 0): full_run, (0, 1): no_flex_run,
              (1, 0): full_20ts_run, (1, 1): no_flex_20ts_run}
-    _matrix_figure(cells, "fig311_matrix_tsa_sized_delta_border", panel_fn=_fig300_sized_panel,
-                   baseline_delta=FIG311_STYLE,
-                   legend=_fig306_legend(FIG311_STYLE, f"{FULL}, 10 time steps"),
-                   symmetric=True, row_names=("10 time steps", "20 time steps"),
-                   placeholders=frozenset({(1, 1)} if no_flex_20ts_placeholder else ()))
+    for dark, subdir in _matrix_variants():
+        style = _matrix_style(dark)
+        _matrix_figure(cells, "fig311_matrix_time_steps" + _variant_suffix(dark, subdir),
+                       panel_fn=_fig300_sized_panel, baseline_delta=style,
+                       legend=_fig306_legend(style, f"{FULL}, 10 time steps"),
+                       symmetric=True, row_names=("10 time steps", "20 time steps"),
+                       placeholders=frozenset({(1, 1)} if no_flex_20ts_placeholder else ()),
+                       subdir=subdir)
 
 
 def _matrix_figure(cells: dict[tuple[int, int], Run], fig_name: str,
                    panel_fn=_fig30_matrix_panel, legend: list | None = None,
-                   symmetric: bool = False, **panel_kw) -> None:
+                   symmetric: bool = False, subdir: str | None = None, **panel_kw) -> None:
     """fig30's body for any 2x2 `cells` (row, col) -> run, (0, 0) the
     baseline; `panel_kw` goes to every `panel_fn`. `legend` handles go below
     the panels, centred on them; `symmetric` drops the column labels from the
@@ -2991,7 +3134,7 @@ def _matrix_figure(cells: dict[tuple[int, int], Run], fig_name: str,
     vals = {k: {rc: m[k] for rc, m in metrics.items()} for k in FIG30_PANELS}
 
     # 2x2 grid of panels: cost | HP share over VRE | curtailment.
-    fig, axes = plt.subplots(2, 2, figsize=(13.2, 13.2) if symmetric else (15, 14))
+    fig, axes = plt.subplots(2, 2, figsize=(REPORT_WIDTH, REPORT_WIDTH) if symmetric else (15, 14))
     panels = [(vals[k], *FIG30_PANELS[k]) for k in FIG30_PANELS]
     cbars = [panel_fn(fig, ax, vals, title, unit, cbar_label, row_labels=(i % 2 == 0),
                       **({"col_names": ()} if symmetric and i >= 2 else {}),
@@ -3017,14 +3160,14 @@ def _matrix_figure(cells: dict[tuple[int, int], Run], fig_name: str,
         if symmetric and i >= 2:  # where the column labels would be (0.2 margin, 0.06 offset)
             top = ax.transData.transform((0, ax.get_ylim()[1] - 0.2 + 0.06))[1]
         x, y = to_fig.transform(((left + right) / 2, top))
-        fig.text(x, y + 0.003, title, ha="center", va="bottom", fontsize=15 if symmetric else 12.5,
-                 fontweight="bold")
+        fig.text(x, y + 0.003, f"({'abcd'[i]}) {title}" if symmetric else title, ha="center", va="bottom",
+                 fontsize=9.5 if symmetric else 12.5, fontweight="bold")
     bottom = to_fig.transform((0, axes[1, 0].get_window_extent(renderer).y0))[1]
     if legend:
         x_mid = to_fig.transform(((axes[1, 0].get_window_extent(renderer).x0
                                    + axes[1, 1].get_window_extent(renderer).x1) / 2, 0))[0]
         fig.legend(handles=legend, loc="upper center", bbox_to_anchor=(x_mid, bottom), ncol=2,
-                   frameon=False, fontsize=12.5)
+                   frameon=False, fontsize=8 if symmetric else 12.5)
     elif FIG30_SHOW_ARROWS:
         fig.text(0.5, bottom - 0.012, "Arrow width is proportional to the size of the change relative to "
                  "the largest change within each panel.", ha="center", va="top", fontsize=10,
@@ -3033,12 +3176,12 @@ def _matrix_figure(cells: dict[tuple[int, int], Run], fig_name: str,
         fig.text(0.5, bottom - 0.012, "Hatched cell: placeholder — shows the 10 time step run "
                  "until the 20 time step run is available.", ha="center", va="top", fontsize=10,
                  style="italic", color="black")
-    savefig(fig, fig_name)
+    savefig(fig, fig_name, subdir=subdir)
 
 
 # fig40 panels — fig30's 4 plus DSM and TES discharge: key -> (title, Δ unit,
 # value format). The baseline's absolute value is shown in "%" for hp_share.
-FIG40_PANELS = {"cost": ("Total cumulative costs", "bn €", "{:,.0f}"),
+FIG40_PANELS = {"cost": ("Total cumulative cost", "bn €", "{:,.0f}"),
                 "hp_share": (f"Heat-pump share {FIG30_YEAR}", "pp", "{:.1f}"),
                 "vre": (f"Variable renewables {FIG30_YEAR}", "GW", "{:,.0f}"),
                 "storage": (f"Storage discharge {FIG30_YEAR}", "TWh", "{:,.0f}"),
@@ -3108,26 +3251,36 @@ def fig40_flex_scenarios(runs: list[Run]) -> None:
 def fig41_flex_scenarios_table(runs: list[Run], panels: dict = FIG40_PANELS,
                                metrics_fn=_fig30_metrics,
                                fig_name: str = "fig41_flex_scenarios_table",
-                               transpose: bool = False) -> None:
-    """fig40's data as an annotated heatmap table (alternative to fig40, per
-    user): scenarios as rows (FIG40_ORDER, No flexibility below a dashed
-    line), the FIG40_PANELS metrics as columns. Each cell gives the absolute
-    value and, under it, the difference to Full flexibility (absolute and
-    %; pp for the heat-pump share), and is shaded by that difference — ETH
-    blue below / red above Full flexibility, scaled per column to its
-    largest |difference| (cost moves by ~0.1 %, DSM/TES by up to 100 %, so a
-    shared scale would leave most columns white). `panels`/`metrics_fn`/
-    `fig_name` let fig43 reuse it with an extra curtailment metric;
-    `transpose` puts the metrics in rows and the scenarios in columns (No
-    flexibility right of a dashed line), shading then scaled per row.
+                               transpose: bool = False, dark: bool | None = None,
+                               subdir: str | None = None) -> None:
+    """fig40's data as an annotated table: scenarios as rows (FIG40_ORDER, No
+    flexibility below a dashed line), the FIG40_PANELS metrics as columns. Each
+    cell gives the absolute value and, under it, the difference to ZEN-Europe
+    (absolute and %; pp for the heat-pump share), and is shaded by that
+    difference in the report matrix scheme (_matrix_style: baseline grey,
+    increase ETH green, decrease ETH red), scaled per metric to its largest
+    |difference| (cost moves by ~0.1 %, DSM/TES by up to 100 %, so a shared
+    scale would leave most cells white). `dark` picks the saturated/white-text
+    variant (default MATRIX_DARK). `transpose` puts the metrics in rows and the
+    scenarios in columns (No flexibility right of a dashed line).
     -> SI_results/fig41_flex_scenarios_table.svg
     """
     by = {r.label: r for r in runs}
     order = [lbl for lbl in FIG40_ORDER if lbl in by]
     metrics = {lbl: metrics_fn(by[lbl]) for lbl in order}
     base = metrics[FULL]
-    cmap = LinearSegmentedColormap.from_list("fig41_delta", [_ETH_BLUE, "white", _ETH_RED])
-    norm = Normalize(vmin=-1, vmax=1)
+    style = _matrix_style(dark)
+    is_dark = style is MATRIX_STYLE_DARK
+    inc, dec = style["increase"]["facecolor"], style["decrease"]["facecolor"]
+
+    def cell_color(x: float) -> str:
+        """x = difference / largest |difference| of the metric, in [-1, 1]."""
+        if abs(x) < 1e-9:
+            return _eth_tint(_ETH_GREY, 0.45) if is_dark else "white"
+        hue = _ETH_GREEN if x > 0 else _ETH_RED
+        # light: white -> the light fill; dark: mid tint -> the saturated fill
+        lo, hi = (0.3, 0.0) if is_dark else (0.92, 0.55)
+        return _eth_tint(hue, lo + (hi - lo) * abs(x))
 
     n_metrics, n_scen = len(panels), len(order)
 
@@ -3136,69 +3289,71 @@ def fig41_flex_scenarios_table(runs: list[Run], panels: dict = FIG40_PANELS,
         return (i_scen, i_metric) if transpose else (i_metric, i_scen)
 
     n_x, n_y = xy(n_metrics, n_scen)
-    fig, ax = plt.subplots(figsize=(2.5 * n_x + (2.5 if transpose else 0), 5.6 if not transpose
-                                    else 1.0 * n_y + 1.2))
+    fig, ax = plt.subplots(figsize=(REPORT_WIDTH, 0.56 * n_y + 0.9) if transpose
+                           else (2.5 * n_x, 5.6))
     for i_m, (key, (title, unit, fmt)) in enumerate(panels.items()):
         abs_unit = "%" if key == "hp_share" else unit
         if transpose:
-            # Inside the (white) Full flexibility cell's left margin, nearer its values
-            # (which sit right of centre, x + 0.6, to balance the gaps either side).
-            ax.text(0.15, i_m + 0.5, f"{title}\n[{abs_unit}]", ha="right", va="center",
-                    fontsize=10.5, fontweight="bold")
+            ax.text(-0.06, i_m + 0.5, f"{title}\n({abs_unit})", ha="right", va="center",
+                    fontsize=8, fontweight="bold")
         else:
-            ax.text(i_m + 0.5, -0.12, f"{title}\n[{abs_unit}]", ha="center", va="bottom",
-                    fontsize=10.5, fontweight="bold")
+            ax.text(i_m + 0.5, -0.12, f"{title}\n({abs_unit})", ha="center", va="bottom",
+                    fontsize=8, fontweight="bold")
         max_abs = max(abs(metrics[lbl][key] - base[key]) for lbl in order) or 1.0
         pct_fmt = "{:.2f}" if key == "cost" else "{:.1f}"
         for i_s, lbl in enumerate(order):
             x, y = xy(i_m, i_s)
             val = metrics[lbl][key]
             d = val - base[key]
-            color = cmap(norm(d / max_abs))
+            color = style["baseline"] if lbl == FULL else cell_color(d / max_abs)
             ax.add_patch(Rectangle((x, y), 1, 1, facecolor=color, edgecolor="white",
-                                   linewidth=2, zorder=1))
-            text_color = _text_color_for_bg(color)
-            cx = x + (0.6 if transpose and lbl == FULL else 0.5)
-            ax.text(cx, y + 0.4, fmt.format(val), ha="center", va="center",
-                    fontsize=12, fontweight="bold", color=text_color)
+                                   linewidth=1.5, zorder=1))
+            text_color = "white" if is_dark else "black"
+            cx = x + 0.5
             if lbl == FULL:
-                sub = "baseline"
+                ax.text(cx, y + 0.36, fmt.format(val), ha="center", va="center",
+                        fontsize=8.5, fontweight="bold", color=text_color)
+                ax.text(cx, y + 0.7, "baseline", ha="center", va="center", fontsize=7,
+                        style="italic", color=text_color)
             else:
                 sign = "+" if d >= 0 else "−"
-                sub = (f"{sign}{fmt.format(abs(d))} {unit} "
-                       f"({sign}{pct_fmt.format(abs(d) / base[key] * 100)} %)")
-            ax.text(cx, y + 0.72, sub, ha="center", va="center", fontsize=9,
-                    style="italic" if lbl == FULL else "normal", color=text_color)
+                ax.text(cx, y + 0.28, fmt.format(val), ha="center", va="center",
+                        fontsize=8.5, fontweight="bold", color=text_color)
+                ax.text(cx, y + 0.58, f"{sign}{fmt.format(abs(d))} {unit}", ha="center", va="center",
+                        fontsize=6.5, color=text_color)
+                ax.text(cx, y + 0.82, f"({sign}{pct_fmt.format(abs(d) / base[key] * 100)} %)",
+                        ha="center", va="center", fontsize=6.5, color=text_color)
     for i_s, lbl in enumerate(order):
+        name = lbl.replace("ZEN-Europe-", "ZEN-Europe-\n") if lbl != FULL else lbl
         if transpose:
-            ax.text(i_s + (0.6 if lbl == FULL else 0.5), -0.12, lbl, ha="center",
-                    va="bottom", fontsize=11,
-                    fontweight="bold")
+            ax.text(i_s + 0.5, -0.08, name, ha="center", va="bottom", fontsize=7.5, fontweight="bold")
         else:
-            ax.text(-0.08, i_s + 0.5, lbl, ha="right", va="center", fontsize=11)
+            ax.text(-0.08, i_s + 0.5, lbl, ha="right", va="center", fontsize=8)
     if transpose:
-        ax.plot([n_scen - 1] * 2, [-0.5, n_metrics], color="#1F2A3A", linestyle="--",
-                linewidth=1.2, clip_on=False, zorder=3)
+        ax.plot([n_scen - 1] * 2, [-0.6, n_metrics], color="#1F2A3A", linestyle="--",
+                linewidth=0.8, clip_on=False, zorder=3)
     else:
         ax.plot([-0.9, n_metrics], [n_scen - 1] * 2, color="#1F2A3A", linestyle="--",
-                linewidth=1.2, clip_on=False, zorder=3)
+                linewidth=0.8, clip_on=False, zorder=3)
     ax.set_xlim(0, n_x)
     ax.set_ylim(n_y, 0)
     ax.axis("off")
-    cbar = fig.colorbar(ScalarMappable(norm=norm, cmap=cmap), ax=ax, fraction=0.025, pad=0.02,
-                        ticks=[-1, 0, 1])
-    cbar.ax.set_yticklabels(["largest\ndecrease", f"same as\n{FULL}", "largest\nincrease"],
-                            fontsize=9)
-    cbar.set_label(f"Difference to {FULL} (scaled per {'row' if transpose else 'column'})",
-                   fontsize=10)
-    savefig(fig, fig_name)
+    handles = [Patch(facecolor=style["baseline"], label=f"Baseline ({FULL})"),
+               Patch(facecolor=dec, label=f"Lower than {FULL}"),
+               Patch(facecolor=inc, label=f"Higher than {FULL}")]
+    ax.legend(handles=handles, loc="upper center", bbox_to_anchor=(0.5, -0.01), ncol=3, fontsize=7.5,
+              frameon=False, handlelength=1.2,
+              title=f"Shade scaled per {'row' if transpose else 'column'} to its largest difference",
+              title_fontsize=7.5)
+    fig.tight_layout()
+    savefig(fig, fig_name, subdir=subdir)
 
 
 # fig41's columns plus curtailment (_curtailment_twh).
 FIG43_PANELS = {**FIG40_PANELS, "curtailment": (f"Curtailment {FIG30_YEAR}", "TWh", "{:,.0f}")}
 
 
-def fig43_flex_scenarios_table_curtailment(runs: list[Run]) -> None:
+def fig43_flexibility_scenarios_table(runs: list[Run]) -> None:
     """fig41 transposed (metrics as rows, scenarios as columns — taller, less
     wide) with a 7th metric: FIG30_YEAR renewable curtailment [TWh] — see
     _curtailment_twh for how it is computed (available PV/wind/run-of-river
@@ -3212,10 +3367,12 @@ def fig43_flex_scenarios_table_curtailment(runs: list[Run]) -> None:
     (264), curtailment 2050 253 TWh (392) / 3.6 % of available VRE energy
     (4.7 %), 2038 263 TWh (348); heat-pump share, DSM and TES discharge do
     not apply (no industry heat).
-    -> SI_results/fig43_flex_scenarios_table_curtailment.svg
+    -> SI_results/fig43_flexibility_scenarios_table.svg
     """
-    fig41_flex_scenarios_table(runs, FIG43_PANELS, _fig43_metrics,
-                               "fig43_flex_scenarios_table_curtailment", transpose=True)
+    for dark, subdir in _matrix_variants():
+        fig41_flex_scenarios_table(runs, FIG43_PANELS, _fig43_metrics,
+                                   "fig43_flexibility_scenarios_table" + _variant_suffix(dark, subdir),
+                                   transpose=True, dark=dark, subdir=subdir)
 
 
 def _dsm_storage_cost_bn(r: Run) -> float:
@@ -3825,24 +3982,23 @@ POWER_GEN_TECHS = [
 # run-of-river_hydro, wind_offshore, wind_onshore lightest) — distinguishable
 # by lightness, the same convention HEAT_SUPPLY_COLOR_MAP uses for its
 # multiple heat-pump temperature bands.
-_SOLAR_YELLOW = "#FFCA3A"
 POWER_GEN_COLOR_MAP = {
-    "photovoltaics": _SOLAR_YELLOW,
-    "wind_onshore": _eth_tint(_ETH_BLUE, 0.65),
-    "wind_offshore": _eth_tint(_ETH_BLUE, 0.45),
-    "reservoir_hydro": _ETH_BLUE,
-    "run-of-river_hydro": _eth_tint(_ETH_BLUE, 0.25),
-    "nuclear": _ETH_PURPLE,
-    "natural_gas_turbine": _ETH_TURQUOISE,
-    "natural_gas_turbine_CCS": _ETH_TURQUOISE,
-    "hard_coal_plant": _ETH_GREY,
-    "lignite_coal_plant": _eth_tint(_ETH_GREY, 0.3),
-    "oil_plant": _ETH_BRONZE,
-    "biomass_plant": _ETH_GREEN,
-    "biomass_plant_CCS": _ETH_GREEN,
-    "waste_plant": _ETH_RED,
+    "photovoltaics": CARRIER_COLORS["solar"],
+    "wind_onshore": CARRIER_COLORS["wind_onshore"],
+    "wind_offshore": CARRIER_COLORS["wind_offshore"],
+    "reservoir_hydro": CARRIER_COLORS["hydro_reservoir"],
+    "run-of-river_hydro": CARRIER_COLORS["hydro_ror"],
+    "nuclear": CARRIER_COLORS["nuclear"],
+    "natural_gas_turbine": CARRIER_COLORS["natural_gas"],
+    "natural_gas_turbine_CCS": CARRIER_COLORS["natural_gas_ccs"],
+    "hard_coal_plant": CARRIER_COLORS["hard_coal"],
+    "lignite_coal_plant": CARRIER_COLORS["lignite"],
+    "oil_plant": CARRIER_COLORS["oil"],
+    "biomass_plant": CARRIER_COLORS["biomass"],
+    "biomass_plant_CCS": CARRIER_COLORS["biomass_ccs"],
+    "waste_plant": CARRIER_COLORS["waste"],
 }
-POWER_GEN_HATCH_MAP = {"natural_gas_turbine_CCS": _HP_HATCH, "biomass_plant_CCS": _HP_HATCH}
+POWER_GEN_HATCH_MAP: dict[str, str] = {}  # colour only (CCS = lighter tint of its fuel)
 # Fossil (dirtiest first) at the bottom of the stack, then biomass/waste,
 # nuclear, hydro, VRE on top — same "cleaner = higher in the stack"
 # convention HEAT_SUPPLY_STACK_ORDER uses.
@@ -3866,11 +4022,11 @@ POWER_GEN_STACK_ORDER = [
 # as oil_plant (and oil_boiler_industry elsewhere), hydrogen=ETH_PURPLE
 # (matching nuclear; no analog in the generation row, free to reuse).
 STORAGE_COLOR_MAP = {
-    "battery": _ETH_BLUE,
-    "pumped_hydro": _eth_tint(_ETH_BLUE, 0.35),
-    "natural_gas_storage": _ETH_TURQUOISE,
-    "oil_storage": _ETH_BRONZE,
-    "salt_cavern_storage": _ETH_PURPLE,
+    "battery": CARRIER_COLORS["battery"],
+    "pumped_hydro": CARRIER_COLORS["pumped_hydro"],
+    "natural_gas_storage": CARRIER_COLORS["natural_gas"],
+    "oil_storage": CARRIER_COLORS["oil"],
+    "salt_cavern_storage": CARRIER_COLORS["hydrogen"],
 }
 STORAGE_STACK_ORDER = ["battery", "pumped_hydro", "natural_gas_storage", "oil_storage", "salt_cavern_storage"]
 
@@ -4046,13 +4202,13 @@ def _plot_base_and_floating_delta(
                 continue
             color = color_map[category]
             ax.bar(base_pos, val, bar_width, bottom=bottom, color=color,
-                   label=category if category not in labeled else None,
-                   edgecolor="white", linewidth=0.5, hatch=hatch_map.get(category, ""))
+                   label=display_name(category) if category not in labeled else None,
+                   edgecolor="white", linewidth=0.4, hatch=hatch_map.get(category, ""))
             bottom += val
             labeled.add(category)
         base_total = bottom
         ax.text(base_pos, base_total, f"{base_total:,.{decimals}f}", ha="center", va="bottom",
-                 fontsize=8, fontweight="bold")
+                 fontsize=REPORT_VALUE_SIZE)
 
         for di, delta_label in enumerate(delta_labels):
             delta_pos = base_pos + 1 + di
@@ -4063,33 +4219,33 @@ def _plot_base_and_floating_delta(
                 hatch = hatch_map.get(category, "")
                 if val > 0:
                     ax.bar(delta_pos, val, bar_width, bottom=top, color=color,
-                           label=category if category not in labeled else None,
-                           edgecolor="white", linewidth=0.5, hatch=hatch)
+                           label=display_name(category) if category not in labeled else None,
+                           edgecolor="white", linewidth=0.4, hatch=hatch)
                     top += val
                     labeled.add(category)
                 elif val < 0:
                     ax.bar(delta_pos, val, bar_width, bottom=bot, color=color,
-                           label=category if category not in labeled else None,
-                           edgecolor="white", linewidth=0.5, hatch=hatch if hatch else "//")
+                           label=display_name(category) if category not in labeled else None,
+                           edgecolor="white", linewidth=0.4, hatch=hatch)
                     bot += val
                     labeled.add(category)
             y_max, y_min = max(y_max, base_total, top), min(y_min, bot)
             delta_total = df[delta_label].sum()
             pct = (delta_total / base_total * 100) if base_total else 0.0
             label_y, va = (top, "bottom") if delta_total >= 0 else (bot, "top")
-            ax.text(delta_pos, label_y, f"{delta_total:+,.{decimals}f}\n({pct:+.1f}%)",
-                     ha="center", va=va, fontsize=8, fontweight="bold")
+            ax.text(delta_pos, label_y, f"{delta_total:+,.{decimals}f}\n({pct:+.1f} %)",
+                     ha="center", va=va, fontsize=REPORT_VALUE_SIZE)
             ax.plot([base_pos + bar_width / 2, delta_pos - bar_width / 2], [base_total, base_total],
                     color="#888888", linestyle="--", linewidth=0.8, zorder=0)
 
     ax.set_xticks(positions_all)
-    ax.set_xticklabels(tick_labels_all, fontsize=8, rotation=30, ha="right")
+    ax.set_xticklabels(tick_labels_all, fontsize=7, rotation=25, ha="right", rotation_mode="anchor")
     for yc, year in zip(year_centers, years):
         ax.annotate(str(year), xy=(yc, 0), xycoords=("data", "axes fraction"),
-                    xytext=(0, -46), textcoords="offset points",
-                    ha="center", va="top", fontsize=11, fontweight="bold")
-    ax.set_ylabel(unit, fontsize=11)
-    ax.set_title(title, fontsize=12, fontweight="bold")
+                    xytext=(0, -50), textcoords="offset points",
+                    ha="center", va="top", fontsize=9, fontweight="bold")
+    ax.set_ylabel(unit)
+    _panel_title(ax, title)
     # Headroom for the 2-line value labels above the tallest bar (and below
     # the lowest, if any delta goes negative) so they don't hit the title.
     span = y_max - y_min
@@ -4098,11 +4254,10 @@ def _plot_base_and_floating_delta(
     if show_legend:
         handles, labels = ax.get_legend_handles_labels()
         if handles:
-            ax.legend(handles[::-1], labels[::-1], bbox_to_anchor=(1.02, 1),
-                      loc="upper left", fontsize=8, frameon=False)
+            _report_legend(ax, handles[::-1], labels[::-1])
 
 
-def fig12_capacity_and_storage_base_and_delta(base_run: Run, no_flex_run: Run) -> None:
+def fig12_capacity_and_storage_legacy_vs_no_flex(base_run: Run, no_flex_run: Run) -> None:
     """Power generation capacity (left) and storage annual energy discharged
     (right), side by side, 3 snapshot years each (2030/2040/2050, same
     SNAPSHOT_YEARS_POWER/tech scope as fig11) — each year cluster is base
@@ -4111,10 +4266,10 @@ def fig12_capacity_and_storage_base_and_delta(base_run: Run, no_flex_run: Run) -
     separate figures (one per panel) per user request to show both side by
     side in one figure instead. The former 3rd Δ Full flexibility bar was
     dropped per user request — only No flexibility vs. base is compared.
-    -> SI_results/fig12_capacity_and_storage_base_and_delta.svg
+    -> SI_results/fig12_capacity_and_storage_legacy_vs_no_flex.svg
     """
     _capacity_and_storage_base_and_delta(base_run, no_flex_run, BASE_SCENARIO[1], DELTA_LABEL,
-                                         "fig12_capacity_and_storage_base_and_delta")
+                                         "fig12_capacity_and_storage_legacy_vs_no_flex")
 
 
 def fig51_capacity_and_storage_dsm_no_cost_vs_full_flex(full_run: Run, no_cost_run: Run) -> None:
@@ -4165,262 +4320,15 @@ def _capacity_and_storage_base_and_delta(base_run: Run, no_flex_run: Run, base_l
                                                  base_label, delta_label) \
             .reindex(STORAGE_STACK_ORDER).fillna(0.0)
 
-    fig, axes = plt.subplots(1, 2, figsize=(16, 6))
-    with plt.rc_context({"hatch.linewidth": 0.5}):
-        _plot_base_and_floating_delta(gen_by_year, "Power Generation Capacity", "GW", axes[0],
-                                      color_map=POWER_GEN_COLOR_MAP, hatch_map=POWER_GEN_HATCH_MAP)
-        _plot_base_and_floating_delta(disch_by_year, "Storage Annual Energy Discharged", "TWh", axes[1],
-                                      color_map=STORAGE_COLOR_MAP, hatch_map={}, decimals=1)
-    fig.tight_layout()
+    fig, axes = plt.subplots(2, 1, figsize=(REPORT_WIDTH, 7.0))
+    _plot_base_and_floating_delta(gen_by_year, "(a) Power generation capacity",
+                                  "Capacity (GW)", axes[0],
+                                  color_map=POWER_GEN_COLOR_MAP, hatch_map=POWER_GEN_HATCH_MAP)
+    _plot_base_and_floating_delta(disch_by_year, "(b) Storage discharge", "Annual discharge (TWh)",
+                                  axes[1], color_map=STORAGE_COLOR_MAP, hatch_map={}, decimals=1)
+    _comma_axis(axes[0])
+    fig.tight_layout(h_pad=1.5)
     savefig(fig, fig_name)
-
-
-# ── 70: RQ1 summary figure — heat electrification -> power-system ripple ─────
-# One figure meant to replace fig12 + fig15a for RQ1. Four rows, shared time
-# axis, read top to bottom as cause -> effect:
-#   (a) industrial heat supply share in No-Flex (aggregated categories) plus
-#       the electrified share of every other scenario as thin lines (robustness)
-#   (b) Δ electricity consumption vs. Legacy, split by cause
-#   (c) Δ power generation capacity vs. Legacy
-#   (d) Δ storage discharge vs. Legacy
-# Cause groups for (b) come from Δ flow_conversion_input[electricity] by
-# technology (No-Flex − Legacy). The generic heat_pump/electrode_boiler
-# (carrier "heat") grow by about the same amount as DAC's extra heat
-# consumption (the exogenous heat demand is the same in both runs), so they
-# are counted under carbon removal together with DAC itself.
-
-RQ1_HEAT_CATEGORIES = {
-    "Heat pumps": [t for t in HEAT_SUPPLY_STACK_ORDER if t.startswith("heat_pump_industry")],
-    "Electrode boilers": ["electrode_boiler_industry"],
-    "Biomass boilers": ["biomass_boiler_industry"],
-    "Fossil & waste boilers": ["natural_gas_boiler_industry", "coal_boiler_industry",
-                               "oil_boiler_industry", "waste_boiler_industry"],
-}
-RQ1_HEAT_COLORS = {
-    "Heat pumps": _ETH_BLUE,
-    "Electrode boilers": _ETH_GREEN,
-    "Biomass boilers": _eth_tint(_ETH_GREEN, 0.55),
-    "Fossil & waste boilers": _ETH_GREY,
-}
-
-RQ1_ELEC_CAUSES = {
-    "Industrial heat <200 °C": lambda t: t.startswith("heat_pump_industry") or t == "electrode_boiler_industry",
-    "New industry sectors": lambda t: t in {"paper_production", "food_production", "ceramic_production",
-                                            "glass_production", "electricity_to_kilnfuel"},
-    "Carbon removal (DAC + its heat)": lambda t: t in {"DAC", "heat_pump", "electrode_boiler"},
-    # No-Flex electrifies passenger cars in 2034 instead of 2038 (same 2050 stock)
-    "Transport (earlier EVs)": lambda t: t == "BEV",
-}
-RQ1_ELEC_OTHER = "Other"
-RQ1_ELEC_COLORS = {
-    "Industrial heat <200 °C": _ETH_BLUE,
-    "New industry sectors": _ETH_BRONZE,
-    "Carbon removal (DAC + its heat)": _ETH_PURPLE,
-    "Transport (earlier EVs)": _ETH_RED,
-    RQ1_ELEC_OTHER: _eth_tint(_ETH_GREY, 0.45),
-}
-
-RQ1_CAP_GROUPS = {
-    "Solar PV": ["photovoltaics"],
-    "Wind": ["wind_onshore", "wind_offshore"],
-}
-RQ1_CAP_COLORS = {"Solar PV": _SOLAR_YELLOW, "Wind": _eth_tint(_ETH_BLUE, 0.55),
-                  "Other": _eth_tint(_ETH_GREY, 0.45)}
-RQ1_STO_GROUPS = {
-    "Battery": ["battery"],
-    "Natural gas storage": ["natural_gas_storage"],
-    "Hydrogen (salt cavern)": ["salt_cavern_storage"],
-}
-RQ1_STO_COLORS = {"Battery": _ETH_BLUE, "Natural gas storage": _ETH_TURQUOISE,
-                  "Hydrogen (salt cavern)": _ETH_PURPLE, "Other": _eth_tint(_ETH_GREY, 0.45)}
-
-
-def _group_rows(df: pd.DataFrame, groups: dict[str, list[str]], other: str = "Other") -> pd.DataFrame:
-    """Sum the rows of `df` (index = technology) into `groups`; the rest -> `other`."""
-    out, used = {}, set()
-    for name, techs in groups.items():
-        present = [t for t in techs if t in df.index]
-        out[name] = df.loc[present].sum() if present else pd.Series(0.0, index=df.columns)
-        used.update(present)
-    rest = [t for t in df.index if t not in used]
-    out[other] = df.loc[rest].sum() if rest else pd.Series(0.0, index=df.columns)
-    return pd.DataFrame(out).T
-
-
-def _delta(base: pd.DataFrame, other: pd.DataFrame) -> pd.DataFrame:
-    """other − base on the union of rows/columns (missing -> 0)."""
-    idx = base.index.union(other.index)
-    cols = [c for c in other.columns if c in base.columns]
-    return other.reindex(idx, fill_value=0.0)[cols] - base.reindex(idx, fill_value=0.0)[cols]
-
-
-def _electricity_consumption_twh(r: Run) -> pd.DataFrame:
-    """Electricity consumed by conversion technologies, TWh, index=technology."""
-    fi = _cached_total(r.results, "flow_conversion_input")
-    return fi.xs("electricity", level="carrier").groupby("technology").sum() / 1000.0
-
-
-def _electricity_by_cause(df: pd.DataFrame) -> pd.DataFrame:
-    rows, used = {}, set()
-    for cause, member in RQ1_ELEC_CAUSES.items():
-        techs = [t for t in df.index if member(t)]
-        rows[cause] = df.loc[techs].sum() if techs else pd.Series(0.0, index=df.columns)
-        used.update(techs)
-    rows[RQ1_ELEC_OTHER] = df.loc[[t for t in df.index if t not in used]].sum()
-    return pd.DataFrame(rows).T
-
-
-def _total_electricity_twh(r: Run) -> pd.Series:
-    """Conversion-technology input + exogenous electricity demand, TWh per year."""
-    total = _electricity_consumption_twh(r).sum()
-    try:
-        total = total + r.results.get_total("demand").xs("electricity", level="carrier").sum() / 1000.0
-    except KeyError:
-        pass
-    return total
-
-
-def _signed_stacked_bars(ax: plt.Axes, df: pd.DataFrame, colors: dict, x: np.ndarray,
-                         width: float = 0.7) -> tuple[np.ndarray, np.ndarray]:
-    """Stack positive values upwards and negative values downwards from 0.
-    df: index = category (bottom to top), columns = years. Returns (top, bottom)."""
-    pos = np.zeros(len(df.columns))
-    neg = np.zeros(len(df.columns))
-    for cat in df.index:
-        v = df.loc[cat].to_numpy(dtype=float)
-        vp, vn = np.clip(v, 0, None), np.clip(v, None, 0)
-        ax.bar(x, vp, width, bottom=pos, color=colors[cat], edgecolor="white", linewidth=0.5, label=cat)
-        ax.bar(x, vn, width, bottom=neg, color=colors[cat], edgecolor="white", linewidth=0.5)
-        pos += vp
-        neg += vn
-    return pos, neg
-
-
-def _label_delta_totals(ax: plt.Axes, x: np.ndarray, delta: pd.Series, base_total: pd.Series,
-                        top: np.ndarray, unit: str, fontsize: float = 7.5) -> None:
-    """'+X unit' and '(+Y %)' above each bar (only where the change is noticeable)."""
-    span = max(top.max(), 1e-9)
-    for xi, year, t in zip(x, delta.index, top):
-        d, b = delta[year], base_total[year]
-        if abs(d) < 0.02 * span:
-            continue
-        pct = f"\n({d / b * 100:+.0f} %)" if b else ""
-        ax.text(xi, t + 0.02 * span, f"{d:+,.0f}{pct}", ha="center", va="bottom", fontsize=fontsize)
-
-
-def fig70_rq1_electrification_ripple(base_run: Run, no_flex_run: Run, other_runs: list[Run]) -> None:
-    """RQ1 summary: industrial heat electrifies in every scenario (a), which,
-    together with the rest of the industry extension, raises electricity
-    demand (b), met by more PV/wind (c) and more storage (d). (b)–(d) are
-    No-Flex − Legacy.
-    -> SI_results/fig70_rq1_electrification_ripple.svg
-    """
-    years = [y for y in get_available_years(no_flex_run.results)
-             if y in get_available_years(base_run.results)]
-    x = np.arange(len(years))
-
-    # (a) heat supply shares, No-Flex
-    heat = _output_annual_twh(no_flex_run, INDUSTRY_HEAT_TECHS_BOILERS_HP)
-    heat_share = 100 * _group_rows(heat, RQ1_HEAT_CATEGORIES).drop(index="Other") \
-        .div(heat.sum(), axis=1)[years]
-    electrified = {r.label: _electrification_stack(r).sum(axis=1).reindex(years)
-                   for r in other_runs}
-    nf_elec = heat_share.loc[["Heat pumps", "Electrode boilers"]].sum()
-    all_2050 = [nf_elec[years[-1]]] + [s[years[-1]] for s in electrified.values()]
-
-    # (b) Δ electricity consumption by cause
-    elec_delta = _electricity_by_cause(_delta(_electricity_consumption_twh(base_run),
-                                              _electricity_consumption_twh(no_flex_run)))[years]
-    elec_base_total = _total_electricity_twh(base_run)[years]
-
-    # (c) Δ capacity
-    cap_b = get_capacity(base_run.results, POWER_GEN_TECHS, "power")
-    cap_n = get_capacity(no_flex_run.results, POWER_GEN_TECHS, "power")
-    cap_delta = _group_rows(_delta(cap_b, cap_n), RQ1_CAP_GROUPS)[years]
-    cap_base_total = cap_b.sum()[years]
-
-    # (d) Δ storage discharge
-    sto_techs = BULK_STORAGE_TECHS + INDUSTRY_TES_TECHS
-    sto_b = get_storage_flows(base_run.results, sto_techs, "flow_storage_discharge") / 1000.0
-    sto_n = get_storage_flows(no_flex_run.results, sto_techs, "flow_storage_discharge") / 1000.0
-    sto_delta = _group_rows(_delta(sto_b, sto_n), RQ1_STO_GROUPS)[years]
-    sto_base_total = sto_b.sum()[years]
-
-    print("  fig70 numbers (No-Flex − Legacy):")
-    print("    Δ electricity [TWh]\n" + elec_delta.round(0).to_string())
-    print("    Δ capacity [GW]\n" + cap_delta.round(0).to_string())
-    print("    Δ storage discharge [TWh]\n" + sto_delta.round(0).to_string())
-    print("    electrified share 2050 [%]: " + ", ".join(
-        f"{k}: {v:.1f}" for k, v in zip([no_flex_run.label, *electrified], all_2050)))
-
-    fig, axes = plt.subplots(4, 1, figsize=(9, 12), sharex=True,
-                             gridspec_kw={"height_ratios": [1.1, 1, 1, 1]})
-    title_kw = dict(loc="left", fontsize=11, fontweight="bold")
-
-    # (a)
-    ax = axes[0]
-    bottom = np.zeros(len(years))
-    for cat in RQ1_HEAT_CATEGORIES:
-        v = heat_share.loc[cat].to_numpy()
-        ax.bar(x, v, 0.7, bottom=bottom, color=RQ1_HEAT_COLORS[cat], edgecolor="white",
-               linewidth=0.5, label=f"{cat} ({no_flex_run.label})")
-        bottom += v
-    for i, s in enumerate(electrified.values()):
-        ax.plot(x, s.to_numpy(), color="black", linewidth=0.8, alpha=0.55, marker="o", markersize=2.5,
-                label=f"Electrified share, other scenarios (n={len(electrified)})" if i == 0 else None,
-                zorder=3)
-    ax.set_ylim(0, 105)
-    ax.set_ylabel("Share of industrial\nheat supply (%)")
-    ax.set_title("(a) Industrial heat <200 °C is electrified, in every scenario", **title_kw)
-    lo = min(all_2050)
-    share_txt = "100 %" if lo >= 99.5 else f"≥{lo:.0f} %"
-    ax.text(x[-1] + 0.45, 50, f"{share_txt} electrified\nin 2050 in all\n"
-            f"{len(all_2050)} scenarios", ha="left", va="center", fontsize=8.5)
-
-    # (b)-(d)
-    panels = [
-        (axes[1], elec_delta, RQ1_ELEC_COLORS, elec_base_total, "TWh", "Δ electricity\nconsumption (TWh)",
-         "(b) ... which raises electricity consumption"),
-        (axes[2], cap_delta, RQ1_CAP_COLORS, cap_base_total, "GW", "Δ generation\ncapacity (GW)",
-         "(c) ... met by more solar PV and wind"),
-        (axes[3], sto_delta, RQ1_STO_COLORS, sto_base_total, "TWh", "Δ storage\ndischarge (TWh)",
-         "(d) ... and more storage"),
-    ]
-    for ax, df, colors, base_total, unit, ylabel, title in panels:
-        top, bot = _signed_stacked_bars(ax, df, colors, x)
-        _label_delta_totals(ax, x, df.sum(), base_total, top, unit)
-        span = top.max() - min(bot.min(), 0)
-        ax.set_ylim(min(bot.min(), 0) - 0.05 * span, top.max() + 0.3 * span)
-        ax.axhline(0, color="black", linewidth=0.6)
-        ax.set_ylabel(ylabel)
-        ax.set_title(title, **title_kw)
-
-    for ax in axes:
-        handles, labels = ax.get_legend_handles_labels()
-        if ax is not axes[0]:
-            handles, labels = handles[::-1], labels[::-1]
-        ax.legend(handles, labels, bbox_to_anchor=(1.01, 1), loc="upper left", fontsize=8, frameon=False)
-        ax.spines[["top", "right"]].set_visible(False)
-    axes[0].legend_.set_bbox_to_anchor((1.01, 0.0))
-    axes[0].legend_.set_loc("lower left")
-    axes[-1].set_xticks(x)
-    axes[-1].set_xticklabels([str(y) for y in years])
-    fig.text(0.01, 0.005, f"(b)–(d): {no_flex_run.label} minus {base_run.label}; "
-             "labels give the absolute and relative change of the total.", fontsize=7.5, color="#555555")
-    fig.tight_layout(rect=(0, 0.015, 1, 1))
-    savefig(fig, "fig70_rq1_electrification_ripple")
-
-
-def main_fig70() -> None:
-    """Build only fig70 (loads just the runs it needs)."""
-    runs = load_scenarios()
-    base = load_base_scenario()
-    extras = [load_no_flex_single_temp_scenario(), load_dsm_no_cost_scenario(),
-              load_extra_scenario(FULL_FLEX_20TS_SCENARIO), load_extra_scenario(NO_FLEX_20TS_SCENARIO)]
-    no_flex = by_label(runs, NO_FLEX)
-    others = [r for r in runs if r.label != NO_FLEX] + [r for r in extras if r is not None]
-    FIGURES_DIR.mkdir(parents=True, exist_ok=True)
-    fig70_rq1_electrification_ripple(base, no_flex, others)
 
 
 # ── 11: MGA method schematic (no data) ──────────────────────────────────────
@@ -4977,15 +4885,20 @@ _FIG20_INDUSTRY_GROUPS = {
     "Low-T heating (incl. TES)": _FIG20_LOWT_HEAT_TECHS,
     "DSM (all products)": INDUSTRY_DSM_TECHS,
 }
+# Top level in neutral greys, only "Industries" highlighted (near-black navy,
+# not ETH red: red is the waste boiler's colour in the heating row); the
+# industry row in SECTOR_COLORS with low-T heating continuing the highlight;
+# the heating row in the heat colours (HEAT_SUPPLY_COLOR_MAP).
+_FIG20_HIGHLIGHT = "#1F2A3A"
 _FIG20_SECTOR_COLORS = {
-    "Transport": _ETH_BLUE, "Power generation": _ETH_BRONZE,
-    "Industries": _ETH_RED, "Others": _eth_tint(_ETH_GREY, 0.45),
-    "Imported carriers": _ETH_GREEN,
+    "Transport": _eth_tint(_ETH_GREY, 0.2), "Power generation": _eth_tint(_ETH_GREY, 0.45),
+    "Industries": _FIG20_HIGHLIGHT, "Others": _eth_tint(_ETH_GREY, 0.65),
+    "Imported carriers": _eth_tint(_ETH_GREY, 0.82),
 }
 _FIG20_INDUSTRY_COLORS = {
-    "Steel": _ETH_GREY, "Cement": _eth_tint(_ETH_GREY, 0.5), "Chemicals": _ETH_PURPLE,
-    "Paper": _ETH_TURQUOISE, "Food": _ETH_GREEN, "Glass & ceramics": _ETH_BRONZE,
-    "Low-T heating (incl. TES)": _ETH_RED, "DSM (all products)": _ETH_BLUE,
+    "Steel": SECTOR_COLORS["steel"], "Cement": SECTOR_COLORS["cement"], "Chemicals": SECTOR_COLORS["chemicals"],
+    "Paper": SECTOR_COLORS["paper"], "Food": SECTOR_COLORS["food"], "Glass & ceramics": SECTOR_COLORS["glass"],
+    "Low-T heating (incl. TES)": _FIG20_HIGHLIGHT, "DSM (all products)": _eth_tint(_FIG20_HIGHLIGHT, 0.6),
 }
 
 
@@ -5045,12 +4958,7 @@ def fig20_cost_breakdown_sector_industry_heating(base_run: Run, no_flex_run: Run
         heat_df.loc["industry_TES"] = heat_df.loc[tes_rows].sum()
         heat_df = heat_df.drop(index=tes_rows)
     heat_df = heat_df[heat_df.abs().sum(axis=1) > 1e-6]
-    heat_colors = {**HEAT_SUPPLY_COLOR_MAP, "industry_TES": _eth_tint(_ETH_BRONZE, 0.3)}
-
-    from matplotlib.patches import Patch
-    heat_pretty = lambda t: (t.replace("heat_pump_industry_", "HP ").replace("_boiler_industry", " boiler")
-                              .replace("_waste_heat", " waste heat").replace("_water", " water")
-                              .replace("_", "-").replace("industry-TES", "TES"))
+    heat_colors = {**HEAT_SUPPLY_COLOR_MAP, "industry_TES": CARRIER_COLORS["tes"]}
 
     _bn = lambda v: f"{v:,.0f} bn" if abs(v) >= 10 else f"{v:,.1f} bn" if abs(v) >= 0.1 else f"{v:.2f} bn"
 
@@ -5067,23 +4975,26 @@ def fig20_cost_breakdown_sector_industry_heating(base_run: Run, no_flex_run: Run
             if v <= 0:
                 continue
             w = 100 * v / tot
-            ax.barh(y, v * f, left=left, height=0.56, color=colors[n], edgecolor="white", linewidth=0.8,
-                    hatch=(hatch_map or {}).get(n))
+            ax.barh(y, v * f, left=left, height=0.56, color=colors[n], edgecolor="white", linewidth=0.6)
             if v * f / x_max >= min_label:
-                ax.text(left + v * f / 2, y, f"{names(n)}\n{w:.1f}%\n{_bn(v)}", ha="center", va="center",
-                        fontsize=8, color=_text_color_for_bg(colors[n]), fontweight="bold",
-                        bbox=dict(fc=colors[n], ec="none", pad=1.5) if (hatch_map or {}).get(n) else None)
+                name = names(n)
+                r_, g_, b_ = to_rgba(colors[n])[:3]  # white unless the segment is light
+                txt_color = "black" if 0.299 * r_ + 0.587 * g_ + 0.114 * b_ > 0.62 else "white"
+                ax.text(left + v * f / 2, y, (f"{name}\n" if name else "") + f"{w:.1f} %\n{_bn(v)}",
+                        ha="center", va="center", fontsize=6.5, color=txt_color,
+                        linespacing=1.1)
             else:
                 pass  # too narrow for an in-bar label; identified via the legend
             pos[n] = (left, left + v * f)
             left += v * f
         x_txt = left + 0.006 * x_max
-        ax.text(x_txt, y + (0.14 if f != 1.0 else 0), _bn(tot), ha="left", va="center", fontsize=9, fontweight="bold")
+        ax.text(x_txt, y + (0.14 if f != 1.0 else 0), _bn(tot), ha="left", va="center", fontsize=7.5,
+                fontweight="bold")
         return pos
 
     def connector(ax, y_top, y_bot, seg, tot_bot):
         for xa, xb in zip(seg, (0, tot_bot)):
-            ax.plot([xa, xb], [y_top - 0.25, y_bot + 0.25], color="#555555", linestyle="--", linewidth=0.8)
+            ax.plot([xa, xb], [y_top - 0.25, y_bot + 0.25], color="#555555", linestyle="--", linewidth=0.6)
 
     # Lower rows are "zoomed in": one factor per row type, identical across scenarios,
     # chosen so the largest bar of that type spans ~82% of the axis.
@@ -5092,35 +5003,36 @@ def fig20_cost_breakdown_sector_industry_heating(base_run: Run, no_flex_run: Run
 
     def magnifier(ax, y, f, x0):
         """Magnifier icon + zoom factor + scale bar, tucked under the row's total label (at x0)."""
-        ax.plot([x0 + 0.008 * x_max], [y - 0.06], marker="o", markersize=10, mfc="none", mec="#333333",
-                mew=1.6, clip_on=False)
-        ax.plot([x0 + 0.014 * x_max, x0 + 0.022 * x_max], [y - 0.11, y - 0.19], color="#333333", lw=2.2,
+        ax.plot([x0 + 0.01 * x_max], [y - 0.06], marker="o", markersize=5.5, mfc="none", mec="#333333",
+                mew=1.0, clip_on=False)
+        ax.plot([x0 + 0.017 * x_max, x0 + 0.025 * x_max], [y - 0.13, y - 0.22], color="#333333", lw=1.4,
                 solid_capstyle="round")
-        ax.text(x0 + 0.03 * x_max, y - 0.06, f"zoom ×{f:.0f}", fontsize=8, va="center", ha="left")
+        ax.text(x0 + 0.035 * x_max, y - 0.06, f"zoom ×{f:.0f}", fontsize=6.5, va="center", ha="left")
         L = min([1, 2, 5, 10, 20, 50, 100, 200], key=lambda b: abs(b * f - 0.08 * x_max))
-        ax.plot([x0, x0 + L * f], [y - 0.28, y - 0.28], color="#333333", lw=2)
-        ax.text(x0 + L * f + 0.005 * x_max, y - 0.28, f"{L} bn", fontsize=7.5, va="center")
+        ax.plot([x0, x0 + L * f], [y - 0.32, y - 0.32], color="#333333", lw=1.2)
+        ax.text(x0 + L * f + 0.005 * x_max, y - 0.32, f"{L} bn", fontsize=6.5, va="center")
 
     # Panels without a heating row (e.g. base run) are cropped and given less height
     y_lo = [-0.45 if float(heat_df[lab].sum()) > 1e-6 else 0.55 for lab in labels]
-    fig, axes = plt.subplots(3, 1, figsize=(15, 13.5),
+    fig, axes = plt.subplots(3, 1, figsize=(REPORT_WIDTH, 9.2),
                              gridspec_kw={"height_ratios": [3.1 - lo for lo in y_lo]})
     for k, (ax, lab) in enumerate(zip(axes, labels)):
         heat_k = float(heat_df[lab].sum())
-        ax.text(0, 2.62, lab, fontsize=11.5,
-                fontweight="bold", va="bottom")
-        pos1 = draw_row(ax, 2, sector_df[lab], _FIG20_SECTOR_COLORS, lambda n: n)
+        ax.text(0, 2.62, f"({'abc'[k]}) {lab}", fontsize=9.5, fontweight="bold", va="bottom")
+        pos1 = draw_row(ax, 2, sector_df[lab], _FIG20_SECTOR_COLORS,
+                        lambda n: n.replace("Power generation", "Power\ngeneration")
+                        .replace("Imported carriers", "Imported\ncarriers"), min_label=0.09)
         ind_tot = float(ind_df[lab].sum())
         connector(ax, 2, 1, pos1["Industries"], ind_tot * f_ind)
         pos2 = draw_row(ax, 1, ind_df[lab], _FIG20_INDUSTRY_COLORS,
-                        lambda n: n.replace(" (incl. TES)", "").replace(" (all products)", "").replace("Glass & ceramics", "Glass &\nceramics"),
-                        f=f_ind, min_label=0.035)
+                        lambda n: n.replace(" (incl. TES)", "").replace(" (all products)", "")
+                        .replace("Glass & ceramics", "Glass &\nceramics").replace("Low-T heating", "Low-T\nheating")
+                        .replace("Chemicals", "Chem-\nicals"),
+                        f=f_ind, min_label=0.075)
         magnifier(ax, 1, f_ind, ind_tot * f_ind + 0.006 * x_max)
         if heat_k > 1e-6:
             connector(ax, 1, 0, pos2["Low-T heating (incl. TES)"], heat_k * f_heat)
-            draw_row(ax, 0, heat_df[lab], heat_colors,
-                     lambda t: heat_pretty(t).replace(" waste heat", "\nwaste heat").replace(" water", "\nwater"),
-                     hatch_map=HEAT_SUPPLY_HATCH_MAP, min_label=0.06, f=f_heat)
+            draw_row(ax, 0, heat_df[lab], heat_colors, lambda t: "", min_label=0.06, f=f_heat)
             magnifier(ax, 0, f_heat, heat_k * f_heat + 0.006 * x_max)
         ax.set_xlim(0, x_max); ax.set_ylim(y_lo[k], 3.1)
         ax.set_yticks([])
@@ -5129,30 +5041,38 @@ def fig20_cost_breakdown_sector_industry_heating(base_run: Run, no_flex_run: Run
             ax.spines["bottom"].set_visible(False)
             ax.set_xticks([])
         else:
-            ax.set_xlabel("Cumulative discounted cost [bn EUR] — axis valid for the top bars only; industry and heating rows are zoomed (see scale bars)", fontsize=9)
-            ax.tick_params(labelsize=8)
-    handles = ([Patch(color=c, label=n) for n, c in _FIG20_SECTOR_COLORS.items()]
-               + [Patch(color=c, label=f"(industries) {n}") for n, c in _FIG20_INDUSTRY_COLORS.items()]
-               + [Patch(facecolor=heat_colors[n], hatch=HEAT_SUPPLY_HATCH_MAP.get(n), edgecolor="white",
-                        label=f"(heating) {heat_pretty(n)}") for n in heat_df.index])
-    fig.legend(handles=handles, loc="upper center", bbox_to_anchor=(0.5, 0.955), ncol=5, fontsize=7.5, frameon=False)
-    fig.suptitle("Total system cost, cumulative (discounted): system → industries → low-T heating",
-                 fontsize=13, fontweight="bold")
-    fig.tight_layout(rect=[0, 0, 1, 0.9])
+            ax.set_xlabel("Cumulative discounted cost (bn EUR); axis for the top bars only, "
+                          "lower rows zoomed (see scale bars)")
+            _comma_axis(ax, "x")
+    # Narrow segments carry no in-bar label, and heating-row segments no name:
+    # all are identified via these two legends.
+    row_handles = ([Patch(color=c, label=n) for n, c in _FIG20_SECTOR_COLORS.items()]
+                   + [Patch(color=c, label=n) for n, c in _FIG20_INDUSTRY_COLORS.items()])
+    heat_handles = [Patch(color=heat_colors[n], label=display_name(n)) for n in heat_df.index[::-1]]
+    fig.tight_layout(rect=[0, 0.2, 1, 1], h_pad=0.4)
+    legend_kw = dict(loc="upper left", fontsize=7, frameon=False, title_fontsize=7.5,
+                     handlelength=1.2, columnspacing=1.2, alignment="left")
+    fig.legend(handles=row_handles, bbox_to_anchor=(0.0, 0.19), ncol=3,
+                      title="System row (top) and industries row (middle)", **legend_kw)
+    fig.legend(handles=heat_handles, bbox_to_anchor=(0.0, 0.098), ncol=3,
+               title="Low-temperature heating row (bottom)", **legend_kw)
     savefig(fig, "fig20_cost_breakdown_sector_industry_heating")
 
 
 # ── Main ──────────────────────────────────────────────────────────────────
 
-def main() -> None:
+def main(report_only: bool = False) -> None:
+    """report_only=True: build only the report figures (REPORT_FIGURES +
+    REPORT_METHOD_FIGURE_FUNCS); False: build every figure."""
     print(f"Loading {len(SCENARIOS)} euler scenarios...")
     runs = load_scenarios()
     snap_snapshot_years(runs)
-    print("Computing headline metrics (cost, emissions, capacity)...")
-    metrics = compute_headline_metrics(runs)
     FIGURES_DIR.mkdir(parents=True, exist_ok=True)
-    metrics.to_csv(FIGURES_DIR / "headline_metrics.csv")
-    print(f"  wrote {(FIGURES_DIR / 'headline_metrics.csv').relative_to(REPO_ROOT)}")
+    if not report_only:
+        print("Computing headline metrics (cost, emissions, capacity)...")
+        metrics = compute_headline_metrics(runs)
+        metrics.to_csv(FIGURES_DIR / "headline_metrics.csv")
+        print(f"  wrote {(FIGURES_DIR / 'headline_metrics.csv').relative_to(REPO_ROOT)}")
 
     print(f"Loading base scenario ({BASE_SCENARIO[1]})...")
     base = load_base_scenario()
@@ -5175,8 +5095,18 @@ def main() -> None:
                  DSM_NO_COST_SCENARIO[1]: dsm_no_cost,
                  FULL_FLEX_20TS_SCENARIO[1]: full_20ts}
 
+    report_funcs = {
+        fig0b_emissions_source_comparison, fig5b_dsm_discharge_by_product,
+        fig12_capacity_and_storage_legacy_vs_no_flex, fig15_heat_supply_output_twh_for,
+        fig20_cost_breakdown_sector_industry_heating, fig310_matrix_temperature_levels,
+        fig311_matrix_time_steps, fig43_flexibility_scenarios_table,
+    }
+
     def run_if(needs: list[str], fn, *args) -> None:
-        """Call fn(*args) if every scenario in `needs` is loaded, else print a skip line."""
+        """Call fn(*args) if every scenario in `needs` is loaded, else print a skip line.
+        In report_only mode, figures not in the report are skipped silently."""
+        if report_only and fn not in report_funcs and fn.__name__ not in REPORT_METHOD_FIGURE_FUNCS:
+            return
         missing = [n for n in needs if available[n] is None]
         if missing:
             print(f"  skipping {fn.__name__}: {', '.join(missing)} not loaded")
@@ -5185,10 +5115,11 @@ def main() -> None:
 
     print("Generating figures...")
     # results
-    if base is not None:
-        fig0a_cost_composition(compute_cost_components([base] + runs))
-    else:
-        print("  skipping fig0a_cost_composition: base not loaded")
+    if not report_only:
+        if base is not None:
+            fig0a_cost_composition(compute_cost_components([base] + runs))
+        else:
+            print("  skipping fig0a_cost_composition: base not loaded")
     run_if(["base", NO_FLEX, FULL],
            fig0b_emissions_source_comparison, base, no_flex, full)
     run_if([FULL, NO_TES_DSM_PESS], fig5b_dsm_discharge_by_product, runs)
@@ -5196,31 +5127,28 @@ def main() -> None:
     run_if(["base", NO_FLEX], fig5_retrofit_ccs_comparison, no_flex, base)
     run_if([NO_FLEX], fig8a_diffusion_mechanisms_heat_pumps, runs)
     run_if([NO_FLEX, FULL], fig9_heat_supply_trajectory, no_flex, full)
-    run_if(["base", NO_FLEX], fig12_capacity_and_storage_base_and_delta, base, no_flex)
-    run_if(["base", NO_FLEX], fig70_rq1_electrification_ripple, base, no_flex,
-           [r for r in runs if r.label != NO_FLEX]
-           + [r for r in (no_flex_single, dsm_no_cost, full_20ts, no_flex_20ts) if r is not None])
+    run_if(["base", NO_FLEX], fig12_capacity_and_storage_legacy_vs_no_flex, base, no_flex)
     single_temp_set = [NO_FLEX, NO_FLEX_SINGLE_TEMP_SCENARIO[1], FULL, SINGLE_TEMP]
     for fn in (fig14a_heat_supply_electrification_singletemp_vs_full,
                fig14b_cost_and_emissions_totals_singletemp_vs_full, fig30_matrix,
-               fig310_matrix_sized_delta_hatched):
+               fig310_matrix_temperature_levels):
         run_if(single_temp_set, fn, no_flex, no_flex_single, full, single_temp)
     run_if([NO_FLEX], fig15_heat_supply_output_twh_for,
-           runs, NO_FLEX, "fig15a_heat_supply_output_no_flexibility_twh")
+           runs, NO_FLEX, "fig15a_heat_supply_no_flex")
     run_if([FULL], fig15_heat_supply_output_twh_for,
-           runs, FULL, "fig15b_heat_supply_output_zen_europe_twh")
+           runs, FULL, "fig15b_heat_supply_zen_europe")
     run_if(["base", NO_FLEX, FULL],
            fig20_cost_breakdown_sector_industry_heating, base, no_flex, full)
     run_if([NO_FLEX, FULL], fig40_flex_scenarios, runs)
     run_if([NO_FLEX, FULL], fig41_flex_scenarios_table, runs)
     run_if([NO_FLEX, FULL], fig42_flex_decomposition, runs)
-    run_if([NO_FLEX, FULL], fig43_flex_scenarios_table_curtailment, runs)
+    run_if([NO_FLEX, FULL], fig43_flexibility_scenarios_table, runs)
     run_if([FULL, DSM_NO_COST_SCENARIO[1]], fig50_dsm_no_cost_vs_full_flex,
            full, dsm_no_cost)
     run_if([FULL, DSM_NO_COST_SCENARIO[1]],
            fig51_capacity_and_storage_dsm_no_cost_vs_full_flex, full, dsm_no_cost)
     # No flexibility 20 ts missing -> 10 ts run as a marked placeholder.
-    for fn in (fig31_matrix_tsa, fig311_matrix_tsa_sized_delta):
+    for fn in (fig31_matrix_tsa, fig311_matrix_time_steps):
         run_if([NO_FLEX, FULL, FULL_FLEX_20TS_SCENARIO[1]], fn,
                no_flex, no_flex_20ts or no_flex, full, full_20ts, no_flex_20ts is None)
     run_if([FULL, FULL_FLEX_20TS_SCENARIO[1]], fig60_full_flex_20ts_vs_10ts,
@@ -5230,17 +5158,18 @@ def main() -> None:
 
     # method/
     run_if([NO_FLEX], fig4b_industry_fuel_demand_comparison, runs)
-    fig8_industry_sector_emissions_context()
-    fig9_model_scope_coverage()
-    fig15_global_ghg_sector_breakdown()
-    fig11_mga_method()
-    fig13_mga_axis_construction()
-    fig14_mga_exploration_sequence()
+    for fn in (fig8_industry_sector_emissions_context, fig9_model_scope_coverage,
+               fig15_global_ghg_sector_breakdown, fig11_mga_method,
+               fig13_mga_axis_construction, fig14_mga_exploration_sequence):
+        run_if([], fn)
     print(f"Done. Figures in {FIGURES_DIR.relative_to(REPO_ROOT)}/")
 
 if __name__ == "__main__":
     import sys
-    if sys.argv[1:] == ["fig70"]:
-        main_fig70()
-    else:
+    args = sys.argv[1:]
+    if args == ["report"]:
+        main(report_only=True)
+    elif not args:
         main()
+    else:
+        sys.exit("usage: generate_si_figures.py [report]")

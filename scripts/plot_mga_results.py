@@ -1,6 +1,7 @@
 """Pairwise projections of every solved point of the MGA run (see
-plots/mga_capex_periods_common.py), one figure per horizon: fig1a (2030),
-fig1b (2038) and fig1c (2050), each pairing that year's axes plus total cost.
+plots/mga_capex_periods_common.py), one figure per snapshot year (fig1a, fig1b, ...
+in YEARS order, e.g. fig1a_pairwise_2034), each pairing that year's axes plus total cost,
+and fig1c_pairwise_all_years with those figures side by side.
 
 Also holds the polytope and diagnostics loaders plot_mga_ts_resolution.py
 imports. Earlier versions of this script compared several modes and drew a
@@ -96,7 +97,9 @@ def _axis_label(name: str, unit: str) -> str:
     return f"{region}{METRIC_LABEL[info.metric]}\n[{unit_label}]"
 
 
-def fig1_pairwise_points(poly: Polytope, year: str, fig_name: str) -> None:
+def _draw_pairwise(fig_or_subfig, poly: Polytope, year: str):
+    """Lower-triangle pairwise scatter of `year`'s axes plus cost into a new grid of
+    subplots on `fig_or_subfig`; returns the axes array."""
     origin = np.array(poly.point_origin)
     phys = np.array([poly.to_phys(x) for x in poly.X])
     columns = [i for i, name in enumerate(poly.names)
@@ -108,7 +111,7 @@ def fig1_pairwise_points(poly: Polytope, year: str, fig_name: str) -> None:
     baseline = values[origin == "z_star"][0]
 
     n = len(columns)
-    fig, axes = plt.subplots(n - 1, n - 1, figsize=(2.1 * (n - 1), 2.1 * (n - 1)), squeeze=False)
+    axes = fig_or_subfig.subplots(n - 1, n - 1, squeeze=False)
     for row in range(1, n):
         for col in range(n - 1):
             ax = axes[row - 1, col]
@@ -135,6 +138,13 @@ def fig1_pairwise_points(poly: Polytope, year: str, fig_name: str) -> None:
                               color=METRIC_COLOR[parse_axis(name).metric])
             else:
                 ax.set_yticklabels([])
+    return axes
+
+
+def fig1_pairwise_points(poly: Polytope, year: str, fig_name: str) -> None:
+    n = sum(1 for name in poly.names if parse_axis(name).year in (year, None))
+    fig = plt.figure(figsize=(2.1 * (n - 1), 2.1 * (n - 1)))
+    axes = _draw_pairwise(fig, poly, year)
     handles, labels = axes[0, 0].get_legend_handles_labels()
     fig.legend(handles, labels, loc="upper right", bbox_to_anchor=(0.97, 0.9), fontsize=11, frameon=False,
                markerscale=2)
@@ -144,12 +154,30 @@ def fig1_pairwise_points(poly: Polytope, year: str, fig_name: str) -> None:
     savefig(fig, fig_name)
 
 
+def fig1c_pairwise_all_years(poly: Polytope, fig_name: str = "fig1c_pairwise_all_years") -> None:
+    """fig1a and fig1b side by side: one pairwise triangle per year, shared legend."""
+    n = sum(1 for name in poly.names if parse_axis(name).year in (YEARS[0], None))
+    side = 2.1 * (n - 1)
+    fig = plt.figure(figsize=(side * len(YEARS) + 0.6, side + 0.9), layout="constrained")
+    subfigs = np.atleast_1d(fig.subfigures(1, len(YEARS), wspace=0.04))
+    for subfig, year in zip(subfigs, YEARS):
+        axes = _draw_pairwise(subfig, poly, year)
+        subfig.suptitle(f"{year} axes and total cost", fontsize=12, fontweight="bold", color=NEAR_BLACK)
+    handles, labels = axes[0, 0].get_legend_handles_labels()
+    # Upper-right corner of the last triangle is empty: legend there.
+    subfigs[-1].legend(handles, labels, loc="upper right", bbox_to_anchor=(0.98, 0.9), fontsize=11,
+                       frameon=False, markerscale=2)
+    fig.suptitle(f"{RUN_LABEL}: solved near-optimal designs", fontsize=14, fontweight="bold", color=NEAR_BLACK)
+    savefig(fig, fig_name)
+
+
 def main() -> None:
     poly = load_polytope(POLY_PATH)
     print(f"Loaded {poly.X.shape[0]} points, {poly.n_axes} axes, "
           f"converged={poly.converged}, epsilon={poly.epsilon:g}")
     for year, suffix in zip(YEARS, "abc"):
         fig1_pairwise_points(poly, year, f"fig1{suffix}_pairwise_{year}")
+    fig1c_pairwise_all_years(poly)
 
 
 if __name__ == "__main__":

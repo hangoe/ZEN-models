@@ -28,15 +28,15 @@ HOURS_PER_YEAR = 8760
 #   "report"       — matches MT_report_HG's LaTeX default (plain Computer
 #                     Modern, no font package loaded by 00_Preamble.sty).
 #                     cmr10 ships inside matplotlib itself (no system LaTeX/
-#                     font install needed, portable to Euler too). Its bundled
-#                     Type-1 file has no linked bold companion, so
-#                     fontweight="bold" requests silently render at regular
-#                     weight rather than a mismatched fallback font.
+#                     font install needed, portable to Euler too). Bold and
+#                     italic text is mapped to the bundled cmb10/cmti10, and
+#                     cmr10's mis-mapped glyphs are fixed on every savefig
+#                     (see report_text_pass below).
 #   "presentation"  — Arial, for slide decks. No exact "Arial" mathtext glyph
 #                     set ships with matplotlib, so mathtext ($...$ content —
 #                     subscripts like CO$_2$, etc.) falls back to
 #                     "dejavusans", the closest built-in sans-serif match.
-FONT_MODE = "presentation"  # "report" or "presentation"
+FONT_MODE = "report"  # "report" or "presentation"
 
 
 def apply_font_mode() -> None:
@@ -52,13 +52,102 @@ def apply_font_mode() -> None:
             "axes.unicode_minus": True,
         })
     else:
+        # cmr10 first, DejaVu Serif only for glyphs cmr10 lacks (a generic
+        # "serif" family does NOT fall back glyph by glyph). See
+        # report_text_pass() for the characters cmr10 maps wrongly.
         plt.rcParams.update({
-            "font.family": "serif",
-            "font.serif": ["cmr10"],
+            "font.family": ["cmr10", "DejaVu Serif"],
             "mathtext.fontset": "cm",
             "axes.formatter.use_mathtext": True,
             "axes.unicode_minus": False,
+            "svg.fonttype": "path",
         })
+        _patch_savefig_for_report()
+
+
+def _patch_savefig_for_report() -> None:
+    """Every script calling apply_font_mode() in report mode gets report_text_pass()
+    applied on Figure.savefig, so cmr10's mis-mapped glyphs never reach a file."""
+    from matplotlib.figure import Figure
+    if getattr(Figure.savefig, "_report_wrapped", False):
+        return
+    original = Figure.savefig
+
+    def savefig(self, *args, **kwargs):
+        report_text_pass(self)
+        return original(self, *args, **kwargs)
+
+    savefig._report_wrapped = True
+    Figure.savefig = savefig
+
+
+# cmr10 (BaKoMa, TeX OT1 encoding) puts other glyphs on some ASCII/Unicode code
+# points: "<" -> "¡", ">" -> "¿", "|" -> em dash, "{" -> en dash, "_" -> dot
+# accent, "°" -> "fl"; and inside a mathtext string ("$...$" anywhere) the
+# non-math part has no fallback at all ("–", "€" render as boxes). So, in report
+# mode, every text is rewritten at save time: outside "$...$" these characters
+# become their mathtext form (or the OT1 slot holding the right glyph), giving
+# real Computer Modern glyphs everywhere. cmr10 has no bold/italic face, so
+# bold/italic text switches to matplotlib's bundled cmb10/cmti10 (same encoding).
+_REPORT_CHAR_MAP = {
+    "°": r"$^\circ\!$", "<": r"$\!<\!$", ">": r"$\!>\!$", "≤": r"$\!\leq\!$", "≥": r"$\!\geq\!$",
+    "→": r"$\rightarrow$", "←": r"$\leftarrow$", "Δ": r"$\Delta$", "×": r"$\times$",
+    "−": r"$-$", "±": r"$\pm$", "·": r"$\cdot$", "≈": r"$\!\approx\!$",
+    "–": "{", "—": "|", "_": " ", "€": "EUR", "|": r"$|$",
+}
+
+
+def report_text(s: str) -> str:
+    """One string, cmr10-safe (see _REPORT_CHAR_MAP). Math segments are kept."""
+    if not s or s.strip() == "€":  # a lone "€" is an icon (fig13), not a unit
+        return s
+    parts = s.split("$")
+    if len(parts) % 2 == 0:  # unbalanced "$": leave untouched
+        return s
+    out = []
+    for i, seg in enumerate(parts):
+        if i % 2:  # inside $...$
+            out.append(f"${seg}$")
+            continue
+        seg = seg.replace(" °", "\x00")  # "100 °C": thin space instead of a word space
+        out.append("".join(r"$\,^\circ\!$" if ch == "\x00" else _REPORT_CHAR_MAP.get(ch, ch) for ch in seg))
+    # "${<}$$..." joins: merge adjacent math groups so "$a$$b$" never appears
+    return "".join(out).replace("$$", "")
+
+
+def report_text_pass(fig) -> None:
+    """Rewrite every Text of `fig` with report_text() and map bold/italic to
+    cmb10/cmti10. No-op outside report mode. Call right before saving."""
+    if FONT_MODE != "report":
+        return
+    from matplotlib.text import Text
+    from matplotlib.ticker import FixedFormatter, FuncFormatter
+    from matplotlib.category import StrCategoryFormatter
+    for ax in fig.axes:  # string tick labels are re-applied from the formatter at draw time
+        for axis in (ax.xaxis, ax.yaxis):
+            for fmt in (axis.get_major_formatter(), axis.get_minor_formatter()):
+                if isinstance(fmt, FixedFormatter) and not getattr(fmt, "_report_done", False):
+                    fmt.seq = [report_text(str(x)) for x in fmt.seq]
+                    fmt._report_done = True
+            fmt = axis.get_major_formatter()
+            if isinstance(fmt, StrCategoryFormatter):
+                axis.set_major_formatter(FuncFormatter(lambda x, pos, f=fmt: report_text(f(x, pos))))
+    for t in fig.findobj(Text):
+        if getattr(t, "_report_done", False):
+            continue
+        t._report_done = True
+        s = t.get_text()
+        if s:
+            t.set_text(report_text(s))
+        weight = t.get_fontweight()
+        bold = weight in ("bold", "heavy", "extra bold", "black", "demibold", "semibold") or \
+            (isinstance(weight, (int, float)) and weight >= 600)
+        if bold:
+            t.set_fontfamily(["cmb10", "DejaVu Serif"])
+            t.set_fontweight("normal")
+        elif t.get_fontstyle() in ("italic", "oblique"):
+            t.set_fontfamily(["cmti10", "DejaVu Serif"])
+            t.set_fontstyle("normal")
 
 
 # ── Euler scenario metadata ────────────────────────────────────────────────────

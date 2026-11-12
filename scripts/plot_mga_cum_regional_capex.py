@@ -79,7 +79,7 @@ def _short_axis_label(name: str) -> str:
 
 def _change_label(delta: float, metric: str) -> str:
     """Physical change as cell text; the unit is in the row label."""
-    decimals = 0 if metric in ("capex", "transport", "heating", "ccs") else 1
+    decimals = 0 if metric in ("capex", "transport", "heating", "ccs", "biomass") else 1
     if round(delta, decimals) == 0:
         return "0"
     return f"{delta:+,.{decimals}f}"
