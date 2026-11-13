@@ -17,9 +17,10 @@ The dataset is edited in place (git history is the undo). Running it twice gives
 the same result.
 
 Usage:
-    python scripts/freeze_first_year_additions.py
+    python scripts/freeze_first_year_additions.py [dataset_dir]
 """
 
+import sys
 from pathlib import Path
 
 import numpy as np
@@ -27,7 +28,7 @@ import pandas as pd
 import yaml
 
 REPO_ROOT = Path(__file__).parent.parent
-DATASET = REPO_ROOT / "data" / "outputs" / "zen-europe-old" / "zen_europe_ind_heat_v1_no_flexibility_nodiffusion_export0"
+DATASET = Path(sys.argv[1]).resolve() if len(sys.argv) > 1 else REPO_ROOT / "data" / "outputs" / "zen-europe-old" / "zen_europe_ind_heat_v1_no_flexibility_nodiffusion_export0"
 AXES_CONFIG = REPO_ROOT / "data" / "config_euler" / "config_mga_axes_total_output_1reg_co2storage.yaml"
 LAST_YEAR = 2050
 NOTE_HEADER = "capacity_limit (first-year freeze)"

@@ -226,6 +226,18 @@ vs run 33's 0.003; 7 vs 13 axes), so 46 checks how much the result moves when
 +/-1 pp so 0.95 is resolvable. Same resources as 45.
   sbatch --array=46 --time=5-00:00:00 --cpus-per-task=32 --mem-per-cpu=6G submit_euler_mga.sh
 
+task_id 54/56/57 added 2026-11-13: tasks 44/46/47 rerun on the new ZEN-Europe
+model. Dataset zen-europe-new/zen_europe_no_flex_no_diffusion_export0 = copy of
+the ZEN-Europe-generated zen_europe_no_flex_no_diffusion with
+availability_export_yearly 0 for the 16 product + industry-heat carriers (as the
+old _export0) and scripts/freeze_first_year_additions.py <dataset> (2022 freeze,
+same technologies as task 33). 54 = 44 with tolerance_prob 0.95 / n_samples 4000
+(as 46). Job 20634844_44 had failed after 14 h in batch iteration 3 on the
+scratch file-count quota (not memory, MaxRSS ~503 GiB); it was submitted with
+--mem-per-cpu=5600M (700G).
+  sbatch --array=54 --cpus-per-task=128 --mem-per-cpu=5600M submit_euler_mga.sh
+  sbatch --array=56-57 --time=5-00:00:00 --cpus-per-task=32 --mem-per-cpu=6G submit_euler_mga.sh
+
 Requires the MGA install step in setup_euler_env.sh to have been run once
 (clones + installs ZEN-garden-plugins and near_optimal_tools/pyoNearOpt,
 incl. the "bbo" extra needed by batch bbo mode).

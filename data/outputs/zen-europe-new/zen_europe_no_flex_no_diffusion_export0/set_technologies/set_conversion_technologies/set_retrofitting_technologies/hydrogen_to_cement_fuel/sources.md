@@ -1,0 +1,54 @@
+hydrogen_to_cement_fuel
+=======================
+
+lifetime
+--------
+
+Step 1
+The lifetime of hydrogen to cement fuel is assumed to be the same as the lifetime of cement kilns, since the fuel supply is tied to the cement kiln operation.
+
+capacity_existing
+-----------------
+
+Step 1
+The existing capacity for cement fuel technologies is mainly derived from the Aidres dataset, which provides data on existing capacities for various industrial sectors.
+
+**Citations**
+
+- **aidres**: Luc Girardin, Juan Correa Laguna, Joris Valee (2023). Advancing industrial decarbonisation by assessing the future use of renewable energies in industrial processes. Publications Office of the European Union. https://op.europa.eu/en/publication-detail/-/publication/d80943a6-5116-11ee-9220-01aa75ed71a1/language-en
+- **british_geological_survey**: N E Idoine, E R Raycraft, F Price, S F Hobbs, E A Deady, P Everett, R A Shaw, E J Evans, A J Mills  (2023). World Mineral Production 2017 - 2021. British Geological Survey. https://www.bgs.ac.uk/news/world-mineral-production-2017-to-2021-is-now-available/
+- **material_economics**: Material Economics (2019). Industrial Transformation 2050 - Pathways to Net-Zero Emissions from EU Heavy Industry. Material Economics. https://materialeconomics.com/publications/publication/industrial-transformation-2050
+- **ecra_technology_papers**: ECRA (European Cement Research Academy) (2022). THE ECRA TECHNOLOGY PAPERS 2022 - State of the Art Cement Manufacturing. ECRA Technology Papers. https://www.ecra-online.org/research/technology-papers
+
+capex_specific_conversion
+-------------------------
+
+Step 1
+The specific CAPEX for retrofitting cement kilns to other feedstocks is derived from ECRA (2022), Technology Papers 2022.The size and energy use values are taken from Annex II, p. 185. The substitution to biomass and waste is taken from Technology Paper 14,with the highest value (15 Mio Euro) used for the retrofitting to biomassbecause of the problems with high substitution rates of biomass. The retrofitting to waste is assumed to be lower (10 Mio Euro, average value).The substitution to hydrogen is taken from Technology paper 18, assuming the highest value of 4.5 Mio Euro for the retrofitting to hydrogen. Each investment only buys the substitution potential of the respective fuel, so it is divided by the share of the kiln fuel capacity it can cover.
+
+**Citation**
+
+ECRA (European Cement Research Academy) (2022). THE ECRA TECHNOLOGY PAPERS 2022 - State of the Art Cement Manufacturing. ECRA Technology Papers. https://www.ecra-online.org/research/technology-papers
+
+conversion_factor
+-----------------
+
+Step 1
+The conversion factor for cement fuel technologies is based on the work of Aidres et al. (2023).
+
+**Citation**
+
+Luc Girardin, Juan Correa Laguna, Joris Valee (2023). Advancing industrial decarbonisation by assessing the future use of renewable energies in industrial processes. Publications Office of the European Union. https://op.europa.eu/en/publication-detail/-/publication/d80943a6-5116-11ee-9220-01aa75ed71a1/language-en
+
+retrofit_flow_coupling_factor
+-----------------------------
+
+Step 1
+The retrofit flow coupling factor of cement fuel technologies is the product of the substitution potential of the fuel (10% of the kiln fuel demand, ECRA (2022), Technology Papers 2022) and the fuel consumption of the cement kiln of 3.7 GJ per ton of clinker (Material Economics (2019), 'Industrial Transformation 2050').
+
+**Citations**
+
+- **aidres**: Luc Girardin, Juan Correa Laguna, Joris Valee (2023). Advancing industrial decarbonisation by assessing the future use of renewable energies in industrial processes. Publications Office of the European Union. https://op.europa.eu/en/publication-detail/-/publication/d80943a6-5116-11ee-9220-01aa75ed71a1/language-en
+- **british_geological_survey**: N E Idoine, E R Raycraft, F Price, S F Hobbs, E A Deady, P Everett, R A Shaw, E J Evans, A J Mills  (2023). World Mineral Production 2017 - 2021. British Geological Survey. https://www.bgs.ac.uk/news/world-mineral-production-2017-to-2021-is-now-available/
+- **material_economics**: Material Economics (2019). Industrial Transformation 2050 - Pathways to Net-Zero Emissions from EU Heavy Industry. Material Economics. https://materialeconomics.com/publications/publication/industrial-transformation-2050
+- **ecra_technology_papers**: ECRA (European Cement Research Academy) (2022). THE ECRA TECHNOLOGY PAPERS 2022 - State of the Art Cement Manufacturing. ECRA Technology Papers. https://www.ecra-online.org/research/technology-papers
