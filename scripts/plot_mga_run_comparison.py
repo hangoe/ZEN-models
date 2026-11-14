@@ -1,10 +1,10 @@
-"""Run 46 vs run 47 (COMPARE_RUNS and COMPARE_TAG in plots/mga_capex_periods_common.py).
+"""Run 56 vs run 57 (COMPARE_RUNS and COMPARE_TAG in plots/mga_capex_periods_common.py).
 
 The two runs explore the same 7 axes from the same baseline and the same VMM (own-axis
 min/max) solves, with the same stopping rule (95% CI lower bound of the share of
 well-approximated directions >= 0.95, from 4000 directions). They differ in
 tolerance_explore, the gap below which a direction counts as well approximated: 0.1 in
-run 46, 0.01 in run 47. Per-axis ranges (fig12) are therefore identical, and the figures
+run 56, 0.01 in run 57. Per-axis ranges (fig12) are therefore identical, and the figures
 look at the interior instead:
 
   fig70_<tag>_convergence           ci_lower, max gap and mean gap per iteration, as each
@@ -19,7 +19,7 @@ Each run's logged ci_lower counts directions within its own tolerance, on its ow
 direction set, so the logged values are not comparable between the runs. fig71 re-scores
 both on one fixed set (N_DIRECTIONS scrambled Sobol directions, seed SEED) with
 pyoNearOpt's own gap code, at both tolerances. Both runs are drawn in one hue, the older
-run as a light tint. The run 45 vs 46 version is in mga_tests/archive/run45_vs_46/.
+run as a light tint. Earlier versions: mga_tests/archive/run46_vs_47/ and archive/run45_vs_46/.
 
 Usage (zen-garden-plugins-env, PYTHONPATH=../ZEN-garden-plugins):
     python scripts/plot_mga_run_comparison.py
@@ -53,7 +53,7 @@ from zen_garden_plugins.mga.polytope_io import load_polytope
 
 N_DIRECTIONS = 4000  # common direction set of fig71, as many as the runs used per check
 GAP_FLOOR = 1e-4  # fig71 has a log gap axis; smaller gaps (many are 0) are drawn here
-VOLUME_CHUNK = 20_000  # Monte Carlo points per A @ z <= b check (A has ~1800 rows in run 47)
+VOLUME_CHUNK = 20_000  # Monte Carlo points per A @ z <= b check (A has ~1800 rows in run 47/57)
 SEED = 0
 ALPHA = 0.05  # 95% CI, as in the runs
 N_VOLUME_SAMPLES = 400_000  # Monte Carlo points for the outer volume

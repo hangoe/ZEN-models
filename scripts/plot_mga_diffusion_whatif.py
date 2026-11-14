@@ -1,10 +1,10 @@
 """fig51: what would holding a diffusion rate within a band do to biomass imports and cost?
 
-In the no-diffusion MGA run 47 (parameters_mga.csv task_id 47, industrial-heating thesis
+In the no-diffusion MGA run 57 (parameters_mga.csv task_id 57, industrial-heating thesis
 axes, 2022 additions frozen), the share of one technology group (industrial heat
 electrification or CCS) is held between the trajectories of two diffusion rates r_diff,
 in 2034 and 2050 jointly. The figure shows the range of imported biomass in 2034 and 2050
-and the cheapest extra cost under that mandate. Runs 46/47 have no emissions axis, so imported
+and the cheapest extra cost under that mandate. Runs 46/47 and 56/57 have no emissions axis, so imported
 biomass, its third technology axis, takes the place of run 33's cumulative emissions.
 Like fig20 this is answered from the polytope, with no re-solving of ZEN-garden.
 Every range edge and cost is one LP over the OUTER approximation (the polytope's cuts
@@ -70,7 +70,7 @@ SHOW_TITLE = False  # figure suptitle; False for the report
 
 RUN_PATH = RUN_DIR / f"{MODEL}_batch_summary" / "polytope.npz"
 BASELINE_PATH = RUN_DIR / MODEL
-DATASET_TECHNOLOGIES = REPO_ROOT / "data" / "outputs" / "zen-europe-old" / MODEL / "set_technologies"
+DATASET_TECHNOLOGIES = REPO_ROOT / "data" / "outputs" / "zen-europe-new" / MODEL / "set_technologies"
 
 REFERENCE_YEAR, LAST_YEAR, INTERVAL = 2022, 2050, 4
 YEARS = (2034, 2050)

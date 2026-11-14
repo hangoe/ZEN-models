@@ -1,12 +1,12 @@
 """fig61: what happens to the other exploration axes if industrial heat is (nearly) fully
-electrified, or (nearly) not at all? Read from the MGA run's polytope (run 47, see
+electrified, or (nearly) not at all? Read from the MGA run's polytope (run 57, see
 plots/mga_capex_periods_common.py), with no re-solving of ZEN-garden.
 
 Two limits on the industrial heat electrification share, each in 2034 and in 2050:
   A  99-100%
   B  0-1%
 The bands are one tolerance_explore (0.01 = 1 percentage point of heat share) wide, the
-resolution of run 47's approximation; many solved designs lie in both corners. Earlier
+resolution of run 57's approximation; many solved designs lie in both corners. Earlier
 versions (95-100% / 0-5%, and 95-100% in 2050 only) are in git history; they gave the
 same picture.
 For each, CCS utilisation and imported biomass in 2034 and 2050 and the net present cost

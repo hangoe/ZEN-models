@@ -1,12 +1,14 @@
 """Shared run definition, colours and helpers for the mga_tests figure scripts.
 
-fig1/3/4/10/12 and fig51/52/60 read parameters_mga.csv task_id 47 (tolerance_explore
-0.01, tolerance_prob 0.95, n_samples 4000; axes config_mga_axes_ind_heating_thesis.yaml):
+fig1/3/4/10/12 and fig51/52/60/61 read parameters_mga.csv task_id 57 (run 47 on the new
+ZEN-Europe dataset zen_europe_no_flex_no_diffusion_export0; tolerance_explore 0.01,
+tolerance_prob 0.95, n_samples 4000; axes config_mga_axes_ind_heating_thesis.yaml):
 one region (all), snapshot years 2034 and 2050, 7 axes (industrial heat
 electrification share, CO2 storage utilisation, imported biomass, each per year, and
-cost). fig70-73 (plot_mga_run_comparison.py) compare run 46 (tolerance_explore 0.1) and
-run 47 (COMPARE_RUNS, COMPARE_TAG). Earlier versions are in mga_tests/archive/run46/ and
-archive/run45_vs_46/.
+cost). fig70-73 (plot_mga_run_comparison.py) compare run 56 (tolerance_explore 0.1) and
+run 57 (COMPARE_RUNS, COMPARE_TAG). Earlier versions (old dataset
+zen_europe_ind_heat_v1_no_flexibility_nodiffusion_export0) are in mga_tests/archive/run47/,
+archive/run46_vs_47/, archive/run46/ and archive/run45_vs_46/.
 To plot another run, change MODEL/RUN_SUFFIX/RUN_LABEL/REGIONS/YEARS/METRICS here.
 The run-33 figures (heat/EV/CCS/emissions, 2030/2038/2050) are in
 mga_tests/archive/run33/.
@@ -29,35 +31,37 @@ from .figure_settings import SCENARIO_PALETTE, eth_tint
 FIGURES_DIR = REPO_ROOT / "data" / "outputs" / "figures" / "mga_tests"
 MGA_ROOT = REPO_ROOT / "data" / "outputs" / "euler_outputs_mga"
 
-MODEL = "zen_europe_ind_heat_v1_no_flexibility_nodiffusion_export0"
-RUN46_SUFFIX = (
+MODEL = "zen_europe_no_flex_no_diffusion_export0"
+# Dataset of the runs up to 47 (run 21 is still plotted from it).
+OLD_MODEL = "zen_europe_ind_heat_v1_no_flexibility_nodiffusion_export0"
+RUN56_SUFFIX = (
     "2022_8a_4a_interval_1ts_MGA_IND_HEATING_THESIS"
     "_batch_bbofast_minmax_batch16_tol01_eps001_FREEZE2022_ci095_ns4000"
 )
-RUN46_LABEL = "run 46 (tolerance 0.1)"
+RUN56_LABEL = "run 56 (tolerance 0.1)"
 RUN_SUFFIX = (
     "2022_8a_4a_interval_1ts_MGA_IND_HEATING_THESIS"
     "_batch_bbofast_minmax_batch16_tol001_eps001_FREEZE2022_ci095_ns4000"
 )
 RUN_DIR = MGA_ROOT / f"{MODEL}_{RUN_SUFFIX}"
 POLY_PATH = RUN_DIR / f"{MODEL}_batch_summary" / "polytope.npz"
-RUN_LABEL = "ZEN-Europe MGA, run 47"
-RUN47_LABEL = "run 47 (tolerance 0.01)"
+RUN_LABEL = "ZEN-Europe MGA, run 57"
+RUN57_LABEL = "run 57 (tolerance 0.01)"
 
 # Runs compared in fig70-73: label -> (run-folder suffix, tint), older run first. Each
 # figure draws both runs in one hue (near-black, or the technology's colour), the older
 # run as a light tint. COMPARE_TAG goes into the figure names.
 COMPARE_RUNS = {
-    RUN46_LABEL: (RUN46_SUFFIX, 0.55),
-    RUN47_LABEL: (RUN_SUFFIX, 0.0),
+    RUN56_LABEL: (RUN56_SUFFIX, 0.55),
+    RUN57_LABEL: (RUN_SUFFIX, 0.0),
 }
-COMPARE_TAG = "run46_vs_47"
+COMPARE_TAG = "run56_vs_57"
 
 RUN21_SUFFIX = (
     "2022_8a_4a_interval_1ts_MGA_AXES_OUTPUT_EXP0_2REG_CO2FIX"
     "_batch_bbofast_minmax_batch16_tol03_eps007"
 )
-RUN21_POLY_PATH = MGA_ROOT / f"{MODEL}_{RUN21_SUFFIX}" / f"{MODEL}_batch_summary" / "polytope.npz"
+RUN21_POLY_PATH = MGA_ROOT / f"{OLD_MODEL}_{RUN21_SUFFIX}" / f"{OLD_MODEL}_batch_summary" / "polytope.npz"
 RUN21_FIGURES_SUBDIR = "archive/run21"
 
 _ETH_BLUE, _ETH_PETROL, _ETH_GREEN, _ETH_BRONZE, _ETH_RED, _ETH_PURPLE, _ETH_GREY = SCENARIO_PALETTE
@@ -79,7 +83,7 @@ RUN21_METRIC_COLUMNS = ["capex", "emissions", "transport", "heating"]
 
 METRIC_COLOR = {
     "capex": _ETH_PETROL,
-    # Technology colours of the mga_tests figures (since runs 46/47): heat magenta, CCS blue,
+    # Technology colours of the mga_tests figures (since runs 46/47, also 56/57): heat magenta, CCS blue,
     # biomass green. EVs (run 33, archived) were blue too; no run plots both.
     "transport": _ETH_BLUE,
     "heating": _ETH_PURPLE,

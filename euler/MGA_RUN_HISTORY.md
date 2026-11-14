@@ -236,6 +236,12 @@ same technologies as task 33). 54 = 44 with tolerance_prob 0.95 / n_samples 4000
 scratch file-count quota (not memory, MaxRSS ~503 GiB); it was submitted with
 --mem-per-cpu=5600M (700G).
   sbatch --array=54 --cpus-per-task=128 --mem-per-cpu=5600M submit_euler_mga.sh
+Job 20739678_54 failed after 4h58 in batch iteration 1 (MaxRSS 440 GiB): several
+LPs ended "Sub-optimal termination", and a cut then excluded a stored design by
+1.9e-4, above pyoNearOpt's hard-coded max_pushback of 1e-4 (add_cut in
+approximation_class.py). 2026-11-14: new numeric_focus column in
+parameters_mga.csv, 2 for task 54 only (as parameters.csv rows 0-10); same
+submit line.
   sbatch --array=56-57 --time=5-00:00:00 --cpus-per-task=32 --mem-per-cpu=6G submit_euler_mga.sh
 
 Requires the MGA install step in setup_euler_env.sh to have been run once
