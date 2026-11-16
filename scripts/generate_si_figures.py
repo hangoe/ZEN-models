@@ -45,7 +45,7 @@ SI_results/ (results; removed/superseded figures are kept in SI_results/archive/
 the zen-europe versions of removed ones in archive/zen_europe/):
   fig1_cost_composition (was fig0a)            — CAPEX/OPEX/carrier/carbon-cost breakdown of each v7_0
                                           scenario's cost increase vs ZEN-Europe base
-  fig2_emissions_by_source_and_carbon_budget (was fig0b) — Full flex vs ZEN-Europe base, year 2025: where the
+  fig2_emissions_by_source_and_carbon_budget (was fig0b) — No flex vs ZEN-Europe base, year 2025: where the
                                           emissions increase comes from vs. only a modest cost delta
   fig5b_dsm_discharge_by_product        — annual DSM throughput per product: optimistic vs pessimistic
   fig6_heat_pathway (was fig3b)        — direct vs temp-conversion heat production, 2050
@@ -494,6 +494,8 @@ REPORT_FIGURES = {
     "fig15a_heat_supply_no_flex",
     "fig15b_heat_supply_zen_europe",
     "fig20_cost_breakdown_sector_industry_heating",
+    "fig30_matrix",
+    "fig31_matrix_tsa",
     "fig310_matrix_temperature_levels",
     "fig311_matrix_time_steps",
     "fig43_flexibility_scenarios_table",
@@ -2214,7 +2216,7 @@ EMISSIONS_COLOR_MAP = {  # stack order bottom -> top; "c:" carrier (combustion),
 }
 
 
-def fig0b_emissions_source_comparison(base_run: Run, no_flex_run: Run, full_run: Run) -> None:
+def fig0b_emissions_source_comparison(base_run: Run, no_flex_run: Run) -> None:
     """Panel A explains the emissions increase for "Full flexibility" vs
     "ZEN-Europe (base)" being much larger (proportionally) than the cost
     increase (fig0a): decomposes each run's year-2025 emissions into carrier
@@ -2223,8 +2225,10 @@ def fig0b_emissions_source_comparison(base_run: Run, no_flex_run: Run, full_run:
     that gap: each run's true cumulative emissions vs. its own carbon budget,
     2025-2070.
 
-    Both panels compare all 3 scenarios (base / no flexibility / full
-    flexibility, per user request) rather than just base vs. full flex.
+    Both panels compare base (Legacy) vs. no flexibility only — the full
+    flexibility (ZEN-Europe) scenario was dropped per user request
+    (2026-11-16); the "Full flexibility" numbers further down are kept as
+    background.
     Panel A's stacked-bar segments stay colored by carrier/technology
     CATEGORY (EMISSIONS_COLOR_MAP) — that's the actual content being
     compared — while Panel B's per-run identity (line + budget dashline)
@@ -2331,9 +2335,8 @@ def fig0b_emissions_source_comparison(base_run: Run, no_flex_run: Run, full_run:
     any reading of this figure should treat both overshoot numbers as
     "not yet repaid by 2050", not "failed to decarbonize".
     """
-    fr, nfr, br = full_run.results, no_flex_run.results, base_run.results
-    years_common = sorted(set(get_available_years(fr)) & set(get_available_years(nfr))
-                           & set(get_available_years(br)))
+    fig_runs = [base_run, no_flex_run]
+    years_common = sorted(set.intersection(*(set(get_available_years(r.results)) for r in fig_runs)))
     panel_a_years = [y for y in COMPARISON_YEARS if y in years_common]
 
     # Panel A: full emissions composition per run PER YEAR (carrier +
@@ -2341,11 +2344,11 @@ def fig0b_emissions_source_comparison(base_run: Run, no_flex_run: Run, full_run:
     # true net total for that year — grouped scenario-major/year-minor.
     # Keys: "c:<carrier>" (combustion) / "t:<technology>" (process, capture).
     comp = {}
-    for run, results in [(base_run, br), (no_flex_run, nfr), (full_run, fr)]:
+    for run in fig_runs:
         for year in panel_a_years:
-            carrier = get_emissions_by_carrier(results, year)
+            carrier = get_emissions_by_carrier(run.results, year)
             # H2_DRI is dropped: its emissions are ~0 in every run/year here
-            tech = get_emissions_by_technology(results, year).drop("H2_DRI", errors="ignore")
+            tech = get_emissions_by_technology(run.results, year).drop("H2_DRI", errors="ignore")
             comp[(run.label, year)] = pd.concat([carrier.rename(lambda c: f"c:{c}"),
                                                  tech.rename(lambda t: f"t:{t}")])
     composition = pd.DataFrame(comp).fillna(0.0)
@@ -2358,7 +2361,8 @@ def fig0b_emissions_source_comparison(base_run: Run, no_flex_run: Run, full_run:
     fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(REPORT_WIDTH, 6.8),
                                    gridspec_kw={"height_ratios": [1.15, 1]})
     n_years = len(panel_a_years)
-    x = np.array([i * (n_years + 1) + j for i in range(3) for j in range(n_years)], dtype=float)
+    x = np.array([i * (n_years + 1) + j for i in range(len(fig_runs)) for j in range(n_years)],
+                 dtype=float)
     top, bot = _signed_stacked_bars(ax1, composition, colors, x, width=0.8,
                                     label_fn=lambda k: display_name(k.split(":", 1)[1]))
     net = composition.sum().to_numpy()
@@ -2367,8 +2371,8 @@ def fig0b_emissions_source_comparison(base_run: Run, no_flex_run: Run, full_run:
                  fontsize=6.5)
     ax1.axhline(0, color="black", linewidth=0.6)
     ax1.set_xticks(x)
-    ax1.set_xticklabels([str(y) for _ in range(3) for y in panel_a_years], fontsize=7)
-    for i, run in enumerate([base_run, no_flex_run, full_run]):
+    ax1.set_xticklabels([str(y) for _ in fig_runs for y in panel_a_years], fontsize=7)
+    for i, run in enumerate(fig_runs):
         ax1.annotate(run.label, xy=(i * (n_years + 1) + (n_years - 1) / 2, 0),
                      xycoords=("data", "axes fraction"), xytext=(0, -16), textcoords="offset points",
                      ha="center", va="top", fontsize=8)
@@ -2384,28 +2388,24 @@ def fig0b_emissions_source_comparison(base_run: Run, no_flex_run: Run, full_run:
         s_ = r.get_total(name)
         return {int(k): float(v) for k, v in s_.items()}
 
-    cum = {run.label: _series(run.results, "carbon_emissions_cumulative")
-           for run in (base_run, no_flex_run, full_run)}
+    labels = [run.label for run in fig_runs]
+    cum = {run.label: _series(run.results, "carbon_emissions_cumulative") for run in fig_runs}
     budget = {run.label: float(run.results.get_total("carbon_emissions_budget").iloc[0])
-              for run in (base_run, no_flex_run, full_run)}
-    years = sorted(cum[full_run.label])
+              for run in fig_runs}
+    years = sorted(cum[no_flex_run.label])
     vals = {lab: [c[y] for y in years] for lab, c in cum.items()}
-    # Scenario colours of this panel: Legacy grey, No-Flex blue, ZEN-Europe purple.
-    panel_b_color = {base_run.label: _ETH_GREY, no_flex_run.label: _ETH_BLUE,
-                     full_run.label: _ETH_PURPLE}
-    for lab in (base_run.label, no_flex_run.label, full_run.label):
+    # Scenario colours of this panel: Legacy grey, No-Flex blue.
+    panel_b_color = {base_run.label: _ETH_GREY, no_flex_run.label: _ETH_BLUE}
+    for lab in labels:
         over = np.array([v > budget[lab] for v in vals[lab]])
         ax2.fill_between(years, vals[lab], budget[lab], where=over, color=panel_b_color[lab],
                          alpha=0.12, interpolate=True, linewidth=0)
-    # No-Flex and ZEN-Europe nearly coincide: own markers, No-Flex dashed and on top.
     line_style = {base_run.label: dict(marker="o", linestyle="-"),
-                  full_run.label: dict(marker="^", linestyle="-"),
-                  no_flex_run.label: dict(marker="s", linestyle="--")}
-    budget_style = {base_run.label: "--", full_run.label: "--", no_flex_run.label: ":"}
-    for lab in (base_run.label, full_run.label, no_flex_run.label):
+                  no_flex_run.label: dict(marker="s", linestyle="-")}
+    for lab in labels:
         ax2.plot(years, vals[lab], color=panel_b_color[lab], linewidth=1.2, markersize=3,
                  **line_style[lab])
-        ax2.axhline(budget[lab], color=panel_b_color[lab], linestyle=budget_style[lab], linewidth=1.0)
+        ax2.axhline(budget[lab], color=panel_b_color[lab], linestyle="--", linewidth=1.0)
 
     y_top = max(max(v) for v in vals.values()) * 1.1
     ax2.set_ylabel("Cumulative emissions (Mt CO$_2$-eq)")
@@ -2415,7 +2415,7 @@ def fig0b_emissions_source_comparison(base_run: Run, no_flex_run: Run, full_run:
     _panel_title(ax2, "(b) Cumulative emissions and carbon budget")
     handles = [Line2D([], [], color=panel_b_color[lab], linewidth=1.2, label=lab, **line_style[lab],
                       markersize=3)
-               for lab in (base_run.label, no_flex_run.label, full_run.label)]
+               for lab in labels]
     handles += [Line2D([], [], color="black", linewidth=1.2, label="Cumulative emissions"),
                 Line2D([], [], color="black", linewidth=1.0, linestyle="--", label="Carbon budget"),
                 Patch(facecolor="black", alpha=0.12, label="Above own budget,\nnot yet repaid")]
@@ -2755,6 +2755,39 @@ def _fig306_legend(style: dict, baseline_label: str = f"{FULL}, 3 temp. levels")
     return handles
 
 
+# fig30/fig31 shading. Increases run along an ETH-blue ramp (light tint -> ETH
+# blue -> dark blue) by their size relative to the panel's largest change, for
+# more contrast than a single faded hue (user request 2026-11-16); decreases keep
+# the report red, faded towards white down to SHADE_DELTA_MIN for small changes.
+SHADE_DELTA_MIN = 0.2
+SHADE_DELTA_INCREASE_CMAP = LinearSegmentedColormap.from_list(
+    "shade_delta_increase", [_eth_tint(_ETH_BLUE, 0.85), _ETH_BLUE, "#0F2A52"])
+# fig31's ETH-green counterpart (tells the time-step matrix apart from fig30's
+# blue temperature-level one); selected via the style's "shade_cmap" entry.
+SHADE_DELTA_INCREASE_CMAP_GREEN = LinearSegmentedColormap.from_list(
+    "shade_delta_increase_green", [_eth_tint(_ETH_GREEN, 0.85), _ETH_GREEN, "#2F3709"])
+
+
+def _shade_delta_color(style: dict, frac: float) -> tuple:
+    """Cell colour for a change of `frac` (signed, relative to the panel's largest
+    change): SHADE_DELTA_INCREASE_CMAP for increases, the style's decrease colour
+    faded linearly towards white for decreases."""
+    if frac >= 0:
+        return style.get("shade_cmap", SHADE_DELTA_INCREASE_CMAP)(min(frac, 1.0))
+    full = np.array(to_rgba(style["decrease"]["facecolor"]))
+    w = SHADE_DELTA_MIN + (1 - SHADE_DELTA_MIN) * min(abs(frac), 1.0)
+    return tuple(w * full + (1 - w) * np.ones(4))
+
+
+def _shade_delta_legend(style: dict, baseline_label: str = f"{FULL}, 3 temp. levels") -> list[Patch]:
+    """Legend handles for the shade_delta panels (fig30/fig31)."""
+    kw = dict(edgecolor="#1F2A3A", linewidth=0.6)
+    return [Patch(facecolor=style["baseline"], label=f"Baseline ({baseline_label})", **kw),
+            Patch(facecolor=_shade_delta_color(style, -1.0), label="Decrease below baseline", **kw),
+            Patch(facecolor=_shade_delta_color(style, 0.1), label="Small increase over baseline", **kw),
+            Patch(facecolor=_shade_delta_color(style, 1.0), label="Largest increase in the panel", **kw)]
+
+
 def _fig300_sized_panel(fig: plt.Figure, ax: plt.Axes, values: dict[tuple[int, int], float],
                         title: str, unit: str, cbar_label: str, row_labels: bool = True,
                         value_fmt: str = "{:,.0f}", delta_fmt: str = "{:,.1f}",
@@ -2763,7 +2796,7 @@ def _fig300_sized_panel(fig: plt.Figure, ax: plt.Axes, values: dict[tuple[int, i
                         row_names: tuple[str, str] = ("3 temp. levels", "Single temp. level"),
                         align: str = "inner", arrows: bool = False,
                         single_color: str | None = None, max_outline: bool = False,
-                        baseline_delta: dict | None = None,
+                        baseline_delta: dict | None = None, shade_delta: bool = False,
                         placeholders: frozenset = frozenset()):
     """_fig30_matrix_panel with the relative change also encoded as box size
     (see FIG300_BASE_SIDE). Same colours and colourbar, unless `single_color`
@@ -2782,6 +2815,11 @@ def _fig300_sized_panel(fig: plt.Figure, ax: plt.Axes, values: dict[tuple[int, i
     the whole box; labels at fixed slot positions and margins equal on all sides, so
     every panel has the same geometry whatever its values. `placeholders` (only
     with `baseline_delta`) hatches those boxes and marks them "placeholder" (fig311).
+    `shade_delta` (only with `baseline_delta`; fig30/fig31) keeps every box at the
+    full slot size and encodes the change as shading instead: the baseline box in
+    the style's baseline colour, increases along an ETH-blue ramp and decreases in
+    the style's (faded) decrease colour, by the size of the change relative to the
+    panel's largest one (see _shade_delta_color).
     Returns the colourbar,
     or None without one (see _fig30_matrix_panel)."""
     base_rc = (0, 0)
@@ -2790,6 +2828,8 @@ def _fig300_sized_panel(fig: plt.Figure, ax: plt.Axes, values: dict[tuple[int, i
     max_abs = max(abs(v - base) for v in values.values()) or 1.0
     side = {rc: FIG300_BASE_SIDE + (FIG300_MAX_SIDE - FIG300_BASE_SIDE) * (v - base) / max_abs
             for rc, v in values.items()}
+    if shade_delta:
+        side = {rc: slot for rc in values}
 
     def corner(rc, s=None):  # lower-left corner of a box (side `s`), row 0 on top
         row, col = rc
@@ -2812,24 +2852,34 @@ def _fig300_sized_panel(fig: plt.Figure, ax: plt.Axes, values: dict[tuple[int, i
         if baseline_delta:
             s_dark = min(s, FIG300_BASE_SIDE)
             whole = baseline_delta.get("whole_border")
-            if s > FIG300_BASE_SIDE:
+            text_color = baseline_delta["text"]
+            if shade_delta:
+                face = (to_rgba(baseline_delta["baseline"]) if rc == base_rc
+                        else _shade_delta_color(baseline_delta, (c - base) / max_abs))
+                ax.add_patch(Rectangle((x0, y0), s, s, facecolor=face, edgecolor="#1F2A3A",
+                                       linewidth=whole or 1.2, zorder=1))
+                r_, g_, b_ = (v / 12.92 if v <= 0.04045 else ((v + 0.055) / 1.055) ** 2.4
+                              for v in face[:3])
+                text_color = "white" if 0.2126 * r_ + 0.7152 * g_ + 0.0722 * b_ < 0.179 else "black"
+            elif s > FIG300_BASE_SIDE:
                 ax.add_patch(Rectangle((x0, y0), s, s, linewidth=0 if whole else 1.2, zorder=1,
                                        **baseline_delta["increase"]))
             elif s < FIG300_BASE_SIDE:
                 ax.add_patch(Rectangle(corner(rc, FIG300_BASE_SIDE), FIG300_BASE_SIDE,
                                        FIG300_BASE_SIDE, linewidth=0.6 if whole else 1.2, zorder=1,
                                        **baseline_delta["decrease"]))
-            dx0, dy0 = corner(rc, s_dark)
-            ax.add_patch(Rectangle((dx0, dy0), s_dark, s_dark, facecolor=baseline_delta["baseline"],
-                                   edgecolor="none" if whole else "#1F2A3A", linewidth=1.2, zorder=2))
-            if whole:
-                ax.add_patch(Rectangle((x0, y0), s, s, fill=False, edgecolor="#1F2A3A",
-                                       linewidth=whole, zorder=3))
+            if not shade_delta:
+                dx0, dy0 = corner(rc, s_dark)
+                ax.add_patch(Rectangle((dx0, dy0), s_dark, s_dark, facecolor=baseline_delta["baseline"],
+                                       edgecolor="none" if whole else "#1F2A3A", linewidth=1.2, zorder=2))
+                if whole:
+                    ax.add_patch(Rectangle((x0, y0), s, s, fill=False, edgecolor="#1F2A3A",
+                                           linewidth=whole, zorder=3))
             if rc in placeholders:
                 ax.add_patch(Rectangle((x0, y0), s, s, fill=False, edgecolor="#1F2A3A",
                                        linewidth=0, hatch="//", alpha=0.35, zorder=3))
                 ax.text(x0 + s / 2, y0 + 0.08, "placeholder", ha="center", va="center",
-                        fontsize=7, style="italic", color=baseline_delta["text"], zorder=4)
+                        fontsize=7, style="italic", color=text_color, zorder=4)
             delta = c - base
             sign = "+" if delta >= 0 else "−"
             # units are in the panel title; only a differing delta unit (pp) is written
@@ -2844,7 +2894,6 @@ def _fig300_sized_panel(fig: plt.Figure, ax: plt.Axes, values: dict[tuple[int, i
             y_first = y0 + s / 2 + (len(lines) - 1) * bline / 2
             # white text only where the (saturated) fill is behind it: a box smaller
             # than the text falls back to black, which reads on the light fills too
-            text_color = baseline_delta["text"]
             if text_color == "white" and max(s, FIG300_BASE_SIDE) < 0.45:
                 text_color = "black"
             for i, (txt, kw) in enumerate(lines):
@@ -3062,7 +3111,12 @@ def fig30_matrix(no_flex_run: Run, no_flex_single_run: Run, full_run: Run,
     """
     cells = {(0, 0): full_run, (0, 1): no_flex_run,
              (1, 0): single_temp_run, (1, 1): no_flex_single_run}
-    _matrix_figure(cells, "fig30_matrix")
+    # Report style since 2026-11-16 (same size, fonts, data and grey/green/red
+    # scheme as fig310): equal-size cells, change shown as shading (shade_delta)
+    # instead of the former blue value ramp + colourbar (_fig30_matrix_panel).
+    style = _matrix_style()
+    _matrix_figure(cells, "fig30_matrix", panel_fn=_fig300_sized_panel, baseline_delta=style,
+                   shade_delta=True, legend=_shade_delta_legend(style), symmetric=True)
 
 
 def fig310_matrix_temperature_levels(no_flex_run: Run, no_flex_single_run: Run, full_run: Run,
@@ -3096,9 +3150,11 @@ def fig31_matrix_tsa(no_flex_run: Run, no_flex_20ts_run: Run, full_run: Run,
     """
     cells = {(0, 0): full_run, (0, 1): no_flex_run,
              (1, 0): full_20ts_run, (1, 1): no_flex_20ts_run}
-    _matrix_figure(cells, "fig31_matrix_tsa",
-                   ramp=(_eth_tint(_ETH_GREEN, 0.85), _ETH_GREEN, "#2F3709"),
-                   row_names=("10 time steps", "20 time steps"),
+    # Report style since 2026-11-16, as fig30, but with an ETH-green increase ramp.
+    style = {**_matrix_style(), "shade_cmap": SHADE_DELTA_INCREASE_CMAP_GREEN}
+    _matrix_figure(cells, "fig31_matrix_tsa", panel_fn=_fig300_sized_panel, baseline_delta=style,
+                   shade_delta=True, legend=_shade_delta_legend(style, f"{FULL}, 10 time steps"),
+                   symmetric=True, row_names=("10 time steps", "20 time steps"),
                    placeholders=frozenset({(1, 1)} if no_flex_20ts_placeholder else ()))
 
 
@@ -4902,9 +4958,10 @@ _FIG20_INDUSTRY_COLORS = {
 }
 
 
-def fig20_cost_breakdown_sector_industry_heating(base_run: Run, no_flex_run: Run, full_run: Run) -> None:
+def fig20_cost_breakdown_sector_industry_heating(base_run: Run, no_flex_run: Run) -> None:
     """Cumulative discounted total system cost (the objective) for ZEN-Europe base / No
-    flexibility / Full flexibility, drilled down in 3 panels: (A) the whole
+    flexibility (one panel each, (a)/(b); the Full flexibility panel (c) was dropped
+    per user request, 2026-11-16), drilled down in 3 rows: (A) the whole
     system split into transport / power generation /
     industries / others; (B) industries only, by branch; (C) low-temperature
     industry heating only, by technology. Every bar is annotated with its
@@ -4920,7 +4977,7 @@ def fig20_cost_breakdown_sector_industry_heating(base_run: Run, no_flex_run: Run
     heating bars are not like-for-like with the two industry-heat scenarios.
     -> SI_results/fig20_cost_breakdown_sector_industry_heating.svg
     """
-    runs = [base_run, no_flex_run, full_run]
+    runs = [base_run, no_flex_run]
     labels = [r.label for r in runs]
     costs = []
     npc_totals, carrier_tot = [], []
@@ -5014,8 +5071,14 @@ def fig20_cost_breakdown_sector_industry_heating(base_run: Run, no_flex_run: Run
 
     # Panels without a heating row (e.g. base run) are cropped and given less height
     y_lo = [-0.45 if float(heat_df[lab].sum()) > 1e-6 else 0.55 for lab in labels]
-    fig, axes = plt.subplots(3, 1, figsize=(REPORT_WIDTH, 9.2),
-                             gridspec_kw={"height_ratios": [3.1 - lo for lo in y_lo]})
+    # Fixed legend block (inches) below the panels; panel height per y-unit as in
+    # the former 3-panel, 9.2 in layout.
+    ratios = [3.1 - lo for lo in y_lo]
+    legend_in = 1.84
+    fig_h = legend_in + 0.763 * sum(ratios)
+    lf = legend_in / fig_h  # legend block's share of the figure height
+    fig, axes = plt.subplots(len(runs), 1, figsize=(REPORT_WIDTH, fig_h),
+                             gridspec_kw={"height_ratios": ratios})
     for k, (ax, lab) in enumerate(zip(axes, labels)):
         heat_k = float(heat_df[lab].sum())
         ax.text(0, 2.62, f"({'abc'[k]}) {lab}", fontsize=9.5, fontweight="bold", va="bottom")
@@ -5047,14 +5110,15 @@ def fig20_cost_breakdown_sector_industry_heating(base_run: Run, no_flex_run: Run
     # Narrow segments carry no in-bar label, and heating-row segments no name:
     # all are identified via these two legends.
     row_handles = ([Patch(color=c, label=n) for n, c in _FIG20_SECTOR_COLORS.items()]
-                   + [Patch(color=c, label=n) for n, c in _FIG20_INDUSTRY_COLORS.items()])
+                   + [Patch(color=c, label=n) for n, c in _FIG20_INDUSTRY_COLORS.items()
+                      if float(ind_df.loc[n].abs().sum()) > 1e-6])  # e.g. no DSM without Full flex
     heat_handles = [Patch(color=heat_colors[n], label=display_name(n)) for n in heat_df.index[::-1]]
-    fig.tight_layout(rect=[0, 0.2, 1, 1], h_pad=0.4)
+    fig.tight_layout(rect=[0, lf, 1, 1], h_pad=0.4)
     legend_kw = dict(loc="upper left", fontsize=7, frameon=False, title_fontsize=7.5,
                      handlelength=1.2, columnspacing=1.2, alignment="left")
-    fig.legend(handles=row_handles, bbox_to_anchor=(0.0, 0.19), ncol=3,
+    fig.legend(handles=row_handles, bbox_to_anchor=(0.0, 0.95 * lf), ncol=3,
                       title="System row (top) and industries row (middle)", **legend_kw)
-    fig.legend(handles=heat_handles, bbox_to_anchor=(0.0, 0.098), ncol=3,
+    fig.legend(handles=heat_handles, bbox_to_anchor=(0.0, 0.49 * lf), ncol=3,
                title="Low-temperature heating row (bottom)", **legend_kw)
     savefig(fig, "fig20_cost_breakdown_sector_industry_heating")
 
@@ -5098,7 +5162,8 @@ def main(report_only: bool = False) -> None:
     report_funcs = {
         fig0b_emissions_source_comparison, fig5b_dsm_discharge_by_product,
         fig12_capacity_and_storage_legacy_vs_no_flex, fig15_heat_supply_output_twh_for,
-        fig20_cost_breakdown_sector_industry_heating, fig310_matrix_temperature_levels,
+        fig20_cost_breakdown_sector_industry_heating, fig30_matrix, fig31_matrix_tsa,
+        fig310_matrix_temperature_levels,
         fig311_matrix_time_steps, fig43_flexibility_scenarios_table,
     }
 
@@ -5120,8 +5185,7 @@ def main(report_only: bool = False) -> None:
             fig0a_cost_composition(compute_cost_components([base] + runs))
         else:
             print("  skipping fig0a_cost_composition: base not loaded")
-    run_if(["base", NO_FLEX, FULL],
-           fig0b_emissions_source_comparison, base, no_flex, full)
+    run_if(["base", NO_FLEX], fig0b_emissions_source_comparison, base, no_flex)
     run_if([FULL, NO_TES_DSM_PESS], fig5b_dsm_discharge_by_product, runs)
     run_if([SINGLE_TEMP], fig3b_heat_pathway, runs)
     run_if(["base", NO_FLEX], fig5_retrofit_ccs_comparison, no_flex, base)
@@ -5137,8 +5201,7 @@ def main(report_only: bool = False) -> None:
            runs, NO_FLEX, "fig15a_heat_supply_no_flex")
     run_if([FULL], fig15_heat_supply_output_twh_for,
            runs, FULL, "fig15b_heat_supply_zen_europe")
-    run_if(["base", NO_FLEX, FULL],
-           fig20_cost_breakdown_sector_industry_heating, base, no_flex, full)
+    run_if(["base", NO_FLEX], fig20_cost_breakdown_sector_industry_heating, base, no_flex)
     run_if([NO_FLEX, FULL], fig40_flex_scenarios, runs)
     run_if([NO_FLEX, FULL], fig41_flex_scenarios_table, runs)
     run_if([NO_FLEX, FULL], fig42_flex_decomposition, runs)
