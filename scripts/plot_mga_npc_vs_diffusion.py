@@ -14,7 +14,7 @@ only the hull fails, the range runs up to the cost slack.
 
 Fast bands converge: once the lower trajectory is at 100% in 2030, 2038 and 2050, all
 faster bands impose the same limits. min_cost_curve is reused by fig73
-(plot_mga_run_comparison.py) to draw the same curves for the two compared runs.
+(plot_mga_run_comparison.py) to draw the same curves for the compared runs.
 
 Usage (zen-garden-plugins-env, PYTHONPATH=../ZEN-garden-plugins):
     python scripts/plot_mga_npc_vs_diffusion.py

@@ -1,6 +1,12 @@
-"""fig61: what happens to the other exploration axes if industrial heat is (nearly) fully
-electrified, or (nearly) not at all? Read from the MGA run's polytope (run 57, see
-plots/mga_capex_periods_common.py), with no re-solving of ZEN-garden.
+"""fig61 / fig61a / fig61b: what happens to the other exploration axes if industrial heat
+(fig61), CCS (fig61a) or imported biomass (fig61b) is pushed to its maximum, or to its
+minimum? Read from the MGA run's polytope (run 57, see plots/mga_capex_periods_common.py),
+with no re-solving of ZEN-garden.
+
+The limited axis's two limits are the top and bottom 1% of its near-optimal range (the
+polytope's scaled axis value >= 0.99 or <= 0.01); for heat that is exactly 99-100% / 0-1%.
+For CCS (max 63% in 2034) and biomass (TWh) the bands differ per year and are given in the
+legend. The text below describes fig61 (heat); fig61a/b work the same way.
 
 Two limits on the industrial heat electrification share, each in 2034 and in 2050:
   A  99-100%
@@ -19,8 +25,10 @@ mandate (outer = lower limit, inner = upper limit of that minimum); the upper en
 the cost slack.
 
 Usage (zen-garden-plugins-env, PYTHONPATH=../ZEN-garden-plugins):
-    python scripts/plot_mga_heat_mandate.py
+    python scripts/plot_mga_heat_mandate.py [heat|ccs|biomass ...]   (default: all three)
 """
+
+import sys
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -42,43 +50,70 @@ from plots.mga_capex_periods_common import METRIC_COLOR, RUN_LABEL, savefig
 
 METRICS = ("heat", "ccs", "biomass")
 GREY = SCENARIO_PALETTE[6]
-SCENARIOS = {  # key -> (legend label, {year: (min share, max share)}, tint; None = grey)
-    "free": ("none: no limit (near-optimal space)", {}, None),
-    "A": ("A: heat 99-100% in 2034 and 2050", {2034: (0.99, 1.0), 2050: (0.99, 1.0)}, 0.0),
-    "B": ("B: heat 0-1% in 2034 and 2050", {2034: (0.0, 0.01), 2050: (0.0, 0.01)}, 0.5),
-}
+BAND = 0.01  # width of the A / B limits, as a fraction of the limited axis's range
+# key -> ((scaled low, scaled high) on the limited axis, or None = no limit; tint; None = grey)
+SCENARIO_DEF = {"free": (None, None), "A": ((1 - BAND, 1.0), 0.0), "B": ((0.0, BAND), 0.5)}
 TICK_LABEL = {"free": "none", "A": "A", "B": "B"}
+LIMITED_NAME = {"heat": "heat", "ccs": "CCS", "biomass": "biomass"}
+LIMITED_UNIT = {"heat": "%", "ccs": "%", "biomass": " TWh"}
+FIGURE_NAME = {"heat": "fig61_heat_mandate_effects", "ccs": "fig61a_ccs_limit_effects",
+               "biomass": "fig61b_biomass_limit_effects"}
+SUPTITLE = {"heat": "industrial heat electrification", "ccs": "CCS utilisation", "biomass": "imported biomass"}
 # Each panel in its technology's colour (heat magenta, CCS blue, biomass green); the cost
-# panel in heat's, since the limits are on heat. A full colour, B a light shade.
-PANEL_COLOR = {"heat": MANDATE_COLOR["heat"], "ccs": METRIC_COLOR["ccs"], "biomass": METRIC_COLOR["biomass"],
-               "cost": MANDATE_COLOR["heat"]}
-
-
-def scenario_color(key: str, panel: str) -> str:
-    tint = SCENARIOS[key][2]
-    if tint is None:
-        return GREY
-    return eth_tint(PANEL_COLOR[panel], tint) if tint else PANEL_COLOR[panel]
+# panel in the limited axis's colour. A full colour, B a light shade.
+PANEL_COLOR = {"heat": MANDATE_COLOR["heat"], "ccs": METRIC_COLOR["ccs"], "biomass": METRIC_COLOR["biomass"]}
 OUTER_ALPHA = 0.3
 
 
-def scenario_ranges(poly, axis_idx, limits: dict) -> dict:
+def scenario_color(key: str, panel: str, limited: str) -> str:
+    tint = SCENARIO_DEF[key][1]
+    if tint is None:
+        return GREY
+    color = PANEL_COLOR[limited if panel == "cost" else panel]
+    return eth_tint(color, tint) if tint else color
+
+
+def physical_band(poly, axis_idx, limited: str, year: int, band: tuple[float, float]) -> tuple[float, float]:
+    """Scaled (low, high) on the limited axis -> displayed units (% or TWh)."""
+    k = axis_idx[f"{AXIS_PREFIX[limited]}_{year}"]
+    return tuple(to_display(limited, poly.offset[k] + poly.scale[k] * v) for v in band)
+
+
+def scenario_labels(poly, axis_idx, limited: str) -> dict[str, str]:
+    """Legend label per scenario, with the limit in displayed units for each year."""
+    labels = {"free": "none: no limit (near-optimal space)"}
+    for key, which in (("A", "max"), ("B", "min")):
+        bands = [physical_band(poly, axis_idx, limited, y, SCENARIO_DEF[key][0]) for y in YEARS]
+        texts = [f"{low:,.0f}-{high:,.0f}{LIMITED_UNIT[limited]}" for low, high in bands]
+        years = " and ".join(map(str, YEARS))
+        if len(set(texts)) == 1:
+            where = f"{texts[0]} in {years}"
+        else:
+            where = ", ".join(f"{t} in {y}" for t, y in zip(texts, YEARS))
+        prefix = f"{LIMITED_NAME[limited]} " if limited == "heat" else f"{LIMITED_NAME[limited]} at {which}: "
+        labels[key] = f"{key}: {prefix}{where}"
+    return labels
+
+
+def scenario_ranges(poly, axis_idx, limited: str, band) -> dict:
     """{"inner"/"outer": ranges as from solve_all (None if the limits cannot be met)}.
     A limit at the axis's own min or max adds no constraint."""
     floors, ceilings = [], []
-    for year, (low, high) in limits.items():
-        k = axis_idx[f"{AXIS_PREFIX['heat']}_{year}"]
-        if low > 0:
-            floors.append((k, (low - poly.offset[k]) / poly.scale[k]))
-        if high < 1:
-            ceilings.append((k, (high - poly.offset[k]) / poly.scale[k]))
+    if band is not None:
+        low, high = band
+        for year in YEARS:
+            k = axis_idx[f"{AXIS_PREFIX[limited]}_{year}"]
+            if low > 0:
+                floors.append((k, low))
+            if high < 1:
+                ceilings.append((k, high))
     return {name: solve_all(poly, axis_idx, floors, ceilings, bound, METRICS)
             for name, bound in (("inner", inner_bound), ("outer", outer_bound))}
 
 
-def report(results: dict, poly) -> None:
+def report(results: dict, poly, labels: dict) -> None:
     for key, ranges in results.items():
-        print(f"{SCENARIOS[key][0]}:")
+        print(f"{labels[key]}:")
         inner, outer = ranges["inner"], ranges["outer"]
         if outer is None:
             print("  not reachable")
@@ -99,8 +134,8 @@ def _bar(ax, x, width, span, color, alpha, zorder):
                edgecolor="white", linewidth=0.4, zorder=zorder)
 
 
-def draw_metric(ax, poly, axis_idx, metric: str, results: dict, fmt: str, title: str) -> None:
-    keys = list(SCENARIOS)
+def draw_metric(ax, poly, axis_idx, metric: str, limited: str, results: dict, fmt: str, title: str) -> None:
+    keys = list(SCENARIO_DEF)
     n = len(keys)
     width = 0.84 / n
     ticks, tick_labels = [], []
@@ -110,7 +145,7 @@ def draw_metric(ax, poly, axis_idx, metric: str, results: dict, fmt: str, title:
             ticks.append(x)
             tick_labels.append(TICK_LABEL[key])
             outer, inner = results[key]["outer"], results[key]["inner"]
-            color = scenario_color(key, metric)
+            color = scenario_color(key, metric, limited)
             if outer is None:
                 ax.text(x, 0, "x", ha="center", va="bottom", fontsize=8, color=MUTED)
                 continue
@@ -124,10 +159,12 @@ def draw_metric(ax, poly, axis_idx, metric: str, results: dict, fmt: str, title:
                                 ha="center", va=va, fontsize=S["value"] - 1, color=INK, zorder=6)
         baseline = to_display(metric, poly.z_star_phys[axis_idx[f"{AXIS_PREFIX[metric]}_{year}"]])
         ax.plot([g - 0.45, g + 0.45], [baseline] * 2, color="black", linestyle="--", linewidth=1.0, zorder=5)
-    if metric == "heat":
-        for _, limits, _ in SCENARIOS.values():
-            for low, high in set(limits.values()):
-                ax.axhspan(100 * low, 100 * high, color=MANDATE_COLOR["heat"], alpha=0.08, linewidth=0, zorder=1)
+        if metric == limited:  # shade the A and B limits behind this year's bars
+            for band, _ in SCENARIO_DEF.values():
+                if band is not None:
+                    low, high = physical_band(poly, axis_idx, limited, year, band)
+                    ax.fill_between([g - 0.45, g + 0.45], low, high, color=PANEL_COLOR[limited], alpha=0.08,
+                                    linewidth=0, zorder=1)
     ax.set_xticks(ticks, tick_labels, fontsize=S["tick"] - 1)
     for g, year in enumerate(YEARS):
         ax.annotate(str(year), (g, 0), xycoords=("data", "axes fraction"), xytext=(0, -14),
@@ -142,13 +179,13 @@ def draw_metric(ax, poly, axis_idx, metric: str, results: dict, fmt: str, title:
     ax.tick_params(axis="x", colors=INK)
 
 
-def draw_cost(ax, poly, results: dict, title: str) -> None:
+def draw_cost(ax, poly, results: dict, limited: str, title: str) -> None:
     """Cheapest extra cost per scenario: the range between outer (lower) and inner (upper)
     limit, labelled in bn EUR."""
     slack = 100 * poly.epsilon
-    for x, key in enumerate(SCENARIOS):
+    for x, key in enumerate(SCENARIO_DEF):
         outer, inner = results[key]["outer"], results[key]["inner"]
-        color = scenario_color(key, "cost")
+        color = scenario_color(key, "cost", limited)
         if outer is None:
             ax.text(x, slack / 2, "not\nreachable", ha="center", va="center", fontsize=S["value"], color=MUTED)
             continue
@@ -161,8 +198,8 @@ def draw_cost(ax, poly, results: dict, title: str) -> None:
         ax.annotate(label, (x, high), xytext=(0, 3), textcoords="offset points", ha="center", va="bottom",
                     fontsize=S["value"], color=INK)
     ax.axhline(slack, color=INK, linewidth=0.8, linestyle=":", zorder=2)
-    ax.set_xticks(range(len(SCENARIOS)), [TICK_LABEL[key] for key in SCENARIOS], fontsize=S["tick"])
-    ax.set_xlim(-0.6, len(SCENARIOS) - 0.4)
+    ax.set_xticks(range(len(SCENARIO_DEF)), [TICK_LABEL[key] for key in SCENARIO_DEF], fontsize=S["tick"])
+    ax.set_xlim(-0.6, len(SCENARIO_DEF) - 0.4)
     ax.set_ylim(0, slack * 1.08)
     ax.yaxis.set_major_formatter(lambda v, _: "$C^*$" if v == 0 else f"+{v:g}%")
     ax.grid(axis="y", alpha=0.25)
@@ -170,33 +207,41 @@ def draw_cost(ax, poly, results: dict, title: str) -> None:
     ax.tick_params(axis="x", colors=INK)
 
 
-def main() -> None:
-    poly = load_polytope(RUN_PATH)
-    print(f"loaded {poly.X.shape[0]} points, converged={poly.converged}")
-    axis_idx = {name: i for i, name in enumerate(poly.names)}
-    results = {key: scenario_ranges(poly, axis_idx, limits) for key, (_, limits, _) in SCENARIOS.items()}
-    report(results, poly)
+def plot(poly, axis_idx, limited: str) -> None:
+    labels = scenario_labels(poly, axis_idx, limited)
+    print(f"\n=== limited axis: {limited} ===")
+    results = {key: scenario_ranges(poly, axis_idx, limited, band) for key, (band, _) in SCENARIO_DEF.items()}
+    report(results, poly, labels)
 
     with report_style():  # report figure: REPORT_WIDTH, report font sizes, 2 x 2 panels
         height = 5.4
         fig, axes = plt.subplots(2, 2, figsize=(REPORT_WIDTH, height))
         fig.subplots_adjust(left=0.1, right=0.99, top=0.95, bottom=0.92 / height, wspace=0.38, hspace=0.5)
         for ax, letter, metric, fmt in zip(axes.flat, "abc", METRICS, ("{:.0f}", "{:.0f}", "{:,.0f}")):
-            draw_metric(ax, poly, axis_idx, metric, results, fmt, f"({letter}) {TITLE[metric]}")
-        draw_cost(axes[1, 1], poly, results, "(d) Cheapest extra cost")
+            draw_metric(ax, poly, axis_idx, metric, limited, results, fmt, f"({letter}) {TITLE[metric]}")
+        draw_cost(axes[1, 1], poly, results, limited, "(d) Cheapest extra cost")
         if SHOW_TITLE:  # off for the thesis figures (caption carries the title)
-            fig.suptitle(f"{RUN_LABEL}: industrial heat electrification limited to 99-100% or 0-1%, "
+            fig.suptitle(f"{RUN_LABEL}: {SUPTITLE[limited]} limited to the top or bottom 1% of its range, "
                          "effect on the other axes", fontsize=11, fontweight="bold", color=INK, x=0.1, ha="left")
         # Scenarios are named under each bar; the legend spells them out (no swatch, since the
         # colour depends on the panel: full colour = A, light shade = B, grey = none).
-        handles = [Line2D([0], [0], color="none", label=label) for label, _, _ in SCENARIOS.values()] + [
+        handles = [Line2D([0], [0], color="none", label=label) for label in labels.values()] + [
             Patch(facecolor=GREY, alpha=OUTER_ALPHA, label="Wide light bar: outer approximation"),
             Patch(facecolor=GREY, label="Narrow dark bar: hull of solved designs"),
             Line2D([0], [0], color="black", linestyle="--", linewidth=1.0, label="Cost-optimal baseline"),
         ]
         fig.legend(handles=handles, loc="lower center", ncol=2, fontsize=S["legend"], frameon=False,
                    bbox_to_anchor=(0.5, 0.0), handlelength=1.2, handletextpad=0.5, columnspacing=2.0)
-        savefig(fig, "fig61_heat_mandate_effects")
+        savefig(fig, FIGURE_NAME[limited])
+
+
+def main() -> None:
+    limited_axes = sys.argv[1:] or list(METRICS)
+    poly = load_polytope(RUN_PATH)
+    print(f"loaded {poly.X.shape[0]} points, converged={poly.converged}")
+    axis_idx = {name: i for i, name in enumerate(poly.names)}
+    for limited in limited_axes:
+        plot(poly, axis_idx, limited)
 
 
 if __name__ == "__main__":

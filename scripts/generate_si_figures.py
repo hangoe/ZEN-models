@@ -368,6 +368,16 @@ NO_FLEX_SINGLE_TEMP_SCENARIO = (
     "zen_europe_no_flex_single_temp_2022_8a_4a_interval_10ts",
     "ZEN-Europe-No-Flex-Single-Temp")
 
+# fig30a only: the two single-temperature runs re-run with corrected diffusion
+# ("diff_correct", downloaded 2026-11-17), for comparison with fig30 (which keeps
+# the original single-temp runs). The ZEN-Europe single-temp download is a flat
+# folder (no <model>/ subfolder) — load_results finds it either way.
+SINGLE_TEMP_DIFF_CORRECT_SCENARIO = ("zen_europe_single_temp_diff_correct",
+                                     "ZEN-Europe-Single-Temp (diff. corrected)")
+NO_FLEX_SINGLE_TEMP_DIFF_CORRECT_SCENARIO = (
+    "zen_europe_no_flex_single_temp_diff_correct_2022_8a_4a_interval_10ts",
+    "ZEN-Europe-No-Flex-Single-Temp (diff. corrected)")
+
 # fig50 only: Full flexibility with all 10 *_DSM storage techs made (nearly)
 # free (opex_specific_variable/capex_specific_storage energy 0.001) AND their
 # energy_to_power_ratio_max raised to 336 h (was 2/48 h for 7 of them) —
@@ -495,6 +505,7 @@ REPORT_FIGURES = {
     "fig15b_heat_supply_zen_europe",
     "fig20_cost_breakdown_sector_industry_heating",
     "fig30_matrix",
+    "fig30a_matrix",  # fig30 with the diff_correct single-temp runs (comparison)
     "fig31_matrix_tsa",
     "fig310_matrix_temperature_levels",
     "fig311_matrix_time_steps",
@@ -3090,7 +3101,7 @@ FIG30_PANELS = {
 
 
 def fig30_matrix(no_flex_run: Run, no_flex_single_run: Run, full_run: Run,
-                 single_temp_run: Run) -> None:
+                 single_temp_run: Run, fig_name: str = "fig30_matrix") -> None:
     """fig14b's 4 runs laid out as 2x2 matrices — columns Full flexibility /
     No flexibility, rows 3 temperature levels / single level — per user
     sketch, 3 panels side by side (see _fig30_matrix_panel). Each cell is
@@ -3115,7 +3126,7 @@ def fig30_matrix(no_flex_run: Run, no_flex_single_run: Run, full_run: Run,
     # scheme as fig310): equal-size cells, change shown as shading (shade_delta)
     # instead of the former blue value ramp + colourbar (_fig30_matrix_panel).
     style = _matrix_style()
-    _matrix_figure(cells, "fig30_matrix", panel_fn=_fig300_sized_panel, baseline_delta=style,
+    _matrix_figure(cells, fig_name, panel_fn=_fig300_sized_panel, baseline_delta=style,
                    shade_delta=True, legend=_shade_delta_legend(style), symmetric=True)
 
 
@@ -5147,6 +5158,8 @@ def main(report_only: bool = False) -> None:
     print(f"Loading 20 ts scenarios...")
     full_20ts = load_extra_scenario(FULL_FLEX_20TS_SCENARIO)
     no_flex_20ts = load_extra_scenario(NO_FLEX_20TS_SCENARIO)
+    single_temp_dc = load_extra_scenario(SINGLE_TEMP_DIFF_CORRECT_SCENARIO)
+    no_flex_single_dc = load_extra_scenario(NO_FLEX_SINGLE_TEMP_DIFF_CORRECT_SCENARIO)
 
     by = {r.label: r for r in runs}
     no_flex = by.get(NO_FLEX)
@@ -5157,7 +5170,9 @@ def main(report_only: bool = False) -> None:
                  SINGLE_TEMP: single_temp, NO_TES_DSM_PESS: dsm_pess,
                  NO_FLEX_SINGLE_TEMP_SCENARIO[1]: no_flex_single,
                  DSM_NO_COST_SCENARIO[1]: dsm_no_cost,
-                 FULL_FLEX_20TS_SCENARIO[1]: full_20ts}
+                 FULL_FLEX_20TS_SCENARIO[1]: full_20ts,
+                 SINGLE_TEMP_DIFF_CORRECT_SCENARIO[1]: single_temp_dc,
+                 NO_FLEX_SINGLE_TEMP_DIFF_CORRECT_SCENARIO[1]: no_flex_single_dc}
 
     report_funcs = {
         fig0b_emissions_source_comparison, fig5b_dsm_discharge_by_product,
@@ -5197,6 +5212,9 @@ def main(report_only: bool = False) -> None:
                fig14b_cost_and_emissions_totals_singletemp_vs_full, fig30_matrix,
                fig310_matrix_temperature_levels):
         run_if(single_temp_set, fn, no_flex, no_flex_single, full, single_temp)
+    run_if([NO_FLEX, NO_FLEX_SINGLE_TEMP_DIFF_CORRECT_SCENARIO[1], FULL,
+            SINGLE_TEMP_DIFF_CORRECT_SCENARIO[1]], fig30_matrix,
+           no_flex, no_flex_single_dc, full, single_temp_dc, "fig30a_matrix")
     run_if([NO_FLEX], fig15_heat_supply_output_twh_for,
            runs, NO_FLEX, "fig15a_heat_supply_no_flex")
     run_if([FULL], fig15_heat_supply_output_twh_for,

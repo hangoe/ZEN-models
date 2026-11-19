@@ -3,7 +3,7 @@
 Runs plot_mga_results (fig1a/1b, one per year), plot_mga_ts_resolution (fig3a/3b/4)
 and plot_mga_cum_regional_capex (fig10/12; fig11 only for runs with several regions),
 all for the run set in plots/mga_capex_periods_common.py (run 57), and
-plot_mga_run_comparison (fig70-73, run 56 vs run 57).
+plot_mga_run_comparison (fig70-73, runs 54, 56 and 57).
 
 plot_mga_regional_investment_whatif.py (fig20/21) and plot_mga_share_whatif.py
 (fig30-33, fig40-43) stay standalone scripts because their LPs are heavier.

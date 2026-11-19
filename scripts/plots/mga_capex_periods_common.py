@@ -5,9 +5,10 @@ ZEN-Europe dataset zen_europe_no_flex_no_diffusion_export0; tolerance_explore 0.
 tolerance_prob 0.95, n_samples 4000; axes config_mga_axes_ind_heating_thesis.yaml):
 one region (all), snapshot years 2034 and 2050, 7 axes (industrial heat
 electrification share, CO2 storage utilisation, imported biomass, each per year, and
-cost). fig70-73 (plot_mga_run_comparison.py) compare run 56 (tolerance_explore 0.1) and
-run 57 (COMPARE_RUNS, COMPARE_TAG). Earlier versions (old dataset
-zen_europe_ind_heat_v1_no_flexibility_nodiffusion_export0) are in mga_tests/archive/run47/,
+cost). fig70-73 (plot_mga_run_comparison.py) compare run 54 (5 time steps,
+tolerance_explore 0.1), run 56 (1 time step, tolerance_explore 0.1) and run 57
+(COMPARE_RUNS, COMPARE_TAG). Earlier versions: mga_tests/archive/run56_vs_57/, and (old
+dataset zen_europe_ind_heat_v1_no_flexibility_nodiffusion_export0) archive/run47/,
 archive/run46_vs_47/, archive/run46/ and archive/run45_vs_46/.
 To plot another run, change MODEL/RUN_SUFFIX/RUN_LABEL/REGIONS/YEARS/METRICS here.
 The run-33 figures (heat/EV/CCS/emissions, 2030/2038/2050) are in
@@ -38,7 +39,12 @@ RUN56_SUFFIX = (
     "2022_8a_4a_interval_1ts_MGA_IND_HEATING_THESIS"
     "_batch_bbofast_minmax_batch16_tol01_eps001_FREEZE2022_ci095_ns4000"
 )
-RUN56_LABEL = "run 56 (tolerance 0.1)"
+RUN56_LABEL = "run 56 (1 ts, tolerance 0.1)"
+RUN54_SUFFIX = (
+    "2022_8a_4a_interval_5ts_MGA_IND_HEATING_THESIS"
+    "_batch_bbofast_minmax_batch16_tol01_eps001_FREEZE2022_ci095_ns4000"
+)
+RUN54_LABEL = "run 54 (5 ts, tolerance 0.1)"
 RUN_SUFFIX = (
     "2022_8a_4a_interval_1ts_MGA_IND_HEATING_THESIS"
     "_batch_bbofast_minmax_batch16_tol001_eps001_FREEZE2022_ci095_ns4000"
@@ -46,16 +52,20 @@ RUN_SUFFIX = (
 RUN_DIR = MGA_ROOT / f"{MODEL}_{RUN_SUFFIX}"
 POLY_PATH = RUN_DIR / f"{MODEL}_batch_summary" / "polytope.npz"
 RUN_LABEL = "ZEN-Europe MGA, run 57"
-RUN57_LABEL = "run 57 (tolerance 0.01)"
+RUN57_LABEL = "run 57 (1 ts, tolerance 0.01)"
 
-# Runs compared in fig70-73: label -> (run-folder suffix, tint), older run first. Each
-# figure draws both runs in one hue (near-black, or the technology's colour), the older
-# run as a light tint. COMPARE_TAG goes into the figure names.
+# Runs compared in fig70-73: label -> (run-folder suffix, tint, linestyle). Each figure
+# draws all runs in one hue (near-black, or the technology's colour): run 56 as a light
+# tint, run 57 full colour, run 54 (other time resolution) as a medium tint, dashed. The
+# last entry is the main run (mandate starts, axis styling); COMPARE_REFERENCE is the run
+# the 2D hull areas of fig72 are divided by. COMPARE_TAG goes into the figure names.
 COMPARE_RUNS = {
-    RUN56_LABEL: (RUN56_SUFFIX, 0.55),
-    RUN57_LABEL: (RUN_SUFFIX, 0.0),
+    RUN54_LABEL: (RUN54_SUFFIX, 0.3, "--"),
+    RUN56_LABEL: (RUN56_SUFFIX, 0.55, "-"),
+    RUN57_LABEL: (RUN_SUFFIX, 0.0, "-"),
 }
-COMPARE_TAG = "run56_vs_57"
+COMPARE_REFERENCE = RUN56_LABEL
+COMPARE_TAG = "run54_56_57"
 
 RUN21_SUFFIX = (
     "2022_8a_4a_interval_1ts_MGA_AXES_OUTPUT_EXP0_2REG_CO2FIX"

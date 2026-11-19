@@ -1,0 +1,23 @@
+{
+  "set_nodes": "name:set_nodes;doc:Set of nodes;dims:",
+  "set_edges": "name:set_edges;doc:Set of edges;dims:",
+  "set_nodes_on_edges": "name:set_nodes_on_edges;doc:Set of nodes that constitute an edge;dims:set_edges",
+  "set_carriers": "name:set_carriers;doc:Set of carriers;dims:",
+  "set_technologies": "name:set_technologies;doc:Set of technologies;dims:",
+  "set_elements": "name:set_elements;doc:Set of elements;dims:",
+  "set_hours_all_years": "name:set_hours_all_years;doc:Set of base time steps;dims:",
+  "set_years": "name:set_years;doc:Set of yearly time steps;dims:",
+  "set_years_entire_horizon": "name:set_years_entire_horizon;doc:Set of yearly time steps of the entire optimization horizon;dims:",
+  "set_time_steps_operation": "name:set_time_steps_operation;doc:Set of operational time steps;dims:",
+  "set_time_steps_storage": "name:set_time_steps_storage;doc:Set of storage level time steps;dims:",
+  "set_conversion_technologies": "name:set_conversion_technologies;doc:Set of conversion technologies;dims:",
+  "set_retrofitting_technologies": "name:set_retrofitting_technologies;doc:Set of retrofitting technologies;dims:",
+  "set_transport_technologies": "name:set_transport_technologies;doc:Set of transport technologies;dims:",
+  "set_storage_technologies": "name:set_storage_technologies;doc:Set of storage technologies;dims:",
+  "set_technologies_existing": "name:set_technologies_existing;doc:Set of existing technology vintages;dims:set_technologies",
+  "set_reference_carriers": "name:set_reference_carriers;doc:Reference carriers indexed by technology;dims:set_technologies",
+  "set_input_carriers": "name:set_input_carriers;doc:Input carriers indexed by conversion technology;dims:set_conversion_technologies",
+  "set_output_carriers": "name:set_output_carriers;doc:Output carriers indexed by conversion technology;dims:set_conversion_technologies",
+  "set_dependent_carriers": "name:set_dependent_carriers;doc:Non-reference carriers indexed by conversion technology;dims:set_conversion_technologies",
+  "set_retrofitting_base_technologies": "name:set_retrofitting_base_technologies;doc:Base technologies indexed by retrofitting technology;dims:set_retrofitting_technologies"
+}

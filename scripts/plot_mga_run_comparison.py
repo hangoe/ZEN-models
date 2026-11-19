@@ -1,11 +1,12 @@
-"""Run 56 vs run 57 (COMPARE_RUNS and COMPARE_TAG in plots/mga_capex_periods_common.py).
+"""Runs 54, 56 and 57 (COMPARE_RUNS, COMPARE_REFERENCE and COMPARE_TAG in
+plots/mga_capex_periods_common.py).
 
-The two runs explore the same 7 axes from the same baseline and the same VMM (own-axis
-min/max) solves, with the same stopping rule (95% CI lower bound of the share of
-well-approximated directions >= 0.95, from 4000 directions). They differ in
-tolerance_explore, the gap below which a direction counts as well approximated: 0.1 in
-run 56, 0.01 in run 57. Per-axis ranges (fig12) are therefore identical, and the figures
-look at the interior instead:
+The runs explore the same 7 axes with the same stopping rule (95% CI lower bound of the
+share of well-approximated directions >= 0.95, from 4000 directions). Runs 56 and 57
+share the baseline and the VMM (own-axis min/max) solves and differ in tolerance_explore,
+the gap below which a direction counts as well approximated: 0.1 in run 56, 0.01 in run
+57. Run 54 is run 56 at 5 aggregated time steps per year instead of 1, so its baseline,
+C* and VMM ranges differ. The figures look at:
 
   fig70_<tag>_convergence           ci_lower, max gap and mean gap per iteration, as each
                                     run logged them (diagnostics.csv)
@@ -18,8 +19,9 @@ look at the interior instead:
 Each run's logged ci_lower counts directions within its own tolerance, on its own random
 direction set, so the logged values are not comparable between the runs. fig71 re-scores
 both on one fixed set (N_DIRECTIONS scrambled Sobol directions, seed SEED) with
-pyoNearOpt's own gap code, at both tolerances. Both runs are drawn in one hue, the older
-run as a light tint. Earlier versions: mga_tests/archive/run46_vs_47/ and archive/run45_vs_46/.
+pyoNearOpt's own gap code, at both tolerances (in each run's own normalised coordinates).
+All runs are drawn in one hue, told apart by tint and line style. Earlier versions:
+mga_tests/archive/run56_vs_57/, archive/run46_vs_47/ and archive/run45_vs_46/.
 
 Usage (zen-garden-plugins-env, PYTHONPATH=../ZEN-garden-plugins):
     python scripts/plot_mga_run_comparison.py
@@ -44,7 +46,7 @@ from plot_mga_diffusion_whatif import MANDATE_COLOR, SHARE_METRICS, initial_valu
 from plot_mga_npc_vs_diffusion import NAMES, min_cost_curve, plot_curve, style_cost_axis
 from plot_mga_results import load_native_ci_history
 from plots.mga_capex_periods_common import (
-    COMPARE_RUNS, COMPARE_TAG, METRIC_COLOR, METRIC_LABEL, MGA_ROOT, MODEL, NEAR_BLACK,
+    COMPARE_REFERENCE, COMPARE_RUNS, COMPARE_TAG, METRIC_COLOR, METRIC_LABEL, MGA_ROOT, MODEL, NEAR_BLACK,
     display_unit, parse_axis, savefig,
 )
 from pyoNearOpt.metrics import _DirectionSampler
@@ -69,7 +71,7 @@ def tinted(color: str, tint: float) -> str:
 def load_runs() -> dict:
     """{label: {poly, history, tint}} for COMPARE_RUNS."""
     runs = {}
-    for label, (suffix, tint) in COMPARE_RUNS.items():
+    for label, (suffix, tint, linestyle) in COMPARE_RUNS.items():
         run_dir = MGA_ROOT / f"{MODEL}_{suffix}"
         summary = run_dir / f"{MODEL}_batch_summary"
         poly = load_polytope(summary / "polytope.npz")
@@ -80,7 +82,7 @@ def load_runs() -> dict:
         print(f"  {label}: {poly.X.shape[0]} points, {len(history)} logged iterations, "
               f"target {poly.convergence_threshold:g}, n_samples {poly.run['n_samples']}, "
               f"final_gap {poly.final_gap:.3f}")
-        runs[label] = {"poly": poly, "history": history, "tint": tint, "dir": run_dir}
+        runs[label] = {"poly": poly, "history": history, "tint": tint, "ls": linestyle, "dir": run_dir}
     return runs
 
 
@@ -90,22 +92,18 @@ def fig70_convergence(runs: dict) -> None:
         color = tinted(NEAR_BLACK, run["tint"])
         h = run["history"]
         for ax, column in zip(axes, ("ci_lower", "max_gap", "mean_gap")):
-            ax.plot(h["n_queries"], h[column], color=color, linewidth=1.8, marker="o", markersize=3.5, label=label)
-    targets = {float(run["poly"].convergence_threshold) for run in runs.values()}
-    for label, run in runs.items():
-        color = tinted(NEAR_BLACK, run["tint"]) if len(targets) > 1 else GREY
-        target = run["poly"].convergence_threshold
-        axes[0].axhline(target, color=color, linestyle="--", linewidth=1)
-        if len(targets) > 1 or not run["tint"]:  # a shared target is labelled once
-            axes[0].annotate(f"target {target:g}", (0, target), xycoords=("axes fraction", "data"),
-                             xytext=(4, -10 if run["tint"] else 3), textcoords="offset points", fontsize=8,
-                             color=color)
-        color = tinted(NEAR_BLACK, run["tint"])
-        tolerance = float(run["poly"].run["tolerance_explore"])
+            ax.plot(h["n_queries"], h[column], color=color, linewidth=1.8, linestyle=run["ls"], marker="o",
+                    markersize=3.5, label=label)
+    # Targets and tolerances shared by several runs are drawn and labelled once, in grey.
+    for target in sorted({float(run["poly"].convergence_threshold) for run in runs.values()}):
+        axes[0].axhline(target, color=GREY, linestyle="--", linewidth=1)
+        axes[0].annotate(f"target {target:g}", (0, target), xycoords=("axes fraction", "data"),
+                         xytext=(4, 3), textcoords="offset points", fontsize=8, color=GREY)
+    for tolerance in sorted({float(run["poly"].run["tolerance_explore"]) for run in runs.values()}):
         for ax in axes[1:]:
-            ax.axhline(tolerance, color=color, linestyle=":", linewidth=1)
+            ax.axhline(tolerance, color=GREY, linestyle=":", linewidth=1)
         axes[1].annotate(f"tolerance_explore {tolerance:g}", (1, tolerance), xycoords=("axes fraction", "data"),
-                         xytext=(-4, 3), textcoords="offset points", ha="right", fontsize=8, color=color)
+                         xytext=(-4, 3), textcoords="offset points", ha="right", fontsize=8, color=GREY)
     for ax in axes[1:]:
         ax.set_yscale("log")
     axes[0].set_ylim(-0.03, 1.03)
@@ -163,7 +161,7 @@ def volumes(poly, rng) -> tuple[float, float]:
 def fig71_common_gaps(runs: dict) -> None:
     rng = np.random.default_rng(SEED)
     tolerances = sorted({float(run["poly"].run["tolerance_explore"]) for run in runs.values()}, reverse=True)
-    fig, ax = plt.subplots(figsize=(8.2, 5.0), constrained_layout=True)
+    fig, ax = plt.subplots(figsize=(8.2, 5.0 + 0.6 * max(0, len(runs) - 2)), constrained_layout=True)
     lines = []
     for label, run in runs.items():
         color = tinted(NEAR_BLACK, run["tint"])
@@ -171,7 +169,7 @@ def fig71_common_gaps(runs: dict) -> None:
         inner, outer = volumes(run["poly"], rng)
         gaps = np.sort(result["gaps"])
         ax.step(np.maximum(gaps, GAP_FLOOR), np.arange(1, len(gaps) + 1) / len(gaps), where="post", color=color,
-                linewidth=1.8, label=label)
+                linewidth=1.8, linestyle=run["ls"], label=label)
         within = "; ".join(f"{100 * share:.1f}% within {t:g} (CI lower {ci:.3f})"
                            for t, (share, ci) in result["within"].items())
         implied = ", ".join(f"{v:.3f} at {k:.2f}" if v is not None else f"n/a at {k:.2f}"
@@ -195,7 +193,7 @@ def fig71_common_gaps(runs: dict) -> None:
     ax.legend(fontsize=8, frameon=False, loc="center right")
     for k, (color, text) in enumerate(lines):
         ax.text(0.0, -0.2 - 0.12 * k, text, transform=ax.transAxes, fontsize=7.5, color=color, va="top")
-    ax.set_title(f"Both final polytopes scored on the same {N_DIRECTIONS} directions", fontsize=11)
+    ax.set_title(f"All final polytopes scored on the same {N_DIRECTIONS} directions", fontsize=11)
     savefig(fig, f"fig71_{COMPARE_TAG}_common_gaps")
 
 
@@ -232,6 +230,8 @@ def fig72_pairwise_hulls(runs: dict) -> None:
     n = len(order)
     fig, axes = plt.subplots(n - 1, n - 1, figsize=(1.9 * (n - 1), 1.9 * (n - 1)), squeeze=False)
     labels = list(runs)
+    others = [label for label in labels if label != COMPARE_REFERENCE]
+    short = {label: label.split(" (")[0] for label in labels}
     for row in range(1, n):
         for col in range(n - 1):
             ax = axes[row - 1, col]
@@ -244,15 +244,19 @@ def fig72_pairwise_hulls(runs: dict) -> None:
                 color = tinted(NEAR_BLACK, runs[label]["tint"])
                 points = data[label][:, [i, j]]
                 outline, areas[label] = _hull_outline(points)
-                light = runs[label]["tint"] > 0
-                if light:
+                filled = label == COMPARE_REFERENCE
+                if filled:
                     ax.fill(outline[:, 0], outline[:, 1], color=color, alpha=0.35, linewidth=0, zorder=1)
-                ax.plot(outline[:, 0], outline[:, 1], color=color, linewidth=1.6 if light else 0.9, zorder=3)
-                ax.scatter(points[:, 0], points[:, 1], s=2, color=color, linewidths=0, zorder=2, rasterized=True)
-            if areas[labels[0]] > 0:
-                ax.text(0.97, 0.04, f"$\\times${areas[labels[1]] / areas[labels[0]]:.2f}", transform=ax.transAxes,
-                        ha="right", va="bottom", fontsize=7, color=NEAR_BLACK,
-                        bbox={"facecolor": "white", "edgecolor": "none", "alpha": 0.8, "pad": 0.5})
+                ax.plot(outline[:, 0], outline[:, 1], color=color, linewidth=1.6 if filled else 0.9,
+                        linestyle=runs[label]["ls"], zorder=3)
+                if not runs[label]["ls"] == "--":  # the other time resolution: outline only
+                    ax.scatter(points[:, 0], points[:, 1], s=2, color=color, linewidths=0, zorder=2, rasterized=True)
+            if areas[COMPARE_REFERENCE] > 0:
+                for k, label in enumerate(others):
+                    ax.text(0.97, 0.04 + 0.13 * k, f"$\\times${areas[label] / areas[COMPARE_REFERENCE]:.2f}",
+                            transform=ax.transAxes, ha="right", va="bottom", fontsize=7,
+                            color=tinted(NEAR_BLACK, runs[label]["tint"]),
+                            bbox={"facecolor": "white", "edgecolor": "none", "alpha": 0.8, "pad": 0.5})
             ax.grid(alpha=0.25, linewidth=0.5)
             ax.tick_params(labelsize=6.5)
             if row == n - 1:
@@ -263,13 +267,16 @@ def fig72_pairwise_hulls(runs: dict) -> None:
                 ax.set_ylabel(_label(first, j), fontsize=7.5, color=METRIC_COLOR[parse_axis(first.names[j]).metric])
             else:
                 ax.set_yticklabels([])
-    handles = [Patch(facecolor=tinted(NEAR_BLACK, runs[labels[0]]["tint"]), alpha=0.5,
-                     edgecolor=tinted(NEAR_BLACK, runs[labels[0]]["tint"]), label=f"{labels[0]}, inner hull"),
-               Line2D([0], [0], color=tinted(NEAR_BLACK, runs[labels[1]]["tint"]), linewidth=0.9,
-                      label=f"{labels[1]}, inner hull"),
-               Line2D([0], [0], color="none", label=f"$\\times$ = 2D hull area, {labels[1].split(' (')[0]} / {labels[0].split(' (')[0]}")]
+    reference_color = tinted(NEAR_BLACK, runs[COMPARE_REFERENCE]["tint"])
+    handles = [Patch(facecolor=reference_color, alpha=0.5, edgecolor=reference_color,
+                     label=f"{COMPARE_REFERENCE}, inner hull")]
+    handles += [Line2D([0], [0], color=tinted(NEAR_BLACK, runs[label]["tint"]), linewidth=0.9,
+                       linestyle=runs[label]["ls"], label=f"{label}, inner hull") for label in others]
+    handles.append(Line2D([0], [0], color="none",
+                          label=f"$\\times$ = 2D hull area / {short[COMPARE_REFERENCE]}'s (bottom up: "
+                                + ", ".join(short[label] for label in others) + ")"))
     fig.legend(handles=handles, loc="upper right", bbox_to_anchor=(0.97, 0.93), fontsize=10, frameon=False)
-    fig.suptitle(f"{labels[0].split(' (')[0].capitalize()} vs {labels[1].split(' (')[0]}: "
+    fig.suptitle(f"{', '.join(short[label] for label in labels).capitalize()}: "
                  "solved near-optimal designs, projected on every axis pair",
                  fontsize=13, fontweight="bold", color=NEAR_BLACK)
     fig.tight_layout(rect=(0, 0, 1, 0.97))
@@ -279,7 +286,7 @@ def fig72_pairwise_hulls(runs: dict) -> None:
 def fig73_npc_vs_diffusion(runs: dict) -> None:
     labels = list(runs)
     last = runs[labels[-1]]
-    # Mandate starts come from the dataset and the baseline, identical for both runs.
+    # Mandate starts come from the dataset and the main run's baseline (the last run).
     starts = mandate_start(last["poly"], initial_values(last["poly"]))
     fig, axes = plt.subplots(1, len(SHARE_METRICS), figsize=(6.2 * len(SHARE_METRICS), 4.8), constrained_layout=True)
     for ax, metric in zip(axes, SHARE_METRICS):
@@ -288,12 +295,12 @@ def fig73_npc_vs_diffusion(runs: dict) -> None:
             axis_idx = {name: i for i, name in enumerate(poly.names)}
             print(f"  {label}")
             inner, _ = min_cost_curve(poly, axis_idx, metric, starts[metric])
-            plot_curve(ax, poly, inner, tinted(MANDATE_COLOR[metric], run["tint"]), label)
+            plot_curve(ax, poly, inner, tinted(MANDATE_COLOR[metric], run["tint"]), label, linestyle=run["ls"])
         style_cost_axis(ax, last["poly"])
         style_axes(ax, NAMES[metric], "Net present cost (min. possible)")
         ax.legend(frameon=False, fontsize=8, loc="upper left", bbox_to_anchor=(0.0, 0.9))
-    fig.suptitle(f"Minimum possible net present cost per diffusion rate band: {labels[0].split(' (')[0]} vs "
-                 f"{labels[1].split(' (')[0]}",
+    fig.suptitle("Minimum possible net present cost per diffusion rate band: "
+                 + ", ".join(label.split(" (")[0] for label in labels),
                  fontsize=12, fontweight="bold", color=NEAR_BLACK)
     savefig(fig, f"fig73_{COMPARE_TAG}_npc_vs_diffusion")
 
