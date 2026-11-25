@@ -103,7 +103,7 @@ from zen_creator.datasets.datasets.process_parametrization import (  # noqa: E40
     _kiln_fuel_shares,
 )
 
-OUTPUT_PATH = REPO_ROOT / "data" / "outputs" / "figures" / "SI_results" / "heat_demand_by_sector_input.json"
+OUTPUT_PATH = REPO_ROOT / "data" / "outputs" / "figures-report" / "SI_results" / "heat_demand_by_sector_input.json"
 
 
 def main() -> None:

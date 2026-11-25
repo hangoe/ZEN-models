@@ -299,9 +299,7 @@ def fig73_npc_vs_diffusion(runs: dict) -> None:
         style_cost_axis(ax, last["poly"])
         style_axes(ax, NAMES[metric], "Net present cost (min. possible)")
         ax.legend(frameon=False, fontsize=8, loc="upper left", bbox_to_anchor=(0.0, 0.9))
-    fig.suptitle("Minimum possible net present cost per diffusion rate band: "
-                 + ", ".join(label.split(" (")[0] for label in labels),
-                 fontsize=12, fontweight="bold", color=NEAR_BLACK)
+    # No suptitle: fig73 is used in the thesis appendix (caption there).
     savefig(fig, f"fig73_{COMPARE_TAG}_npc_vs_diffusion")
 
 

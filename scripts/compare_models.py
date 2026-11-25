@@ -20,6 +20,7 @@ import pandas as pd
 from zen_garden import Results
 
 from plots.figure_settings import (
+    FIGURES_ROOT,
     apply_font_mode,
     load_results as _load_results,
     plot_stacked_bars,
@@ -31,7 +32,7 @@ from plots.figure_settings import (
 apply_font_mode()
 
 OUTPUT_DIR = Path(__file__).parent.parent / "data" / "outputs"
-FIGURES_DIR = OUTPUT_DIR / "figures"
+FIGURES_DIR = FIGURES_ROOT
 DEFAULT_MODEL_A = "Crystal_Ball_HG_v4_4_2025_1a_1a_interval_1ts"
 DEFAULT_MODEL_B = "Crystal_Ball_HG_v4_6_2025_1a_1a_interval_1ts"
 YEAR = 2025

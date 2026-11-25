@@ -51,7 +51,7 @@ REPO_ROOT = Path(__file__).parent.parent
 ZEN_CREATOR_ROOT = REPO_ROOT.parent / "ZEN-creator"
 WORKBOOK = (ZEN_CREATOR_ROOT / "input_data" / "JRC-IDEES-2023" / "EU27" /
             "JRC-IDEES-2023_EmissionBalance_EU27.xlsx")
-OUT_JSON = REPO_ROOT / "data" / "outputs" / "figures" / "SI_results" / "industry_sector_emissions_input.json"
+OUT_JSON = REPO_ROOT / "data" / "outputs" / "figures-report" / "SI_results" / "industry_sector_emissions_input.json"
 
 YEAR = 2022  # matches sector_emissions_2022.csv's reference year (fig9)
 

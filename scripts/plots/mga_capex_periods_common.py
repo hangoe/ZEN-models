@@ -27,9 +27,9 @@ REPO_ROOT = Path(__file__).parent.parent.parent
 
 import matplotlib.pyplot as plt
 
-from .figure_settings import SCENARIO_PALETTE, eth_tint
+from .figure_settings import FIGURES_ROOT, SCENARIO_PALETTE, eth_tint
 
-FIGURES_DIR = REPO_ROOT / "data" / "outputs" / "figures" / "mga_tests"
+FIGURES_DIR = FIGURES_ROOT / "mga_tests"
 MGA_ROOT = REPO_ROOT / "data" / "outputs" / "euler_outputs_mga"
 
 MODEL = "zen_europe_no_flex_no_diffusion_export0"
@@ -45,14 +45,16 @@ RUN54_SUFFIX = (
     "_batch_bbofast_minmax_batch16_tol01_eps001_FREEZE2022_ci095_ns4000"
 )
 RUN54_LABEL = "run 54 (5 ts, tolerance 0.1)"
-RUN_SUFFIX = (
+RUN57_SUFFIX = (
     "2022_8a_4a_interval_1ts_MGA_IND_HEATING_THESIS"
     "_batch_bbofast_minmax_batch16_tol001_eps001_FREEZE2022_ci095_ns4000"
 )
+RUN57_LABEL = "run 57 (1 ts, tolerance 0.01)"
+# Main run of the thesis figures: final run 54 (was run 57 until 2026-11-19).
+RUN_SUFFIX = RUN54_SUFFIX
 RUN_DIR = MGA_ROOT / f"{MODEL}_{RUN_SUFFIX}"
 POLY_PATH = RUN_DIR / f"{MODEL}_batch_summary" / "polytope.npz"
-RUN_LABEL = "ZEN-Europe MGA, run 57"
-RUN57_LABEL = "run 57 (1 ts, tolerance 0.01)"
+RUN_LABEL = "ZEN-Europe MGA, run 54"
 
 # Runs compared in fig70-73: label -> (run-folder suffix, tint, linestyle). Each figure
 # draws all runs in one hue (near-black, or the technology's colour): run 56 as a light
@@ -60,9 +62,9 @@ RUN57_LABEL = "run 57 (1 ts, tolerance 0.01)"
 # last entry is the main run (mandate starts, axis styling); COMPARE_REFERENCE is the run
 # the 2D hull areas of fig72 are divided by. COMPARE_TAG goes into the figure names.
 COMPARE_RUNS = {
-    RUN54_LABEL: (RUN54_SUFFIX, 0.3, "--"),
     RUN56_LABEL: (RUN56_SUFFIX, 0.55, "-"),
-    RUN57_LABEL: (RUN_SUFFIX, 0.0, "-"),
+    RUN57_LABEL: (RUN57_SUFFIX, 0.3, "--"),
+    RUN54_LABEL: (RUN54_SUFFIX, 0.0, "-"),  # main (final) run since 2026-11-19
 }
 COMPARE_REFERENCE = RUN56_LABEL
 COMPARE_TAG = "run54_56_57"

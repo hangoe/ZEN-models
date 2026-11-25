@@ -3,6 +3,7 @@ discovery, Results loading, and matplotlib plotting primitives. Used by both
 the Streamlit dashboard (streamlit/app.py) and standalone figure-generation
 scripts (e.g. generate_si_figures.py) — this module owns no UI logic itself."""
 
+import os
 import re
 import textwrap
 from dataclasses import dataclass
@@ -22,7 +23,10 @@ HOURS_PER_YEAR = 8760
 # v9.py, plot_mga_results.py, plot_mga_cum_regional_capex.py) used to inline
 # its own identical rcParams block for this. Centralized here so switching
 # every script's fonts
-# at once is a ONE-LINE change: flip FONT_MODE below, nothing else. Each
+# at once only needs the environment variable FIGURE_MODE (read once, at
+# import), e.g. `FIGURE_MODE=presentation python scripts/plot_mga_results.py`.
+# It also picks the output root: data/outputs/figures-report/ or
+# data/outputs/figures-presi/ (generate_all_figures.py builds both). Each
 # figure's own fontsize=N calls are untouched by this toggle either way —
 # only the font FAMILY (and matching mathtext glyph set) changes.
 #   "report"       — matches MT_report_HG's LaTeX default (plain Computer
@@ -32,11 +36,16 @@ HOURS_PER_YEAR = 8760
 #                     italic text is mapped to the bundled cmb10/cmti10, and
 #                     cmr10's mis-mapped glyphs are fixed on every savefig
 #                     (see report_text_pass below).
-#   "presentation"  — Arial, for slide decks. No exact "Arial" mathtext glyph
-#                     set ships with matplotlib, so mathtext ($...$ content —
-#                     subscripts like CO$_2$, etc.) falls back to
-#                     "dejavusans", the closest built-in sans-serif match.
-FONT_MODE = "report"  # "report" or "presentation"
+#   "presentation"  — Arial, for slide decks. Mathtext ($...$ content —
+#                     subscripts like CO$_2$, etc.) uses Arial too; symbols
+#                     Arial lacks fall back to STIX sans.
+FONT_MODE = os.environ.get("FIGURE_MODE", "report")  # "report" or "presentation"
+if FONT_MODE not in ("report", "presentation"):
+    raise ValueError(f"FIGURE_MODE must be 'report' or 'presentation', got {FONT_MODE!r}")
+
+# Input files of figure scripts (JSON, CSV) exist once, under REPORT_FIGURES_ROOT.
+REPORT_FIGURES_ROOT = OUTPUT_DIR / "figures-report"
+FIGURES_ROOT = OUTPUT_DIR / "figures-presi" if FONT_MODE == "presentation" else REPORT_FIGURES_ROOT
 
 
 def apply_font_mode() -> None:
@@ -46,11 +55,18 @@ def apply_font_mode() -> None:
     if FONT_MODE == "presentation":
         plt.rcParams.update({
             "font.family": "sans-serif",
-            "font.sans-serif": ["Arial"],
-            "mathtext.fontset": "dejavusans",
+            "font.sans-serif": ["Arial", "DejaVu Sans"],
+            "mathtext.fontset": "custom",
+            "mathtext.rm": "Arial",
+            "mathtext.it": "Arial:italic",
+            "mathtext.bf": "Arial:bold",
+            "mathtext.sf": "Arial",
+            "mathtext.cal": "Arial:italic",
+            "mathtext.fallback": "stixsans",
             "axes.formatter.use_mathtext": True,
             "axes.unicode_minus": True,
         })
+        _patch_savefig(presentation_text_pass)
     else:
         # cmr10 first, DejaVu Serif only for glyphs cmr10 lacks (a generic
         # "serif" family does NOT fall back glyph by glyph). See
@@ -62,22 +78,33 @@ def apply_font_mode() -> None:
             "axes.unicode_minus": False,
             "svg.fonttype": "path",
         })
-        _patch_savefig_for_report()
+        _patch_savefig(report_text_pass)
 
 
-def _patch_savefig_for_report() -> None:
-    """Every script calling apply_font_mode() in report mode gets report_text_pass()
-    applied on Figure.savefig, so cmr10's mis-mapped glyphs never reach a file."""
+def presentation_text_pass(fig) -> None:
+    """Arial counterpart of report_text_pass(): "EUR" as in the report, and "C*" as
+    plain text (mathtext's asterisk operator has no Arial glyph)."""
+    from matplotlib.text import Text
+    for t in fig.findobj(Text):
+        s = t.get_text()
+        new = s if s.strip() == "€" else s.replace("€", "EUR").replace("$C^*$", "C*")
+        if new != s:
+            t.set_text(new)
+
+
+def _patch_savefig(text_pass) -> None:
+    """Every script calling apply_font_mode() gets `text_pass` applied on
+    Figure.savefig (report mode: cmr10's mis-mapped glyphs never reach a file)."""
     from matplotlib.figure import Figure
-    if getattr(Figure.savefig, "_report_wrapped", False):
+    if getattr(Figure.savefig, "_text_pass_wrapped", False):
         return
     original = Figure.savefig
 
     def savefig(self, *args, **kwargs):
-        report_text_pass(self)
+        text_pass(self)
         return original(self, *args, **kwargs)
 
-    savefig._report_wrapped = True
+    savefig._text_pass_wrapped = True
     Figure.savefig = savefig
 
 
@@ -543,7 +570,7 @@ def _text_color_for_bg(bg_color) -> str:
 # OUTPUT_DIR itself), each searched independently so neither root directory is
 # ever mistaken for a model name.
 
-_NON_MODEL_DIRS = {"figures", "solver_files", "archive"}
+_NON_MODEL_DIRS = {"figures-report", "figures-presi", "solver_files", "archive"}
 
 
 def _search_var_dict(path: Path, max_depth: int = 2) -> Path | None:
@@ -594,6 +621,11 @@ def strip_sector_suffix(name):
     return m.group(1) if m else name
 
 
+# Large components read in chunks of technologies (see _get_total_chunked).
+_CHUNKED_COMPONENTS = {"flow_conversion_input", "flow_conversion_output"}
+_CHUNK_TECHS = 6
+
+
 class SectorAggregatedResults:
     """Thin wrapper around zen_garden.Results: get_total/get_full_ts frames get
     their technology/carrier index levels sector-aggregated (see
@@ -636,7 +668,17 @@ class SectorAggregatedResults:
         intensive = component in self._parameters and _INTENSIVE_PARAMETER_RE.search(component)
         return grouped.mean() if intensive else grouped.sum()
 
+    def _get_total_chunked(self, component):
+        """Results.get_total, read a few technologies at a time: at once, the dense
+        flow_conversion_* arrays take several GB as a pandas Series."""
+        techs = self._results.get_total("capacity").index.get_level_values("technology").unique()
+        chunks = [self._results.get_total(component, index={"technology": list(techs[i:i + _CHUNK_TECHS])})
+                  for i in range(0, len(techs), _CHUNK_TECHS)]
+        return pd.concat([c for c in chunks if not c.empty]).sort_index()
+
     def get_total(self, component, *args, **kwargs):
+        if component in _CHUNKED_COMPONENTS and not args and not kwargs:
+            return self._aggregate(component, self._get_total_chunked(component))
         return self._aggregate(component, self._results.get_total(component, *args, **kwargs))
 
     def get_full_ts(self, component, *args, **kwargs):

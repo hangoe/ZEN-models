@@ -1,4 +1,5 @@
-"""Regenerate the figures in data/outputs/figures/mga_tests/.
+"""Regenerate the figures in data/outputs/figures-report/mga_tests/
+(or figures-presi/ with FIGURE_MODE=presentation).
 
 Runs plot_mga_results (fig1a/1b, one per year), plot_mga_ts_resolution (fig3a/3b/4)
 and plot_mga_cum_regional_capex (fig10/12; fig11 only for runs with several regions),

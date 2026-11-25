@@ -1,6 +1,6 @@
 """fig61 / fig61a / fig61b: what happens to the other exploration axes if industrial heat
 (fig61), CCS (fig61a) or imported biomass (fig61b) is pushed to its maximum, or to its
-minimum? Read from the MGA run's polytope (run 57, see plots/mga_capex_periods_common.py),
+minimum? Read from the MGA run's polytope (RUN_SUFFIX in plots/mga_capex_periods_common.py, run 54),
 with no re-solving of ZEN-garden.
 
 The limited axis's two limits are the top and bottom 1% of its near-optimal range (the

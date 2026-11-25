@@ -151,7 +151,7 @@ fig11 (method/fig5) is a pure method illustration: hand-picked, unitless 2D
 geometry (no model run, no external data at all), generated unconditionally
 in main() like fig8/fig9. It intentionally uses a toy feasible region (not
 the model's actual 6-D MGA exploration space plotted in
-data/outputs/figures/mga_tests/) so both axes can be labeled generically
+data/outputs/figures-report/mga_tests/) so both axes can be labeled generically
 ("Variable A/B") for a textbook-style explainer, independent of which
 specific technologies the real MGA runs explored.
 
@@ -262,12 +262,15 @@ from plots.figures_by_scenario import (
     plot_stacked_bars,
 )
 from plots.figure_settings import (
+    FONT_MODE,
     HOURS_PER_YEAR,
     Run,
     SCENARIO_PALETTE,
     COLOR_MAP,
     _apply_shared_ylim,
     _text_color_for_bg,
+    FIGURES_ROOT,
+    REPORT_FIGURES_ROOT,
     apply_font_mode,
     eth_tint,
     get_available_years,
@@ -281,7 +284,7 @@ from plots.figure_settings import (
 # fontsize=N calls throughout this file are unaffected by this toggle either way.
 apply_font_mode()
 
-FIGURES_DIR = REPO_ROOT / "data" / "outputs" / "figures" / "SI_results"
+FIGURES_DIR = FIGURES_ROOT / "SI_results"
 # Runs named after the models.yaml variants: <model>_<comment>/<model>/ (see SCENARIOS).
 RUNS_ROOT = REPO_ROOT / "data" / "outputs" / "zen-europe-outputs-new"
 # Single-year snapshot used throughout (horizon totals used where noted).
@@ -511,6 +514,8 @@ REPORT_FIGURES = {
     "fig311_matrix_time_steps",
     "fig43_flexibility_scenarios_table",
 }
+# Presentation-only figures (FIGURE_MODE=presentation), built one at a time via SINGLE_FIGURES.
+PRESI_FIGURES = {"fig101_matrix_one_row", "fig102_heat_supply_aggregated"}
 # method/ figures used in the report (built in `report` mode as well).
 REPORT_METHOD_FIGURE_FUNCS = {"fig4b_industry_fuel_demand_comparison", "fig13_mga_axis_construction"}
 
@@ -530,7 +535,7 @@ def savefig(fig: plt.Figure, name: str, subdir: str | None = None, extra_artists
     documented fix: it folds these into that same bbox calculation. Found via
     fig7_retrofit_ccs_comparison's two side-by-side (Scenario/Year) legends
     being clipped despite fitting comfortably within the figure's own size."""
-    if subdir is None and name not in REPORT_FIGURES:
+    if subdir is None and name not in REPORT_FIGURES | PRESI_FIGURES:
         subdir = "archive"  # not used in the report -> keep SI_results/ clean
     directory = FIGURES_DIR / subdir if subdir else FIGURES_DIR
     directory.mkdir(parents=True, exist_ok=True)
@@ -1102,6 +1107,48 @@ def fig15_heat_supply_output_twh_for(runs: list[Run], label: str, fig_name: str)
     savefig(fig, fig_name)
 
 
+# fig102 groups, bottom to top: name -> (colour, is the technology in it?). The waste
+# boiler (2022 only) counts as fossil.
+FIG102_GROUPS = {
+    "Fossil boilers": (_ETH_GREY, lambda t: t in {
+        "natural_gas_boiler_industry", "oil_boiler_industry", "coal_boiler_industry", "waste_boiler_industry"}),
+    "Biomass boiler": (CARRIER_COLORS["biomass"], lambda t: t == "biomass_boiler_industry"),
+    "Electrode boiler": (CARRIER_COLORS["electrode_boiler"], lambda t: t == "electrode_boiler_industry"),
+    "Heat pumps": (_ETH_BLUE, lambda t: t.startswith("heat_pump_industry")),
+}
+
+
+def fig102_heat_supply_aggregated(no_flex_run: Run, full_run: Run) -> None:
+    """Presentation: fig15a | fig15b side by side, technologies aggregated to
+    FIG102_GROUPS, shared y axis and one legend."""
+    fig, axes = plt.subplots(1, 2, figsize=(10.5, 3.4), sharey=True)
+    colors = {g: c for g, (c, _) in FIG102_GROUPS.items()}
+    y_max = 0.0
+    for letter, ax, r in zip("ab", axes, (no_flex_run, full_run)):
+        techs = _output_annual_twh(r, INDUSTRY_HEAT_TECHS_BOILERS_HP)
+        group_of = {t: [g for g, (_, member) in FIG102_GROUPS.items() if member(t)] for t in techs.index}
+        unassigned = [t for t, g in group_of.items() if len(g) != 1]
+        if unassigned:
+            raise ValueError(f"fig102: technologies without a single group: {unassigned}")
+        df = techs.groupby({t: g[0] for t, g in group_of.items()}).sum().reindex(list(FIG102_GROUPS)).fillna(0.0)
+        df = df[get_available_years(r.results)]
+        print(f"fig102 {r.label} (TWh; total before grouping {techs.sum().sum():.1f}, after {df.sum().sum():.1f})")
+        print(df.round(1).to_string())
+        x = np.arange(len(df.columns))
+        top, _ = _signed_stacked_bars(ax, df, colors, x, width=0.72)
+        y_max = max(y_max, top.max())
+        ax.set_xticks(x)
+        ax.set_xticklabels([str(y) for y in df.columns])
+        ax.set_xlim(-0.6, len(x) - 0.4)
+        _panel_title(ax, f"({letter}) {r.label}")
+    axes[0].set_ylim(0, y_max * 1.03)
+    axes[0].set_ylabel("Industrial heat supply (TWh)")
+    handles, labels = axes[0].get_legend_handles_labels()
+    fig.tight_layout()
+    _report_legend(axes[1], handles[::-1], labels[::-1])
+    savefig(fig, "fig102_heat_supply_aggregated")
+
+
 # fig14a-specific: one color per TEMPERATURE BAND, not per source — unlike
 # HEAT_SUPPLY_COLOR_MAP (fig9/fig1b), which hues by source (water=blue vs.
 # waste heat=turquoise) and tints by band, fig14a merges water and waste-heat
@@ -1641,7 +1688,7 @@ _ELECTRICITY_LABEL = "Electricity"
 
 
 # Reconstruction: this figure (and fig6, originally numbered "fig99") originally existed only as a
-# raw SVG under data/outputs/euler_outputs/ and data/outputs/figures/SI_
+# raw SVG under data/outputs/euler_outputs/ and data/outputs/figures-report/SI_
 # results/, committed without a generating script anywhere in the repo or
 # any branch (verified via `git log --all --diff-filter=A` /
 # `git ls-tree -r <branch>` across every local+remote branch) — added
@@ -3130,6 +3177,16 @@ def fig30_matrix(no_flex_run: Run, no_flex_single_run: Run, full_run: Run,
                    shade_delta=True, legend=_shade_delta_legend(style), symmetric=True)
 
 
+def fig101_matrix_one_row(no_flex_run: Run, no_flex_single_run: Run, full_run: Run,
+                          single_temp_run: Run) -> None:
+    """Presentation: fig30a's four matrices in one row (same runs, data and style)."""
+    style = _matrix_style()
+    cells = {(0, 0): full_run, (0, 1): no_flex_run,
+             (1, 0): single_temp_run, (1, 1): no_flex_single_run}
+    _matrix_figure(cells, "fig101_matrix_one_row", panel_fn=_fig300_sized_panel, baseline_delta=style,
+                   shade_delta=True, legend=_shade_delta_legend(style), symmetric=True, one_row=True)
+
+
 def fig310_matrix_temperature_levels(no_flex_run: Run, no_flex_single_run: Run, full_run: Run,
                                       single_temp_run: Run) -> None:
     """fig30's matrices with the relative change encoded as box size too: the
@@ -3191,23 +3248,31 @@ def fig311_matrix_time_steps(no_flex_run: Run, no_flex_20ts_run: Run, full_run: 
 
 def _matrix_figure(cells: dict[tuple[int, int], Run], fig_name: str,
                    panel_fn=_fig30_matrix_panel, legend: list | None = None,
-                   symmetric: bool = False, subdir: str | None = None, **panel_kw) -> None:
+                   symmetric: bool = False, subdir: str | None = None, one_row: bool = False,
+                   **panel_kw) -> None:
     """fig30's body for any 2x2 `cells` (row, col) -> run, (0, 0) the
     baseline; `panel_kw` goes to every `panel_fn`. `legend` handles go below
     the panels, centred on them; `symmetric` drops the column labels from the
     bottom row of panels, moves that row's titles down into their place and
-    spaces the panels tightly and equally in both directions."""
+    spaces the panels tightly and equally in both directions; `one_row` (with
+    `symmetric`, fig101) puts the four panels side by side instead of 2x2."""
     metrics = {rc: _fig43_metrics(r) for rc, r in cells.items()}
     vals = {k: {rc: m[k] for rc, m in metrics.items()} for k in FIG30_PANELS}
 
     # 2x2 grid of panels: cost | HP share over VRE | curtailment.
-    fig, axes = plt.subplots(2, 2, figsize=(REPORT_WIDTH, REPORT_WIDTH) if symmetric else (15, 14))
+    if one_row:
+        fig, axes = plt.subplots(1, 4, figsize=(4 * 2.45, 2.45))
+    else:
+        fig, axes = plt.subplots(2, 2, figsize=(REPORT_WIDTH, REPORT_WIDTH) if symmetric else (15, 14))
+    lower = (lambda i: not one_row and i >= 2)  # panel below another one
     panels = [(vals[k], *FIG30_PANELS[k]) for k in FIG30_PANELS]
-    cbars = [panel_fn(fig, ax, vals, title, unit, cbar_label, row_labels=(i % 2 == 0),
-                      **({"col_names": ()} if symmetric and i >= 2 else {}),
+    cbars = [panel_fn(fig, ax, vals, title, unit, cbar_label, row_labels=(i == 0 if one_row else i % 2 == 0),
+                      **({"col_names": ()} if symmetric and lower(i) else {}),
                       **kw, **panel_kw)
              for i, (ax, (vals, title, unit, cbar_label, kw)) in enumerate(zip(axes.flat, panels))]
-    if symmetric:
+    if one_row:
+        fig.subplots_adjust(left=0, right=1, bottom=0, top=1, wspace=0)
+    elif symmetric:
         fig.subplots_adjust(left=0.115, right=0.885, bottom=0.115, top=0.885, hspace=-0.02, wspace=-0.02)
     else:
         fig.subplots_adjust(hspace=0.1, wspace=0.12)
@@ -3224,15 +3289,15 @@ def _matrix_figure(cells: dict[tuple[int, int], Run], fig_name: str,
         left = ax.transData.transform((0, 0))[0] if cbar else extent.x0
         right = cbar.ax.get_tightbbox(renderer).x1 if cbar else extent.x1
         top = ax.get_window_extent(renderer).y1
-        if symmetric and i >= 2:  # where the column labels would be (0.2 margin, 0.06 offset)
+        if symmetric and lower(i):  # where the column labels would be (0.2 margin, 0.06 offset)
             top = ax.transData.transform((0, ax.get_ylim()[1] - 0.2 + 0.06))[1]
         x, y = to_fig.transform(((left + right) / 2, top))
         fig.text(x, y + 0.003, f"({'abcd'[i]}) {title}" if symmetric else title, ha="center", va="bottom",
                  fontsize=9.5 if symmetric else 12.5, fontweight="bold")
-    bottom = to_fig.transform((0, axes[1, 0].get_window_extent(renderer).y0))[1]
+    bottom = to_fig.transform((0, axes.flat[-1].get_window_extent(renderer).y0))[1]
     if legend:
-        x_mid = to_fig.transform(((axes[1, 0].get_window_extent(renderer).x0
-                                   + axes[1, 1].get_window_extent(renderer).x1) / 2, 0))[0]
+        x_mid = to_fig.transform(((axes.flat[0].get_window_extent(renderer).x0
+                                   + axes.flat[-1].get_window_extent(renderer).x1) / 2, 0))[0]
         fig.legend(handles=legend, loc="upper center", bbox_to_anchor=(x_mid, bottom), ncol=2,
                    frameon=False, fontsize=8 if symmetric else 12.5)
     elif FIG30_SHOW_ARROWS:
@@ -3683,7 +3748,7 @@ def _cost_and_emissions_totals(runs: list[Run], base_for: dict[str, str], delta_
 # ZEN-creator's input_data) that motivate/contextualize ZEN-Europe's
 # sectoral scope, per user request — generated unconditionally in main().
 
-INDUSTRY_SECTOR_EMISSIONS_JSON = FIGURES_DIR / "industry_sector_emissions_input.json"
+INDUSTRY_SECTOR_EMISSIONS_JSON = REPORT_FIGURES_ROOT / "SI_results" / "industry_sector_emissions_input.json"
 # Sibling-repo convention: a plain CSV, so no openpyxl/env-split bridge is
 # needed unlike fig8's JSON.
 MODEL_SCOPE_CSV = REPO_ROOT.parent / "ZEN-creator" / "input_data" / "Emissionbudget" / "sector_emissions_2022.csv"
@@ -4618,7 +4683,7 @@ def fig11_mga_method() -> None:
 # Purely illustrative, like fig11/fig12 — no solved points. Left: the real
 # north/west/south/east geography (drawn the same way
 # plot_country_groups_map.py / fig_country_groups_map.svg in
-# data/outputs/figures/mga/ does — same Natural Earth polygons, same region
+# data/outputs/figures-report/mga/ does — same Natural Earth polygons, same region
 # split, same colors). Right: the axis matrix — one column per region, one
 # row per metric (investment cost, mobility electrification, heating
 # electrification, cumulative emissions), stacked three deep for the
@@ -5245,12 +5310,67 @@ def main(report_only: bool = False) -> None:
         run_if([], fn)
     print(f"Done. Figures in {FIGURES_DIR.relative_to(REPO_ROOT)}/")
 
+# One figure at a time, loading only the runs it needs (low RAM use):
+# figure name -> (run labels, function taking those runs in that order).
+def _as_list(fn, *args):
+    return lambda *runs: fn(list(runs), *args)
+
+
+_LABEL_TO_FOLDER = {label: folder for folder, label in [
+    *SCENARIOS, BASE_SCENARIO, NO_FLEX_SINGLE_TEMP_SCENARIO, SINGLE_TEMP_DIFF_CORRECT_SCENARIO,
+    NO_FLEX_SINGLE_TEMP_DIFF_CORRECT_SCENARIO, FULL_FLEX_20TS_SCENARIO, NO_FLEX_20TS_SCENARIO]}
+
+SINGLE_FIGURES = {
+    "fig2_industry_energy_input_by_carrier": ([NO_FLEX], _as_list(fig4b_industry_fuel_demand_comparison)),
+    "fig15a_heat_supply_no_flex": (
+        [NO_FLEX], _as_list(fig15_heat_supply_output_twh_for, NO_FLEX, "fig15a_heat_supply_no_flex")),
+    "fig15b_heat_supply_zen_europe": (
+        [FULL], _as_list(fig15_heat_supply_output_twh_for, FULL, "fig15b_heat_supply_zen_europe")),
+    "fig2_emissions_by_source_and_carbon_budget": (
+        [BASE_SCENARIO[1], NO_FLEX], fig0b_emissions_source_comparison),
+    "fig12_capacity_and_storage_legacy_vs_no_flex": (
+        [BASE_SCENARIO[1], NO_FLEX], fig12_capacity_and_storage_legacy_vs_no_flex),
+    "fig20_cost_breakdown_sector_industry_heating": (
+        [BASE_SCENARIO[1], NO_FLEX], fig20_cost_breakdown_sector_industry_heating),
+    "fig5b_dsm_discharge_by_product": ([FULL, NO_TES_DSM_PESS], _as_list(fig5b_dsm_discharge_by_product)),
+    "fig30_matrix": ([NO_FLEX, NO_FLEX_SINGLE_TEMP_SCENARIO[1], FULL, SINGLE_TEMP], fig30_matrix),
+    "fig30a_matrix": (
+        [NO_FLEX, NO_FLEX_SINGLE_TEMP_DIFF_CORRECT_SCENARIO[1], FULL, SINGLE_TEMP_DIFF_CORRECT_SCENARIO[1]],
+        lambda *runs: fig30_matrix(*runs, "fig30a_matrix")),
+    "fig101_matrix_one_row": (
+        [NO_FLEX, NO_FLEX_SINGLE_TEMP_DIFF_CORRECT_SCENARIO[1], FULL, SINGLE_TEMP_DIFF_CORRECT_SCENARIO[1]],
+        fig101_matrix_one_row),
+    "fig102_heat_supply_aggregated": ([NO_FLEX, FULL], fig102_heat_supply_aggregated),
+    "fig31_matrix_tsa": (
+        [NO_FLEX, NO_FLEX_20TS_SCENARIO[1], FULL, FULL_FLEX_20TS_SCENARIO[1]], fig31_matrix_tsa),
+    "fig43_flexibility_scenarios_table": (
+        [NO_FLEX, FULL, NO_TES_DSM_PESS, NO_TES, NO_DSM], _as_list(fig43_flexibility_scenarios_table)),
+}
+
+
+def make_single_figure(name: str) -> None:
+    if name in PRESI_FIGURES and FONT_MODE != "presentation":
+        sys.exit(f"{name} is a presentation figure: run with FIGURE_MODE=presentation")
+    labels, fn = SINGLE_FIGURES[name]
+    palette = {label: SCENARIO_PALETTE[i] for i, (_, label) in enumerate(SCENARIOS)}
+    palette[BASE_SCENARIO[1]] = SCENARIO_PALETTE[6]
+    runs = []
+    for label in labels:
+        folder = _LABEL_TO_FOLDER[label]
+        runs.append(Run(name=folder, label=label, mode="euler", results=load_results(RUNS_ROOT, folder),
+                        color=palette.get(label, SCENARIO_PALETTE[1])))
+    snap_snapshot_years(runs)
+    fn(*runs)
+
+
 if __name__ == "__main__":
     import sys
     args = sys.argv[1:]
     if args == ["report"]:
         main(report_only=True)
+    elif len(args) == 1 and args[0] in SINGLE_FIGURES:
+        make_single_figure(args[0])
     elif not args:
         main()
     else:
-        sys.exit("usage: generate_si_figures.py [report]")
+        sys.exit("usage: generate_si_figures.py [report | <figure>], figures: " + ", ".join(SINGLE_FIGURES))

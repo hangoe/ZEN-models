@@ -26,6 +26,7 @@ from zen_garden import Results
 
 from plots.figure_settings import (
     add_price_line,
+    FIGURES_ROOT,
     apply_font_mode,
     load_results as _load_results,
     plot_stacked_bars_years,
@@ -37,7 +38,7 @@ from plots.figure_settings import (
 apply_font_mode()
 
 OUTPUT_DIR = Path(__file__).parent.parent / "data" / "outputs"
-FIGURES_DIR = OUTPUT_DIR / "figures"
+FIGURES_DIR = FIGURES_ROOT
 DEFAULT_MODEL = "Crystal_Ball_HG_v4_6_2025_6a_5a_interval_10ts/Crystal_Ball_HG_v4_6"
 
 INDUSTRY_HEAT_CARRIERS_ENERGY = [

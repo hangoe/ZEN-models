@@ -21,7 +21,7 @@ import geopandas as gpd
 import matplotlib.pyplot as plt
 import pandas as pd
 
-from plots.figure_settings import apply_font_mode
+from plots.figure_settings import FIGURES_ROOT, apply_font_mode
 from plots.mga_capex_periods_common import REGION_COLOR
 from plots.natural_earth import EUROPE_EXTENT, ISO_A2_EH_OVERRIDES, ensure_naturalearth_data
 
@@ -32,7 +32,7 @@ apply_font_mode()
 NODES_CSV = (REPO_ROOT / "data" / "outputs" / "zen-europe-old"
              / "zen_europe_ind_heat_v1_no_flexibility_nodiffusion_export0"
              / "energy_system" / "set_nodes.csv")
-FIGURES_DIR = REPO_ROOT / "data" / "outputs" / "figures" / "mga"
+FIGURES_DIR = FIGURES_ROOT / "mga"
 
 # Same split as config_mga_axes_total_output_2reg.yaml.
 NODE_GROUPS = {
