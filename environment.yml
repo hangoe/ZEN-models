@@ -1,0 +1,20 @@
+# Environment for the figures (make_figures.py), the runs (run_model.py) and the dashboard.
+# ZEN-garden, ZEN-garden-plugins and near_optimal_tools are installed from source (versions
+# used for the thesis in README.md):
+#   conda env create -f environment.yml && conda activate zen-models
+#   pip install -e ../ZEN-garden -e ../ZEN-garden-plugins -e "../near_optimal_tools[bbo]"
+name: zen-models
+channels:
+  - conda-forge
+dependencies:
+  - python=3.13
+  - numpy=2.4
+  - pandas=3.0
+  - matplotlib=3.11
+  - scipy=1.18
+  - xarray=2026.7
+  - pyyaml=6.0
+  - pip
+  - pip:
+      - streamlit>=1.35   # dashboard only
+      - ruff              # linting

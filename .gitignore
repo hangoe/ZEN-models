@@ -1,21 +1,19 @@
+# Editors, environments, caches
 /.idea
 /.vscode
-*.lp
-data/outputs/**/*.h5
-/data/naturalearth/
 /.venv/
+__pycache__/
+*.pyc
+.ruff_cache/
+.DS_Store
+
+# ZEN-garden result files too large for git (NetCDF, HDF5); shared separately (README.md)
+*.nc
+data/results/**/*.h5
+*.lock
+*.lp
+
+# Local run staging (run_model.py --run_on local) and SLURM logs
+/_runs/
 zen_run_*.out
 zen_run_*.err
-*.pyc
-.DS_Store
-# solver duals: large (up to >100 MB, GitHub's hard limit) and not needed for figures
-data/outputs/euler_outputs/**/duals.nc
-
-# local run staging (run_model.py --run_on local)
-_runs/
-
-# NetCDF model outputs (too large for GitHub)
-*.nc
-
-# ZEN-garden result file locks
-*.lock

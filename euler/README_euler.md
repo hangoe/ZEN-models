@@ -68,36 +68,30 @@ module spider python   # available versions
 
 | File | Role |
 |---|---|
-| `run_model.py` | Runs **one row** of a sweep CSV (`--task_id`; CSV chosen by `--params`, default `parameters.csv`). Stages a private copy of the dataset, applies the row's `system` overrides to the copy, and runs ZEN-garden. Any override a row doesn't set falls back to `DEFAULT_SYSTEM_OVERRIDES`. For MGA configs it replaces `plugins.mga.axes` with the row's `axes_config` file (rows without one keep the config's own axes). |
-| `parameters.csv` | Normal sweep table, one row per run. Columns: `my_dataset`, `my_comment`, one column per `system` override, plus optional meta columns (e.g. `numeric_focus`). Runs `data/config.yaml`. |
-| `submit_euler.sh` | SLURM array job for `parameters.csv`. |
-| `parameters_mga.csv` | MGA sweep table. It adds the `config`, `normalisation`, `batch_size`, `n_workers`, `tolerance_explore` and `axes_config` columns. |
-| `submit_euler_mga.sh` | SLURM array job for `parameters_mga.csv`. Its header comment lists the per-range resource profiles. |
-| `euler/MGA_RUN_HISTORY.md` | History of the MGA rows, their resource profiles and the sweep driver. |
-| `setup_euler_env.sh` | One-time environment build (venv + `zen_garden`, plus the MGA plugin and `pyoNearOpt`). |
+| `run_model.py` | Runs **one row** of a run table (`--task_id`; table chosen by `--params`, default `runs/parameters.csv`). Stages a private copy of the dataset, applies the row's `system` overrides to the copy, and runs ZEN-garden. Any override a row doesn't set falls back to `DEFAULT_SYSTEM_OVERRIDES`. For MGA configs it replaces `plugins.mga.axes` with the row's `axes_config` file. |
+| `runs/parameters.csv` | Single runs, one row per run. Columns: `my_dataset`, `my_comment`, one column per `system` override, plus optional meta columns (e.g. `numeric_focus`). Runs `configs/config.yaml`. |
+| `euler/submit_euler.sh` | SLURM array job for `runs/parameters.csv`. |
+| `runs/parameters_mga.csv` | MGA runs. Adds the `config`, `normalisation`, `batch_size`, `n_workers`, `tolerance_explore`, `axes_config`, ... columns. |
+| `euler/submit_euler_mga.sh` | SLURM array job for `runs/parameters_mga.csv`. Its header lists the resource profiles of the thesis runs. |
+| `euler/MGA_RUN_HISTORY.md` | History of the MGA runs and their resource profiles. |
+| `euler/setup_euler_env.sh` | One-time environment build (venv + `zen_garden`, plus the MGA plugin and `pyoNearOpt`). |
 
 ```
 /cluster/home/<user>/
-├── ZEN-models/
-│   ├── run_model.py, parameters*.csv, submit_euler*.sh, setup_euler_env.sh
-│   └── data/
-│       ├── config*.yaml
-│       └── outputs/              <- local-run outputs (Euler outputs go to scratch)
-└── ZEN-creator/
-    └── outputs/
-        └── zen_europe_ind_heat_v1_no_flexibility/   <- input dataset
+└── ZEN-models/
+    ├── run_model.py, runs/, configs/, euler/
+    └── data/
+        ├── datasets/             <- input datasets (looked up by my_dataset)
+        └── results/single/       <- local-run outputs (Euler outputs go to scratch)
 ```
-
-Both repos must be in Home, because `run_model.py` looks datasets up in
-`../ZEN-creator/outputs/<my_dataset>` (falling back to `data/`).
 
 ## 4. How a sweep works
 
 ```
-parameters.csv        submit_euler.sh                 compute nodes
- task_id 47 ─┐     sbatch --array=47-49 ─┐       ┌─ run_model.py --task_id 47
- task_id 48 ─┼──────► (SLURM array)      ├──────►├─ run_model.py --task_id 48
- task_id 49 ─┘                           ┘       └─ run_model.py --task_id 49
+runs/parameters.csv   euler/submit_euler.sh           compute nodes
+ task_id 0  ─┐     sbatch --array=0-2   ─┐       ┌─ run_model.py --task_id 47
+ task_id 1  ─┼──────► (SLURM array)      ├──────►├─ run_model.py --task_id 48
+ task_id 2  ─┘                           ┘       └─ run_model.py --task_id 49
 ```
 
 `SLURM_ARRAY_TASK_ID` → `--task_id` → the matching row. Per task, `run_model.py`:
@@ -107,7 +101,7 @@ parameters.csv        submit_euler.sh                 compute nodes
 3. applies the row's overrides to the copy's `system.json`/`system.yaml`,
 4. runs ZEN-garden, writing to `$SCRATCH/zen_runs/outputs/<my_dataset>_<my_comment>`.
 
-With `--run_on local`, outputs go to `data/outputs/zen-europe-outputs-new/` instead.
+With `--run_on local`, outputs go to `data/results/single/` instead.
 
 ### Row columns (`run_model.py`)
 
@@ -117,28 +111,27 @@ keeps the dataset's value; a system key without a column falls back to
 
 | Column | Effect |
 |---|---|
-| `my_dataset`, `my_comment` | Dataset name (looked up in `DATASET_SEARCH_DIRS`) and run name; output folder `<my_dataset>_<my_comment>`. |
-| `config` | Config file (`config_mga_*` from `data/config_euler/`, others from `data/`); default `config.yaml`. |
-| `axes_config` | Axes file in `data/config_euler/` that replaces `plugins.mga.axes`. |
+| `my_dataset`, `my_comment` | Dataset name (looked up in `data/datasets/`) and run name; output folder `<my_dataset>_<my_comment>`. |
+| `config` | Config file (`config_mga_*` from `configs/mga/`, others from `configs/`); default `config.yaml`. |
+| `axes_config` | Axes file in `configs/mga/` that replaces `plugins.mga.axes`. |
 | `normalisation`, `epsilon` | Override `plugins.mga.normalisation` / `epsilon`. |
 | `batch_size`, `n_workers`, `tolerance_explore`, `seed_rng`, `max_iterations` | Override the keys of `plugins.mga.batch`. Without `seed_rng`, batch mode is not reproducible between runs. |
 | `solver_threads`, `numeric_focus`, `solver_options` | Override Gurobi `Threads`, `NumericFocus`, or any `Key=value;Key=value` options. |
-| `cost_noise` (+ `noise_seed`), `flex_cost_fix` | Solver-degeneracy tests on the TES/DSM technologies (see `scripts/solver_tests/NOTES.md`). |
 
 ## 5. Run order
 
 ```bash
 # ONE-TIME
 cd /cluster/home/<user>/ZEN-models
-bash setup_euler_env.sh           # build venv; never create a venv inside the job
+bash euler/setup_euler_env.sh     # build venv; never create a venv inside the job
 source .venv/bin/activate
 python -c "from zen_garden import run, Results; print('imports OK')"
 
 # CALIBRATE, then SWEEP
-sbatch --array=49 submit_euler.sh       # one small row first, generous resources
+sbatch --array=1 euler/submit_euler.sh       # one small row first, generous resources
 myjobs -j <jobID>                       # read actual CPU/RAM/time
-# ...edit --time / --cpus-per-task / --mem-per-cpu in submit_euler.sh...
-sbatch --array=47,48 submit_euler.sh    # the rest (must match task_ids in the CSV)
+# ...edit --time / --cpus-per-task / --mem-per-cpu in euler/submit_euler.sh...
+sbatch --array=0,2 euler/submit_euler.sh    # the rest (must match task_ids in the CSV)
 
 # MONITOR
 squeue                                  # PD = pending, R = running
@@ -169,13 +162,13 @@ What each setting controls:
 
 ## 7. MGA sweeps
 
-The normal sweep doesn't need the MGA plugin. For `parameters_mga.csv` /
-`submit_euler_mga.sh`, run this once:
+The normal sweep doesn't need the MGA plugin. For `runs/parameters_mga.csv` /
+`euler/submit_euler_mga.sh`, run this once:
 
 ```bash
 cd /cluster/home/<user>/ZEN-models
 git pull
-bash setup_euler_env.sh
+bash euler/setup_euler_env.sh
 # Output should end with:
 #   registered plugins: [..., 'mga', ...]
 #   pyoNearOpt OK
@@ -185,18 +178,18 @@ bash setup_euler_env.sh
 #   git -C $HOME/ZEN-garden-plugins pull
 
 source .venv/bin/activate
-python run_model.py --task_id 0 --run_on local --params parameters_mga.csv   # smoke test
+python run_model.py --task_id 56 --run_on local --params runs/parameters_mga.csv   # smoke test
 ```
 
 Batch mode forks `batch_size` Gurobi workers, so size `cpus-per-task` as
 `batch_size × Threads-per-worker`. Submit each range with its own profile (see
-the header comment of `submit_euler_mga.sh`), for example:
+the header comment of `euler/submit_euler_mga.sh`), for example:
 
 ```bash
-sbatch --array=0-4 submit_euler_mga.sh   # standard profile (#SBATCH defaults)
+sbatch --array=56 --time=5-00:00:00 --cpus-per-task=32 --mem-per-cpu=6G euler/submit_euler_mga.sh
 ```
 
-Use `check_mga_convergence.sh` to follow a running MGA job.
+The log reports the convergence of a running MGA job (`CI: [...] | target: 0.95`).
 
 ## 8. Getting results back
 
@@ -205,7 +198,7 @@ promptly, because scratch is purged after ~2 weeks:
 
 ```bash
 # on the Mac
-scp -r euler:/cluster/scratch/hannegoericke/zen_runs/outputs/<run> ~/Downloads/
+scp -r euler:/cluster/scratch/<user>/zen_runs/outputs/<run> data/results/single/
 ```
 
 Alternatively, download from the VS Code Explorer.
@@ -215,7 +208,7 @@ Alternatively, download from the VS Code Explorer.
 ```bash
 ssh euler                     # login
 lquota                        # storage quotas
-sbatch --array=49 submit_euler.sh
+sbatch --array=1 euler/submit_euler.sh
 squeue
 myjobs -j <jobID>
 sacct -j <jobID> --format=JobID,Elapsed,TotalCPU,MaxRSS,ReqMem,State

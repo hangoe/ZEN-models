@@ -1,0 +1,16 @@
+# Tool configuration only; the repository is not an installable package.
+[tool.ruff]
+line-length = 120
+target-version = "py313"
+extend-exclude = ["streamlit"]  # dashboard: to be migrated to the new results separately
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP"]
+ignore = [
+    "E731",  # lambda assignment (registry entries)
+    "B023",  # loop variables in closures used immediately
+    "B905",  # zip() over sequences of equal length by construction
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["thesis_figures"]

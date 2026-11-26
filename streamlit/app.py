@@ -4,8 +4,8 @@ Run:  streamlit run streamlit/app.py   (from repo root)
   or  streamlit run app.py             (from streamlit/ directory)
 
 Two comparison modes, switchable in the sidebar:
-  • Euler — 5 scenarios  (default): all euler_outputs/ scenarios at once.
-  • Local — 2 runs: the original two-model local_outputs/ comparison.
+  • Euler — all runs of the first ZEN-Europe version (data/results/zen_europe_v1/).
+  • Local — two runs of data/results/single/ (the thesis runs).
 
 9 thematic tabs, each showing every selected run side by side (no per-run tabs):
   1. Heat Flows        — heat carrier production/consumption, boiler/HP output
@@ -27,13 +27,12 @@ import pandas as pd
 import streamlit as st
 from zen_garden import Results
 
-# All figure-generation logic (color/hatch maps, Results loading, plotting
-# primitives, and the figure functions themselves) lives in scripts/ so it's
-# shared with standalone scripts (e.g. generate_si_figures.py) instead of
-# being dashboard-only. This app is UI/orchestration only.
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
+# Figure logic lives in streamlit/dashboard/; this app is UI and orchestration only.
+# The repository root is on the path for thesis_figures (shared result loading).
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from plots.figures_by_run import (
+from dashboard.figures_by_run import (
     fig_boiler_hp_production,
     fig_capacity_heat_supply,
     fig_capacity_production,
@@ -50,7 +49,7 @@ from plots.figures_by_run import (
     fig_tes_capacity_addition,
     fig_tes_charge_discharge,
 )
-from plots.figures_by_scenario import (
+from dashboard.figures_by_scenario import (
     fig_carbon_costs_over_time,
     fig_carrier_costs_over_time,
     fig_costs_flexibility,
@@ -64,7 +63,7 @@ from plots.figures_by_scenario import (
     fig_natural_gas_balance,
     get_summary_metrics,
 )
-from plots.figure_settings import (
+from dashboard.settings import (
     EULER_ROOT,
     LOCAL_ROOT,
     Run,
@@ -137,7 +136,7 @@ with st.sidebar:
         st.header("Euler Scenarios")
         euler_available = sort_euler_scenarios(get_available_models(EULER_ROOT))
         if not euler_available:
-            st.error("No euler model outputs found under `data/outputs/euler_outputs/`.")
+            st.error("No euler model outputs found under `data/results/zen_europe_v1/`.")
             st.stop()
         runs = build_runs([("euler", name) for name in euler_available])
         if not runs:
@@ -160,8 +159,8 @@ with st.sidebar:
             available_sources = [s for s, lst in
                                   (("local", local_available), ("euler", euler_available)) if lst]
             if not available_sources:
-                st.error("No model outputs found under `data/outputs/local_outputs/` "
-                         "or `data/outputs/euler_outputs/`.")
+                st.error("No model outputs found under `data/results/single/` "
+                         "or `data/results/zen_europe_v1/`.")
                 return None
             idx = available_sources.index(default_source) if default_source in available_sources else 0
             source = st.radio(

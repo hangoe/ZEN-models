@@ -2,7 +2,9 @@
 
 Notes moved verbatim (2026-10-30) out of the comments of `submit_euler_mga.sh`
 and the docstring of `run_model.py`, so the scripts only describe what they do.
-The task_ids refer to `parameters_mga.csv` at the time of writing.
+The task_ids refer to `parameters_mga.csv` at the time of writing; paths are those of the
+repository layout at the time (`data/config_euler/` is now `configs/mga/`, run outputs are in
+`data/results/`). The runs of the thesis are listed in `runs/mga_runs.csv`.
 
 ## submit_euler_mga.sh: tasks and resource profiles
 
