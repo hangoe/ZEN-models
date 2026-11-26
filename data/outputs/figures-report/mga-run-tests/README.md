@@ -23,6 +23,40 @@ convergence and run time of the near-optimal runs. The text goes into the
 | elapsed job time | Real Euler wall-clock time from SLURM `sacct`. |
 | ZEN-Europe | The input model. Old paths still say `Crystal_Ball`; always write ZEN-Europe. |
 
+## Optimality tolerance of the thesis runs
+
+Two different tolerances are involved:
+
+**1. Cost slack ε (near-optimality tolerance).** Every near-optimal design must satisfy
+net present cost ≤ (1 + ε)·C*, where C* is the cost-optimal NPC of the same model
+(`zen_garden_plugins/mga/near_optimal_model.py`). C* is the objective of the
+cost-optimal solve in each run folder (`<run folder>/<dataset>/benchmarking.json`,
+in megaEuro).
+
+| Run | Time steps | ε | C* (NPC) | ε·C* (allowed extra cost) | Cost limit (1 + ε)·C* |
+|---|---|---|---|---|---|
+| T1 (task 54) | 5 ts | 1 % | 28 022 bn EUR | 280.2 bn EUR | 28 302 bn EUR |
+| T2 (task 56) | 1 ts | 1 % | 27 537 bn EUR | 275.4 bn EUR | 27 813 bn EUR |
+| T3 (task 57) | 1 ts | 1 % | 27 537 bn EUR | 275.4 bn EUR | 27 813 bn EUR |
+| T4 (task 67) | 1 ts | 0.2 % | 27 537 bn EUR (same model as T3; check once downloaded) | 55.1 bn EUR | 27 592 bn EUR |
+
+**2. Gurobi solver tolerance (LP accuracy).** The thesis runs use the barrier method
+without crossover (`Method 2`, `Crossover 0`; stored in `<run folder>/<dataset>/solver.json`)
+and set no tolerance, so Gurobi's defaults apply. The stopping criterion is
+`BarConvTol` = 1e-8, a relative primal-dual gap = 0.000001 % of the objective
+(`FeasibilityTol` = `OptimalityTol` = 1e-6).
+
+- For the cost-optimal solve the objective is C*, so 1e-8 · C* ≈ 0.00028 bn EUR
+  (≈ 0.28 million EUR) for T1 and ≈ 0.000275 bn EUR for T2–T4.
+- In the near-optimal solves the objective is the search direction, not cost. There
+  BarConvTol bounds the direction value, and the cost limit (1 + ε)·C* is a constraint
+  held to `FeasibilityTol` (on the scaled model). Both are negligible next to ε·C*.
+- NumericFocus does not change BarConvTol (T1: NumericFocus 2; T2–T4: default 0 =
+  automatic). It makes Gurobi compute more carefully, so barrier reaches the 1e-8
+  more reliably instead of stopping early with "sub-optimal termination" (numerical
+  trouble or `BarIterLimit` 3000). That happened in T1's first attempt (job
+  20739678_54), which is why T1 was rerun with NumericFocus 2.
+
 ## Run IDs: where the table with names and numbers is
 
 **`euler/mga_runs.csv`** is the master table. One row per near-optimal run, with:
