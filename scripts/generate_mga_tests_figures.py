@@ -11,8 +11,8 @@ plot_mga_regional_investment_whatif.py (fig20/21) and plot_mga_share_whatif.py
 They plot run 21 and write to mga_tests/archive/run21/.
 plot_mga_diffusion_whatif.py (fig51, fig52) and plot_mga_npc_vs_diffusion.py (fig60)
 are standalone too; they also plot run 57.
-plot_ts_resolution_benchmark.py (fig5) is not run here: it still plots the old
-runs.
+The old calibration runs (ts resolution, batch size, seed) are in plot_mga_run_tests.py
+(figures-*/mga-run-tests).
 
 Usage:
     python scripts/generate_mga_tests_figures.py

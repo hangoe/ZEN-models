@@ -4,34 +4,37 @@ al. (2022), Fig. 3B. No re-solving of ZEN-garden; the ranges come from the same 
 plot_mga_heat_mandate.py and plot_mga_cost_limit.py.
 
 One radar per scenario:
-  row 1  no limit, then heat / CCS / biomass at max (A)
-  row 2  key (spoke names and scale), then heat / CCS / biomass at min (B)
-  row 3  cost limited to 20 / 10 / 5 / 1% of the cost slack
-Seven spokes: heat, CCS and biomass in 2034 and 2050 (2050 in a lighter shade) and cost.
+  main figures (fig63 / fig64), 3 x 2   (a) no limit, (b) heat at max (A), (c) heat at min (B),
+                                        (d)-(f) cost limited to 10 / 5 / 1% of the cost slack; legend below
+  appendix figures (fig63a / fig64a),   (a) no limit + legend, (b) / (c) CCS at max / min,
+  2 x 3                                 (d) / (e) biomass at max / min
+Panel (a) carries the key (spoke names, min / max). Seven spokes: heat, CCS and biomass in 2034 and 2050 (2050 in a lighter shade) and cost.
 Radius: 0 (inner ring) = minimum and 1 (outer ring) = maximum of the unconstrained
 near-optimal range (outer approximation) of that spoke; cost from C* (0) to C* (1 + epsilon).
 Each spoke carries the two ranges as in fig61/62:
   wide light bar   outer approximation (cuts A z <= b)
   narrow dark bar  convex hull of the solved designs
-and a black tick at the cost-optimal design. The limited spokes carry one coloured arc at the
+The cost-optimal design is not drawn. The limited spokes carry one coloured arc at the
 limited end instead of the two bars: their range is the limit itself, the same for outer
 approximation and hull. The arc is at least LIMIT_ARC thick (the 1% limits are drawn thicker).
 
 fig63_limit_radar        run 54, the main run (as fig61 / fig61a / fig61b / fig62)
+fig63a_limit_radar_ccs_biomass
+                         appendix: the CCS and biomass limits of run 54
 fig64_run56_57_limit_radar
                          tolerance sensitivity: run 56 (tolerance 0.1) filled, run 57
                          (tolerance 0.01) as dashed outlines, both scaled to run 56's range
+fig64a_run56_57_limit_radar_ccs_biomass
+                         appendix: the CCS and biomass limits of the same comparison
 fig65_run56_57_limit_matrix
                          the same comparison as a matrix (scenario x spoke): shift of the
                          lower / upper end from run 56 to run 57 in % of run 56's unconstrained
                          range; fill = the range gets wider (green), narrower (red) or stays
-                         within +-0.5 (grey). Panel (a) outer approximation, (b) hull.
-fig103_limit_radar_selection
-                         presentation only (FIGURE_MODE=presentation): fig63 reduced to key, no limit,
-                         heat at max / min (row 1) and the cost limits (row 2), lettered (a)-(g)
+                         within +-0.5 (grey). Panel (a) outer approximation, (b) hull. All scenarios,
+                         including the 20% cost limit.
 
 Usage (zen-garden-plugins-env, PYTHONPATH=../ZEN-garden-plugins):
-    python scripts/plot_mga_limit_radar.py [63 64 65 ...]   (default: all)
+    python scripts/plot_mga_limit_radar.py [63 63a 64 64a 65]   (default: all)
 """
 
 import sys
@@ -39,17 +42,16 @@ import sys
 import matplotlib.pyplot as plt
 import numpy as np
 
-from matplotlib.lines import Line2D
 from matplotlib.patches import Patch, Rectangle
 
-from plots.figure_settings import FONT_MODE, REPORT_WIDTH, SCENARIO_PALETTE, apply_font_mode, eth_tint
+from plots.figure_settings import REPORT_WIDTH, SCENARIO_PALETTE, apply_font_mode, eth_tint
 
 apply_font_mode()
 
 import plot_mga_cost_limit as cost_limit
 import plot_mga_heat_mandate as heat_mandate
 from plot_mga_diffusion_whatif import (
-    AXIS_PREFIX, INK, MUTED, S, YEARS, extra_cost_bn, load_polytope, report_style, to_display,
+    INK, MUTED, S, YEARS, extra_cost_bn, load_polytope, report_style,
 )
 from plots.mga_capex_periods_common import (
     MGA_ROOT, MODEL, RUN54_SUFFIX, RUN56_SUFFIX, RUN57_SUFFIX, savefig,
@@ -75,16 +77,14 @@ LIMIT_ARC = 0.03  # minimum thickness of the limit arc, in units of the scaled r
 MIN_BAR = 0.03  # minimum radial bar length, in units of the scaled range
 OVERLAY_LW = 0.7  # dashed outlines of the comparison run
 
-# Scenarios in grid order: "free", (limited axis, "A"/"B"), ("cost", key of cost_limit.SCENARIO_DEF).
+# Scenarios: "free", (limited axis, "A"/"B"), ("cost", key of cost_limit.SCENARIO_DEF).
 LIMIT_KEYS = [(m, k) for k in ("A", "B") for m in METRICS]
 COST_KEYS = [("cost", k) for k in cost_limit.SCENARIO_DEF if k != "free"]
-SCENARIOS = ["free", *LIMIT_KEYS, *COST_KEYS]
-GRID_POS = {"free": (0, 0)} | {key: (0 if key[1] == "A" else 1, 1 + METRICS.index(key[0])) for key in LIMIT_KEYS} \
-    | {key: (2, i) for i, key in enumerate(COST_KEYS)}
-KEY_POS = (1, 0)
-# fig103: key | no limit, heat at max, heat at min; then the cost limits.
-PRESI_SCENARIOS = ["free", ("heat", "A"), ("heat", "B"), *COST_KEYS]
-PRESI_GRID_POS = {s: (i // 4, i % 4) for i, s in enumerate(PRESI_SCENARIOS, start=1)}
+SCENARIOS = ["free", *LIMIT_KEYS, *COST_KEYS]  # all solved; fig65 shows all of them
+# Radar figures, in panel order (three per row).
+# Radar figures: rows of panels ("legend" = the legend in that cell; no "legend" = legend below the grid).
+MAIN_LAYOUT = [["free", ("heat", "A"), ("heat", "B")], [("cost", k) for k in ("10", "5", "1")]]
+APPENDIX_LAYOUT = [["free", "legend"], [("ccs", "A"), ("ccs", "B")], [("biomass", "A"), ("biomass", "B")]]
 
 
 def spoke_color(spoke) -> str:
@@ -110,10 +110,6 @@ class Run:
                 p, idx, limited, heat_mandate.SCENARIO_DEF[key][0])
         for _, key in COST_KEYS:
             self.results["cost", key] = cost_limit.scenario_ranges(p, idx, cost_limit.SCENARIO_DEF[key][0])
-
-    def baseline(self, spoke) -> float:
-        metric, year = spoke
-        return to_display(metric, self.poly.z_star_phys[self.idx[f"{AXIS_PREFIX[metric]}_{year}"]])
 
 
 class Scale:
@@ -148,10 +144,11 @@ def style_radar(ax, labels: bool = False) -> None:
     ax.tick_params(pad=1)
 
 
-def radar_title(ax, title: str, subtitle: str = "") -> None:
-    ax.set_title(title, fontsize=S["title"] - 1, fontweight="bold", color=INK, pad=13 if subtitle else 6)
+def radar_title(ax, title: str, subtitle: str = "", lift: float = 0) -> None:
+    """lift: extra space (points) above the radar, e.g. for the spoke labels of the key panel."""
+    ax.set_title(title, fontsize=S["title"] - 1, fontweight="bold", color=INK, pad=(13 if subtitle else 6) + lift)
     if subtitle:
-        ax.annotate(subtitle, (0.5, 1.0), xycoords="axes fraction", xytext=(0, 4), textcoords="offset points",
+        ax.annotate(subtitle, (0.5, 1.0), xycoords="axes fraction", xytext=(0, 4 + lift), textcoords="offset points",
                     ha="center", va="bottom", fontsize=S["value"], color=MUTED)
 
 
@@ -162,11 +159,6 @@ def _radial_span(scale, spoke, span) -> tuple[float, float]:
     return min(lo, 1 - height), height
 
 
-def _baseline_arc(ax, theta, r, **kwargs) -> None:
-    arc = np.linspace(theta - 0.3 * STEP, theta + 0.3 * STEP, 20)
-    ax.plot(arc, np.full_like(arc, r), clip_on=False, **kwargs)  # full thickness at the outer ring
-
-
 def draw_limit_arc(ax, scenario, scale: Scale, result) -> None:
     """One coloured arc across the limited spokes, at the limited end (max: outer ring, else inner ring)."""
     limited = limited_spokes(scenario)
@@ -174,7 +166,7 @@ def draw_limit_arc(ax, scenario, scale: Scale, result) -> None:
     lo, hi = (scale(limited[0], v) for v in result[limited[0]])
     height = max(hi - lo, LIMIT_ARC)
     ax.bar(np.mean(thetas), height, bottom=min(lo, 1 - height), width=STEP * (len(thetas) - 1) + 0.8 * STEP,
-           color=spoke_color(limited[0]), linewidth=0, zorder=4)  # below the cost-optimal ticks
+           color=spoke_color(limited[0]), linewidth=0, zorder=4)
 
 
 def draw_radar(ax, run: Run, scenario, scale: Scale) -> None:
@@ -193,8 +185,6 @@ def draw_radar(ax, run: Run, scenario, scale: Scale) -> None:
             if result is not None and spoke not in limited:
                 bottom, height = _radial_span(scale, spoke, result[spoke])
                 ax.bar(theta, height, bottom=bottom, width=width, color=color, alpha=alpha, linewidth=0, zorder=z)
-        if spoke != "cost":
-            _baseline_arc(ax, theta, scale(spoke, run.baseline(spoke)), color="black", linewidth=0.9, zorder=5)
     if inner is None:  # the outer approximation allows the limit, but no solved design meets it
         ax.text(0, -R_ORIGIN, "no\nhull", ha="center", va="center", fontsize=S["value"] - 1.5, color=MUTED,
                 zorder=7)
@@ -214,9 +204,6 @@ def draw_overlay(ax, run: Run, scenario, scale: Scale) -> None:
                 bottom, height = _radial_span(scale, spoke, result[spoke])
                 ax.bar(theta, height, bottom=bottom, width=width, fill=False, edgecolor=INK, linewidth=OVERLAY_LW,
                        linestyle=(0, (2.5, 1.5)), zorder=6)
-        if spoke != "cost":
-            _baseline_arc(ax, theta, scale(spoke, run.baseline(spoke)), color="black", linewidth=0.9,
-                          linestyle=(0, (2, 1.2)), zorder=6)
 
 
 def limit_subtitle(run: Run, limited: str, band) -> str:
@@ -247,77 +234,93 @@ def limited_spokes(scenario) -> list:
     return ["cost"] if scenario[0] == "cost" else [(scenario[0], y) for y in YEARS]
 
 
-def draw_key(ax) -> None:
-    """Empty radar with the spoke names and the radial scale."""
-    style_radar(ax, labels=True)
-    for spoke in SPOKES:
-        ax.plot([THETA[spoke]] * 2, [0, 1], color=spoke_color(spoke), linewidth=2.2, alpha=0.8, zorder=3)
-    ax.tick_params(axis="x", labelsize=S["value"] - 0.5, colors=INK, pad=4)
+KEY_LIFT = 15  # points: room for the "Heat 2034" spoke label above panel (a)
+
+
+def add_key(ax) -> None:
+    """Spoke names and the radial scale (min / max) on a radar (panel (a))."""
+    ax.set_xticklabels([SPOKE_LABEL[s] for s in SPOKES])
+    ax.tick_params(axis="x", labelsize=S["value"] - 1, pad=3)
     for label, spoke in zip(ax.get_xticklabels(), SPOKES):
         label.set_color(INK if spoke == "cost" else heat_mandate.PANEL_COLOR[spoke[0]])
+        label.set_linespacing(0.95)
     theta = THETA["cost"] + STEP / 2
     for r, text in ((0, "min"), (1, "max")):
-        ax.text(theta, r, text, ha="center", va="center", fontsize=S["value"] - 1.5, color=MUTED, zorder=6,
-                bbox=dict(facecolor="white", edgecolor="none", pad=0.3))
-    radar_title(ax, "Key")
+        ax.text(theta, r, text, ha="center", va="center", fontsize=S["value"] - 2, color=MUTED, zorder=7,
+                bbox=dict(facecolor="white", edgecolor="none", pad=0.2))
 
 
-def radar_grid(name: str, main_runs: dict, extra_handles: list, note: str = "", overlay: Run | None = None,
-               overlay_scale: Scale | None = None, grid_pos: dict | None = None, key_pos: tuple = KEY_POS,
-               height: float = 6.4, hspace: float = 0.55) -> None:
-    """main_runs = {scenario: (Run, Scale)}; overlay drawn dashed on top, if given."""
+def legend_handles(extra_handles: list) -> list:
+    return [
+        Patch(facecolor=GREY, alpha=OUTER_ALPHA, label="Outer approximation\n(wide light bar)"),
+        Patch(facecolor=GREY, label="Hull of solved designs\n(narrow dark bar)"),
+        Patch(facecolor=INK, label="Imposed limit\n(coloured arc)"),
+        *extra_handles,
+    ]
+
+
+def radar_grid(name: str, layout: list, run: Run, scale: Scale, extra_handles: list = (),
+               overlay: Run | None = None, overlay_scale: Scale | None = None) -> None:
+    """Radars in the rows of `layout`, lettered row by row; overlay drawn dashed on top, if given."""
+    n_rows, n_cols = len(layout), max(len(row) for row in layout)
+    legend_in_cell = any("legend" in row for row in layout)
+    handles = legend_handles(list(extra_handles))
+    side = 0.08 if n_cols == 3 else 0.18  # horizontal margin; 2 columns: radars slightly larger than with 3
+    cell = 1.95
+    legend_h = 0 if legend_in_cell else 0.1 + 0.33 * -(-len(handles) // n_cols)
+    height = n_rows * cell + legend_h + 0.25
     with report_style():
-        grid_pos = grid_pos or GRID_POS
-        n_rows = 1 + max(row for row, _ in grid_pos.values())
-        fig, axes = plt.subplots(n_rows, 4, figsize=(REPORT_WIDTH, height), subplot_kw={"projection": "polar"})
-        fig.subplots_adjust(left=0.03, right=0.97, top=1 - 0.448 / height, bottom=1.0 / height, wspace=0.35, hspace=hspace)
-        for letter, scenario in zip("abcdefghijk", main_runs):
-            run, scale = main_runs[scenario]
-            ax = axes[grid_pos[scenario]]
-            draw_radar(ax, run, scenario, scale)
-            if overlay is not None:
-                draw_overlay(ax, overlay, scenario, overlay_scale)
-            radar_title(ax, *scenario_title(scenario, run, letter))
-        draw_key(axes[key_pos])
-        handles = [
-            Patch(facecolor=GREY, alpha=OUTER_ALPHA, label="Wide light bar: outer approximation"),
-            Patch(facecolor=GREY, label="Narrow dark bar: hull of solved designs"),
-            Line2D([0], [0], color="black", linewidth=0.9, label="Cost-optimal design"),
-            Patch(facecolor=INK, label="Coloured arc: imposed limit"),
-            *extra_handles,
-        ]
-        fig.legend(handles=handles, loc="lower center", ncol=2, fontsize=S["legend"], frameon=False,
-                   bbox_to_anchor=(0.5, 0.25 / height), handlelength=1.4, handletextpad=0.5, columnspacing=2.0)
-        if note:
-            fig.text(0.5, 0.0, note, ha="center", va="bottom", fontsize=S["legend"] - 1, color=MUTED)
+        fig, axes = plt.subplots(n_rows, n_cols, figsize=(REPORT_WIDTH, height), subplot_kw={"projection": "polar"},
+                                 squeeze=False)
+        fig.subplots_adjust(left=side, right=1 - side, top=1 - 0.75 / height,
+                            bottom=(legend_h + (0.3 if legend_in_cell else 0.2)) / height, wspace=0.6 if n_cols == 3 else 0.45, hspace=0.45)
+        legend_kw = dict(handles=handles, fontsize=S["legend"] - 0.5, frameon=False,
+                         handlelength=1.3, handletextpad=0.5, labelspacing=0.7)
+        letters = iter("abcdefghijk")
+        for i, row in enumerate(layout):
+            for j in range(n_cols):
+                ax = axes[i, j]
+                scenario = row[j] if j < len(row) else None
+                if scenario is None or scenario == "legend":
+                    ax.set_visible(False)
+                    if scenario == "legend":
+                        pos = ax.get_position()
+                        fig.legend(loc="center", bbox_to_anchor=(pos.x0 + pos.width / 2, pos.y0 + pos.height / 2),
+                                   ncol=1, **legend_kw)
+                    continue
+                draw_radar(ax, run, scenario, scale)
+                if overlay is not None:
+                    draw_overlay(ax, overlay, scenario, overlay_scale)
+                if scenario == "free":
+                    add_key(ax)
+                lift = KEY_LIFT if "free" in row else 0  # same title height across the row of (a)
+                radar_title(ax, *scenario_title(scenario, run, next(letters)), lift=lift)
+        if not legend_in_cell:
+            fig.legend(loc="lower center", bbox_to_anchor=(0.5, 0.0), ncol=n_cols, columnspacing=1.5, **legend_kw)
         savefig(fig, name)
 
 
-def fig63(runs) -> None:
+def fig63(runs, layout=MAIN_LAYOUT, name="fig63_limit_radar") -> None:
     r54 = runs("54")
-    s54 = Scale(r54)
-    radar_grid("fig63_limit_radar", {s: (r54, s54) for s in SCENARIOS}, [])
+    radar_grid(name, layout, r54, Scale(r54))
 
 
-def fig103(runs) -> None:
-    if FONT_MODE != "presentation":
-        sys.exit("fig103 is a presentation figure: run with FIGURE_MODE=presentation")
-    r54 = runs("54")
-    s54 = Scale(r54)
-    radar_grid("fig103_limit_radar_selection", {s: (r54, s54) for s in PRESI_SCENARIOS}, [],
-               grid_pos=PRESI_GRID_POS, key_pos=(0, 0), height=4.7, hspace=0.6)
+def fig63a(runs) -> None:
+    fig63(runs, APPENDIX_LAYOUT, "fig63a_limit_radar_ccs_biomass")
 
 
-def fig64(runs) -> None:
+def fig64(runs, layout=MAIN_LAYOUT, name="fig64_run56_57_limit_radar") -> None:
     r56, r57 = runs("56"), runs("57")
-    s56 = Scale(r56)
     handles = [
-        Patch(facecolor=GREY, label=f"Filled: test run 1 (tolerance {RUN_TOLERANCE['56']})"),
+        Patch(facecolor=GREY, label=f"Filled: test run 1\n(tolerance {RUN_TOLERANCE['56']})"),
         Patch(facecolor="none", edgecolor=INK, linewidth=OVERLAY_LW, linestyle=(0, (2.5, 1.5)),
-              label=f"Dashed outline: test run 2 (tolerance {RUN_TOLERANCE['57']})"),
+              label=f"Dashed: test run 2\n(tolerance {RUN_TOLERANCE['57']})"),
     ]
-    radar_grid("fig64_run56_57_limit_radar", {s: (r56, s56) for s in SCENARIOS}, handles,
-               overlay=r57, overlay_scale=s56)
+    radar_grid(name, layout, r56, Scale(r56), handles, overlay=r57, overlay_scale=Scale(r56))
+
+
+def fig64a(runs) -> None:
+    fig64(runs, APPENDIX_LAYOUT, "fig64a_run56_57_limit_radar_ccs_biomass")
 
 
 # ---------------------------------------------------------------- fig65: difference matrix
@@ -405,7 +408,7 @@ def fig65(runs) -> None:
         savefig(fig, "fig65_run56_57_limit_matrix")
 
 
-FIGURES = {"63": fig63, "64": fig64, "65": fig65, "103": fig103}
+FIGURES = {"63": fig63, "63a": fig63a, "64": fig64, "64a": fig64a, "65": fig65}
 
 
 def main() -> None:
@@ -416,7 +419,7 @@ def main() -> None:
             cache[run] = Run(run)
         return cache[run]
 
-    for fig in sys.argv[1:] or [f for f in FIGURES if f != "103" or FONT_MODE == "presentation"]:
+    for fig in sys.argv[1:] or FIGURES:
         FIGURES[fig](runs)
 
 

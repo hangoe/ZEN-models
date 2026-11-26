@@ -1,0 +1,38 @@
+{
+  "job_id": "20979167_54",
+  "task_id": 54,
+  "elapsed": "4-02:04:20",
+  "elapsed_seconds": 353060,
+  "total_cpu": "354-10:17:11",
+  "total_cpu_seconds": 30622631,
+  "max_rss_kb": 531921152,
+  "alloc_cpus": 128,
+  "req_mem": "700G",
+  "state": "COMPLETED",
+  "attempts": [
+    {
+      "job_id": "20739678_54",
+      "task_id": 54,
+      "elapsed": "04:58:28",
+      "elapsed_seconds": 17908,
+      "total_cpu": "7-14:06:32",
+      "total_cpu_seconds": 655592,
+      "max_rss_kb": 461086704,
+      "alloc_cpus": 128,
+      "req_mem": "700G",
+      "state": "FAILED"
+    },
+    {
+      "job_id": "20884666_54",
+      "task_id": 54,
+      "elapsed": "11:37:27",
+      "elapsed_seconds": 41847,
+      "total_cpu": "28-04:57:47",
+      "total_cpu_seconds": 2437067,
+      "max_rss_kb": 520693840,
+      "alloc_cpus": 128,
+      "req_mem": "700G",
+      "state": "FAILED"
+    }
+  ]
+}

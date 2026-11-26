@@ -18,8 +18,7 @@ plot_mga_results.load_native_ci_history), so a converged run's line can end
 below the target. The figures say so when that happens.
 
 Earlier versions compared temporal resolutions and drew near-optimal-space size
-(fig6); see git history. TS_COLOR keeps those runs' colours because
-plot_ts_resolution_benchmark.py still imports them.
+(fig6); see git history and plot_mga_run_tests.py.
 
 Usage:
     python scripts/plot_mga_ts_resolution.py
@@ -27,7 +26,7 @@ Usage:
 
 import matplotlib.pyplot as plt
 
-from plots.figure_settings import SCENARIO_PALETTE, apply_font_mode, eth_tint
+from plots.figure_settings import SCENARIO_PALETTE, apply_font_mode
 
 apply_font_mode()
 
@@ -40,14 +39,6 @@ TS_RUNS: dict[str, str] = {
 }
 TS_COLOR: dict[str, str] = {
     RUN_LABEL: NEAR_BLACK,
-    # Old temporal-resolution runs, used only by plot_ts_resolution_benchmark.py.
-    "1ts": SCENARIO_PALETTE[3],
-    "1ts_seed42": SCENARIO_PALETTE[5],
-    "1ts_batch16": SCENARIO_PALETTE[4],
-    "3ts": SCENARIO_PALETTE[2],
-    "10ts": SCENARIO_PALETTE[0],
-    "1ts_4a_10a": eth_tint(SCENARIO_PALETTE[3], 0.5),
-    "1ts_batch32": SCENARIO_PALETTE[1],
 }
 GREY = SCENARIO_PALETTE[6]
 

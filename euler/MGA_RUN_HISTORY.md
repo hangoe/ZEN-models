@@ -40,9 +40,14 @@ than reusing a task_id number that's been retired. weights, oracle mode,
 "relative"/"units" normalisation and batch sampling (strategy_mode=
 "sampling") aren't swept here either -- add a row for any of those too.
 
+Note (2026-11-26): task_id 3 was later switched to
+aggregated_time_steps_per_year=1 (row "2020_4a_10a_interval_1ts_..."); the
+run on disk and in figures-*/mga-run-tests is that 1ts/4a/10a run. task_id 3
+was reused on 2026-10-28 for an unrelated zen_europe run.
+
 3 more rows added 2026-09-17, all config-identical to task_id 0
 (1ts/7a/5a) except as noted -- fig3a/3b comparison runs, see
-scripts/plot_mga_ts_resolution.py's TS_RUNS/TS_COLOR:
+scripts/plot_mga_run_tests.py's TS_RUNS (formerly plot_mga_ts_resolution.py):
   task_id 4 = seed_rng=42 (task_id 0 itself has no seed_rng set --
               batch_oracle's BBO restarts/direction fallbacks then seed
               nondeterministically from OS entropy, see run_model.py's
@@ -243,6 +248,33 @@ approximation_class.py). 2026-11-14: new numeric_focus column in
 parameters_mga.csv, 2 for task 54 only (as parameters.csv rows 0-10); same
 submit line.
   sbatch --array=56-57 --time=5-00:00:00 --cpus-per-task=32 --mem-per-cpu=6G submit_euler_mga.sh
+
+task_id 64/67: same dataset, axes and FREEZE2022 / ci 0.95 / 4000 samples as
+54/57, with epsilon 0.01 -> 0.002 and tolerance_explore 0.01.
+  64 = 54 (5 ts/yr, numeric_focus 2, solver_threads 8) with tolerance_explore
+       0.1 -> 0.01 and max_iterations 300 -> 50.
+  67 = 57 (1 ts/yr, solver_threads 2) with max_iterations 300 -> 6000.
+Both were running on Euler as of 2026-11-26 (jobs 22390122_64, 22390129_67).
+Decision 2026-11-26: run 64 is not used in the thesis (it changes tolerance and
+slack at once vs. 54); 67 vs 57 is the only clean cost-slack pair.
+
+Run table: euler/mga_runs.csv maps each Euler job ID to a short run_id
+(V = old v9 calibration, Z = ZEN-Europe v1 calibration, T = thesis) with its
+settings (time steps, periods, axes, tolerance, slack, batch, CI target, ...).
+The relevant sacct lines are in euler/slurm_usage/mga_sacct_2026-11-26.txt.
+
+sacct outcomes (euler/slurm_usage/mga_sacct_2026-11-26.txt; imported into each
+run folder's slurm_usage.json by scripts/import_slurm_usage.py):
+  21  19535629_21 completed, 24 h 18 min, 32 CPU / 192G, MaxRSS 146 GiB.
+  32  19881756_32 completed, 13 h 20 min (two cancelled starts 19876818, 19879592).
+  33  20326035_33 completed, 6 h 34 min.
+  44  never completed: 20575193_44 OOM at 192G, 20634844_44 scratch file quota.
+  45  20657485_45 completed, 12 min.   46  20659061_46 completed, 20 min.
+  47  20660743_47 completed, 2 h 05 min, 32 CPU / 192G, MaxRSS 140 GiB.
+  54  20739678_54 failed (cut pushback, see above), 20884666_54 failed after
+      11 h 37 min, 20979167_54 completed after 4 d 2 h, 128 CPU / 700G, MaxRSS 507 GiB.
+  56  20739701_56 completed, 27 min.   57  20739701_57 completed, 3 h 21 min.
+The 1-ts batch16 runs all peak at 130-146 GiB, independent of run length.
 
 Requires the MGA install step in setup_euler_env.sh to have been run once
 (clones + installs ZEN-garden-plugins and near_optimal_tools/pyoNearOpt,
