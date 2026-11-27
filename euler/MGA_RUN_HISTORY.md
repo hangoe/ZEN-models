@@ -260,6 +260,14 @@ Both were running on Euler as of 2026-11-26 (jobs 22390122_64, 22390129_67).
 Decision 2026-11-26: run 64 is not used in the thesis (it changes tolerance and
 slack at once vs. 54); 67 vs 57 is the only clean cost-slack pair.
 
+task_id 65 (run T5, added 2026-11-27): 54 (5 ts/yr, tolerance_explore 0.1,
+numeric_focus 2, solver_threads 8) with epsilon 0.01 -> 0.002 and
+max_iterations 300 -> 50, i.e. the 5-ts cost-slack counterpart of 67 vs 57.
+Status pending in runs/mga_runs.csv (no job ID yet).
+TODO: once run 65 is done, fill in job_id/status in runs/mga_runs.csv and add
+T5 to the figures (EFFECTS in thesis_figures/mga/run_tests.py, e.g. a
+T1-vs-T5 cost-slack pair, and the polytope/radar figures as needed).
+
 Run table: euler/mga_runs.csv maps each Euler job ID to a short run_id
 (V = old v9 calibration, Z = ZEN-Europe v1 calibration, T = thesis) with its
 settings (time steps, periods, axes, tolerance, slack, batch, CI target, ...).

@@ -8,16 +8,19 @@ If the thesis is reordered, only the names here change.
 from collections.abc import Callable
 from dataclasses import dataclass
 
+from . import global_ghg_shares
 from .mga import limit_radar, pairwise, run_tests
 from .single import (
     capacity_storage,
     cost_breakdown,
     dsm_discharge,
+    electricity_profile,
     emissions,
     energy_input,
     flexibility_matrix,
     flexibility_scenarios,
     heat_supply,
+    industry_emissions,
     node_map,
 )
 from .single.scenarios import (
@@ -91,4 +94,17 @@ FIGURES: dict[str, Figure] = {
     "presi_heat_supply_aggregated": Figure(
         "", _single(heat_supply.heat_supply_aggregated, [NO_FLEX, FULL]), presentation_only=True),
     "presi_zen_europe_node_map": Figure("", node_map.node_map, presentation_only=True),
+    "presi_vre_generation_and_industry_electricity_2050_flex_week": Figure(
+        "", _single(electricity_profile.vre_and_industry_electricity_flex, [NO_FLEX, FULL], week=True),
+        presentation_only=True),
+    "presi_vre_generation_seasonal_and_week_2050": Figure(
+        "", _single(electricity_profile.vre_seasonal_and_week, [NO_FLEX]), presentation_only=True),
+    "presi_global_ghg_shares_by_sector": Figure("", global_ghg_shares.global_ghg_shares, presentation_only=True),
+    "presi_industry_share_of_total_emissions": Figure(
+        "", _single(industry_emissions.industry_share_of_total, [NO_FLEX]), presentation_only=True),
+    "presi_industry_direct_and_grid_emissions": Figure(
+        "", _single(industry_emissions.industry_emissions, [NO_FLEX]), presentation_only=True),
+    "presi_vre_generation_and_industry_electricity_2050_flex": Figure(
+        "", _single(electricity_profile.vre_and_industry_electricity_flex, [NO_FLEX, FULL]),
+        presentation_only=True),
 }
