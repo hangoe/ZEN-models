@@ -8,7 +8,7 @@ If the thesis is reordered, only the names here change.
 from collections.abc import Callable
 from dataclasses import dataclass
 
-from .mga import limit_radar, run_tests
+from .mga import limit_radar, pairwise, run_tests
 from .single import (
     capacity_storage,
     cost_breakdown,
@@ -18,6 +18,7 @@ from .single import (
     flexibility_matrix,
     flexibility_scenarios,
     heat_supply,
+    node_map,
 )
 from .single.scenarios import (
     FULL,
@@ -74,17 +75,20 @@ FIGURES: dict[str, Figure] = {
         "A5", _single(flexibility_matrix.time_step_matrix, [NO_FLEX, NO_FLEX_20TS, FULL, FULL_20TS])),
     "figA06_mga_limit_radar_ccs_biomass": Figure(
         "A6", lambda name: limit_radar.main_run_radar(name, appendix=True)),
-    "figA07_mga_limit_radar_test_runs": Figure(
-        "A7", limit_radar.test_runs_radar),
-    "figA08_mga_limit_radar_ccs_biomass_test_runs": Figure(
-        "A8", lambda name: limit_radar.test_runs_radar(name, appendix=True)),
-    "figA09_mga_run_tests_convergence": Figure(
-        "A9", run_tests.convergence),
-    "figA10_mga_run_tests_effort": Figure(
-        "A10", run_tests.effort),
+    "figA09_mga_limit_radar_test_runs": Figure(
+        "A9", limit_radar.test_runs_radar),
+    "figA07_mga_run_tests_convergence": Figure(
+        "A7", run_tests.convergence),
+    "figA08_mga_run_tests_effort": Figure(
+        "A8", run_tests.effort),
+    "figA10_mga_limit_radar_cost_slack": Figure(
+        "A10", limit_radar.cost_slack_radar),
+    "figA11_mga_pairwise_hulls_cost_slack_vs_test_run": Figure(
+        "A11", pairwise.pairwise_hulls),
     "presi_flexibility_matrix_one_row": Figure(
         "", _single(flexibility_matrix.temperature_matrix, TEMPERATURE_MATRIX_RUNS, one_row=True),
         presentation_only=True),
     "presi_heat_supply_aggregated": Figure(
         "", _single(heat_supply.heat_supply_aggregated, [NO_FLEX, FULL]), presentation_only=True),
+    "presi_zen_europe_node_map": Figure("", node_map.node_map, presentation_only=True),
 }

@@ -1,0 +1,13 @@
+{
+  "job_id": "22390129_67",
+  "task_id": 67,
+  "elapsed": "1-14:46:16",
+  "elapsed_seconds": 139576,
+  "total_cpu": "9-05:47:45",
+  "total_cpu_seconds": 798465,
+  "max_rss_kb": 151835612,
+  "alloc_cpus": 32,
+  "req_mem": "192G",
+  "state": "COMPLETED",
+  "attempts": []
+}

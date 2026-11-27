@@ -212,6 +212,9 @@ def effort(name: str) -> None:
     loaded = load_all()
     groups = [(title, present) for tag, title, members in EFFECTS
               if len(present := present_members(tag, members, loaded)) >= 2]
+    # The main run (T1) is shown in every group as a reference.
+    if "T1" in loaded:
+        groups = [(title, present + [("T1", "main run")]) for title, present in groups]
     heights = [len(present) for _, present in groups]
     fig, axes = plt.subplots(len(groups), 5, figsize=(REPORT_WIDTH, 0.32 * sum(heights) + 1.7),
                              gridspec_kw={"height_ratios": heights}, sharex="col", squeeze=False)
@@ -255,11 +258,10 @@ def effort(name: str) -> None:
         else:
             axes[0, col].set_xlim(0, 125 if columns[col][0] == "cpu_efficiency_pct" else hi * 1.35)
     fig.tight_layout(rect=(0, 0.04, 1, 1), h_pad=0.6, w_pad=0.2)
-    handles = [Patch(facecolor="white", edgecolor="black", linewidth=0.6, label="thesis run (T)")]
     if any_lower_bound:
-        handles.append(Patch(facecolor="white", edgecolor=GREY, hatch="////",
-                             label="no sacct: solve-round time only (lower bound)"))
-    fig.legend(handles=handles, loc="lower center", ncol=2, fontsize=7)
+        handles = [Patch(facecolor="white", edgecolor=GREY, hatch="////",
+                         label="no sacct: solve-round time only (lower bound)")]
+        fig.legend(handles=handles, loc="lower center", ncol=1, fontsize=7)
     save_figure(fig, name, dpi=200)
 
 

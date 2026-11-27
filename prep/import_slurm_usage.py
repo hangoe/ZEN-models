@@ -7,7 +7,7 @@ The job -> run mapping is runs/mga_runs.csv (job_id = completed job,
 other_jobs = failed/cancelled attempts). Existing slurm_usage.json files are kept; running jobs are skipped.
 
 Usage:
-    python prep/import_slurm_usage.py [euler/slurm_usage/mga_sacct_2026-11-26.txt]
+    python prep/import_slurm_usage.py [euler/slurm_usage/mga_sacct_2026-11-27.txt]
 """
 
 import json
@@ -19,7 +19,7 @@ from thesis_figures.mga.run_tests import RUNS  # noqa: E402
 from thesis_figures.paths import MGA_RESULTS_DIR as MGA_ROOT  # noqa: E402
 from thesis_figures.paths import REPO_ROOT  # noqa: E402
 
-DEFAULT_SACCT = REPO_ROOT / "euler" / "slurm_usage" / "mga_sacct_2026-11-26.txt"
+DEFAULT_SACCT = REPO_ROOT / "euler" / "slurm_usage" / "mga_sacct_2026-11-27.txt"
 
 
 def to_seconds(text: str) -> int:

@@ -74,9 +74,10 @@ deterministic, so a regenerated figure is byte-identical if nothing changed.
 | Fig. A5 | `figA05_flexibility_matrix_time_steps` | Flexibility x time steps per year | No-Flex, ZEN-Europe, 10 and 20 ts |
 | Fig. A6 | `figA06_mga_limit_radar_ccs_biomass` | Near-optimal ranges, limits on carbon flows | MGA T1 |
 | Fig. A7 | `figA07_mga_limit_radar_test_runs` | As Fig. 7, test runs | MGA T2, T3 |
-| Fig. A8 | `figA08_mga_limit_radar_ccs_biomass_test_runs` | As Fig. A6, test runs | MGA T2, T3 |
 | Fig. A9 | `figA09_mga_run_tests_convergence` | Convergence of the MGA runs | MGA V, Z, T |
 | Fig. A10 | `figA10_mga_run_tests_effort` | Computational effort of the MGA runs | MGA V, Z, T |
+| Fig. A11 | `figA11_mga_limit_radar_cost_slack` | As Fig. 7, cost slack 0.2 % vs 1 % | MGA T4, T3 |
+| Fig. A13 | `figA13_mga_pairwise_hulls_cost_slack_vs_test_run` | 2D hulls on every axis pair, cost slack 0.2 % vs 1 % | MGA T4, T3 |
 
 `python make_figures.py --tables` also writes the data of the MGA run table in the appendix
 (`figures/tables/`).

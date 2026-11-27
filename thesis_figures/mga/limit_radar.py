@@ -1,20 +1,24 @@
-"""Near-optimal ranges under additional limits as radar charts (thesis Fig. 7, A6-A8).
+"""Near-optimal ranges under additional limits as radar charts (thesis Fig. 7, A6, A7, A11).
 
 One radar per limit scenario, after Pickering et al. (2022), Fig. 3B. Seven spokes: the
 electrification share of industrial heat, CO2 storage utilisation and imported biomass in
 2034 and 2050 (2050 in a lighter shade), and the total system cost. Radius 0 (inner
-ring) / 1 (outer ring) = minimum / maximum of the unconstrained outer approximation of the
-spoke; cost from C* to C* (1 + epsilon). Each spoke carries two ranges:
+ring) / 1 (outer ring) = the run's normalised axis values 0 / 1, i.e. the axis's own minimum /
+maximum from the min/max solves (identical to the unconstrained outer and inner ranges, which
+contain these solves); cost from C* to C* (1 + epsilon). Each spoke carries two ranges:
 
   wide light bar   outer approximation
   narrow dark bar  convex hull of the solved designs (inner approximation)
 
 Limited spokes carry one coloured arc at the limited end instead (the range is the limit
 itself), at least LIMIT_ARC thick. Main figures: (a) no limit, (b)/(c) heat electrification
-at its maximum / minimum, (d)-(f) cost limited to 10 / 5 / 1 % of the cost slack. Appendix
-figures: (a) no limit and legend, (b)-(e) CO2 storage and biomass at max / min.
-The test-run figures draw test run 1 (T2) filled and test run 2 (T3) as dashed outlines,
-both scaled to T2's ranges.
+at its maximum / minimum, (d)-(f) cost limited to 10 / 5 / 1 % of the cost slack. Main run
+T1 only, Fig. A6: (a) no limit and legend, (b)-(e) CO2 storage and biomass at max / min.
+The comparison figures use the main layout with a second run as dashed outlines, both on
+the filled run's scale: Fig. A7 test run 1 (T2) filled, test run 2 (T3) dashed; Fig. A11
+T4 (cost slack 0.2 %) filled, T3 (cost slack 1 %) dashed. In A11, wider T3 bars are clipped
+at the outer ring (T3's cost spoke fills it), and the cost panels limit each run to the same
+fraction of its own slack, i.e. a different absolute cost.
 """
 
 import matplotlib.pyplot as plt
@@ -24,6 +28,7 @@ from matplotlib.patches import Patch
 from ..style import ETH_BLUE, ETH_GREEN, ETH_GREY, ETH_PURPLE, REPORT_WIDTH, eth_tint, save_figure
 from .polytope import (
     AXIS_LIMITS,
+    AXIS_PREFIX,
     COST_LIMITS,
     LIMITED_UNIT,
     METRICS,
@@ -32,6 +37,7 @@ from .polytope import (
     MgaRun,
     extra_cost_bn,
     physical_band,
+    to_display,
 )
 
 INK, MUTED = "#333333", "#6F6F6F"
@@ -69,12 +75,14 @@ def spoke_color(spoke) -> str:
 
 
 class Scale:
-    """Scaled radius per spoke: 0 / 1 = min / max of a run's unconstrained outer range."""
+    """Scaled radius per spoke: the run's normalised axis value (0 / 1 = own min / max solve)."""
 
     def __init__(self, run: MgaRun):
-        free = run.results["free"]["outer"]
-        self.span = {spoke: free[spoke] for spoke in SPOKES if spoke != "cost"}
-        self.span["cost"] = (0.0, 100 * run.poly.epsilon)
+        p = run.poly
+        self.span = {"cost": (0.0, 100 * p.epsilon)}
+        for metric, year in SPOKES[:-1]:
+            k = run.idx[f"{AXIS_PREFIX[metric]}_{year}"]
+            self.span[metric, year] = (to_display(metric, p.offset[k]), to_display(metric, p.offset[k] + p.scale[k]))
 
     def __call__(self, spoke, value: float, clip: bool = True) -> float:
         lo, hi = self.span[spoke]
@@ -257,13 +265,25 @@ def main_run_radar(name: str, appendix: bool = False) -> None:
     radar_grid(name, APPENDIX_LAYOUT if appendix else MAIN_LAYOUT, run, Scale(run))
 
 
-def test_runs_radar(name: str, appendix: bool = False) -> None:
-    """Test run 1 (T2) filled, test run 2 (T3) dashed, both on T2's scale."""
-    t2, t3 = MgaRun("T2"), MgaRun("T3")
+def overlay_radar(name: str, filled_id: str, dashed_id: str, labels: tuple[str, str]) -> None:
+    """Run `filled_id` filled, run `dashed_id` dashed, both on the filled run's scale."""
+    filled, dashed = MgaRun(filled_id), MgaRun(dashed_id)
     handles = [
-        Patch(facecolor=GREY, label=f"Filled: test run 1\n(tolerance {RUN_TOLERANCE['T2']})"),
+        Patch(facecolor=GREY, label=f"Filled: {labels[0]}"),
         Patch(facecolor="none", edgecolor=INK, linewidth=OVERLAY_LW, linestyle=OVERLAY_DASH,
-              label=f"Dashed: test run 2\n(tolerance {RUN_TOLERANCE['T3']})"),
+              label=f"Dashed: {labels[1]}"),
     ]
-    radar_grid(name, APPENDIX_LAYOUT if appendix else MAIN_LAYOUT, t2, Scale(t2), handles,
-               overlay=t3, overlay_scale=Scale(t2))
+    scale = Scale(filled)
+    radar_grid(name, MAIN_LAYOUT, filled, scale, handles, overlay=dashed, overlay_scale=scale)
+
+
+def test_runs_radar(name: str) -> None:
+    """Test run 1 (T2) filled, test run 2 (T3) dashed, both on T2's scale."""
+    overlay_radar(name, "T2", "T3", (f"test run 1\n(tolerance {RUN_TOLERANCE['T2']})",
+                                     f"test run 2\n(tolerance {RUN_TOLERANCE['T3']})"))
+
+
+def cost_slack_radar(name: str) -> None:
+    """T4 (cost slack 0.2 %) filled, test run 2 (T3, cost slack 1 %) dashed, both on T4's scale."""
+    overlay_radar(name, "T4", "T3", (f"cost slack 0.2%\n(tolerance {RUN_TOLERANCE['T4']})",
+                                     "test run 2\n(cost slack 1%)"))

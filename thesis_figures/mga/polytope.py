@@ -7,7 +7,8 @@ range of an axis under additional limits is the minimum and maximum of that axis
 inner or the outer approximation, each a small LP.
 
 Runs (runs/mga_runs.csv): T1 is the main run (5 representative time steps per year,
-tolerance 0.1), T2 and T3 are test runs with 1 time step per year and tolerance 0.1 / 0.01.
+tolerance 0.1), T2 and T3 are test runs with 1 time step per year and tolerance 0.1 / 0.01,
+T4 repeats T3 with a cost slack of 0.2 % instead of 1 %.
 """
 
 from dataclasses import dataclass, field
@@ -26,8 +27,14 @@ RUN_FOLDERS = {
           "_batch_bbofast_minmax_batch16_tol01_eps001_FREEZE2022_ci095_ns4000",
     "T3": f"{MODEL}_2022_8a_4a_interval_1ts_MGA_IND_HEATING_THESIS"
           "_batch_bbofast_minmax_batch16_tol001_eps001_FREEZE2022_ci095_ns4000",
+    "T4": f"{MODEL}_2022_8a_4a_interval_1ts_MGA_IND_HEATING_THESIS"
+          "_batch_bbofast_minmax_batch16_tol001_eps0002_FREEZE2022_ci095_ns4000",
 }
-RUN_TOLERANCE = {"T1": "0.1", "T2": "0.1", "T3": "0.01"}
+RUN_TOLERANCE = {"T1": "0.1", "T2": "0.1", "T3": "0.01", "T4": "0.01"}
+
+
+def load_run_polytope(run_id: str):
+    return load_polytope(MGA_RESULTS_DIR / RUN_FOLDERS[run_id] / f"{MODEL}_batch_summary" / "polytope.npz")
 
 YEARS = (2034, 2050)
 METRICS = ("heat", "ccs", "biomass")
@@ -152,8 +159,7 @@ class MgaRun:
     results: dict = field(init=False)
 
     def __post_init__(self):
-        folder = RUN_FOLDERS[self.run_id]
-        self.poly = load_polytope(MGA_RESULTS_DIR / folder / f"{MODEL}_batch_summary" / "polytope.npz")
+        self.poly = load_run_polytope(self.run_id)
         self.idx = {name: i for i, name in enumerate(self.poly.names)}
         p, idx = self.poly, self.idx
         self.results = {"free": axis_limit_ranges(p, idx, "heat", None)}
