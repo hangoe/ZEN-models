@@ -75,12 +75,12 @@ FIGURES: dict[str, Figure] = {
         "A5", _single(flexibility_matrix.time_step_matrix, [NO_FLEX, NO_FLEX_20TS, FULL, FULL_20TS])),
     "figA06_mga_limit_radar_ccs_biomass": Figure(
         "A6", lambda name: limit_radar.main_run_radar(name, appendix=True)),
-    "figA09_mga_limit_radar_test_runs": Figure(
-        "A9", limit_radar.test_runs_radar),
     "figA07_mga_run_tests_convergence": Figure(
         "A7", run_tests.convergence),
     "figA08_mga_run_tests_effort": Figure(
         "A8", run_tests.effort),
+    "figA09_mga_limit_radar_test_runs": Figure(
+        "A9", limit_radar.test_runs_radar),
     "figA10_mga_limit_radar_cost_slack": Figure(
         "A10", limit_radar.cost_slack_radar),
     "figA11_mga_pairwise_hulls_cost_slack_vs_test_run": Figure(

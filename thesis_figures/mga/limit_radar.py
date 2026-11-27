@@ -17,8 +17,8 @@ T1 only, Fig. A6: (a) no limit and legend, (b)-(e) CO2 storage and biomass at ma
 The comparison figures use the main layout with a second run as dashed outlines, both on
 the filled run's scale: Fig. A7 test run 1 (T2) filled, test run 2 (T3) dashed; Fig. A11
 T4 (cost slack 0.2 %) filled, T3 (cost slack 1 %) dashed. In A11, wider T3 bars are clipped
-at the outer ring (T3's cost spoke fills it), and the cost panels limit each run to the same
-fraction of its own slack, i.e. a different absolute cost.
+at the outer ring (T3's cost spoke fills it), and the cost panels limit both runs to the same
+absolute cost (T4's fraction of its slack; both runs have the same C*).
 """
 
 import matplotlib.pyplot as plt
@@ -35,6 +35,7 @@ from .polytope import (
     RUN_TOLERANCE,
     YEARS,
     MgaRun,
+    cost_limit_ranges,
     extra_cost_bn,
     physical_band,
     to_display,
@@ -190,8 +191,9 @@ def scenario_title(scenario, run: MgaRun, letter: str) -> tuple[str, str]:
     axis, key = scenario
     if axis == "cost":
         percent = 100 * COST_LIMITS[key] * run.poly.epsilon
+        bn = extra_cost_bn(percent, run.poly.c_star)
         return (f"({letter}) Cost $\\leq$ +{percent:g}%",
-                f"+{extra_cost_bn(percent, run.poly.c_star):,.0f} bn EUR above $C^*$")
+                f"+{bn:,.{1 if bn < 2 else 0}f} bn EUR above $C^*$")
     which = "max" if key == "A" else "min"
     return f"({letter}) {NAME[axis]} at {which}", limit_subtitle(run, axis, AXIS_LIMITS[key])
 
@@ -265,9 +267,17 @@ def main_run_radar(name: str, appendix: bool = False) -> None:
     radar_grid(name, APPENDIX_LAYOUT if appendix else MAIN_LAYOUT, run, Scale(run))
 
 
-def overlay_radar(name: str, filled_id: str, dashed_id: str, labels: tuple[str, str]) -> None:
-    """Run `filled_id` filled, run `dashed_id` dashed, both on the filled run's scale."""
+def overlay_radar(name: str, filled_id: str, dashed_id: str, labels: tuple[str, str],
+                  same_cost: bool = False) -> None:
+    """Run `filled_id` filled, run `dashed_id` dashed, both on the filled run's scale.
+    same_cost: in the cost panels, limit the dashed run to the filled run's absolute cost
+    (needs the same C*) instead of the same fraction of its own slack."""
     filled, dashed = MgaRun(filled_id), MgaRun(dashed_id)
+    if same_cost:
+        assert np.isclose(filled.poly.c_star, dashed.poly.c_star), "same_cost needs the same C*"
+        ratio = filled.poly.epsilon / dashed.poly.epsilon
+        for key, fraction in COST_LIMITS.items():
+            dashed.results["cost", key] = cost_limit_ranges(dashed.poly, dashed.idx, fraction * ratio)
     handles = [
         Patch(facecolor=GREY, label=f"Filled: {labels[0]}"),
         Patch(facecolor="none", edgecolor=INK, linewidth=OVERLAY_LW, linestyle=OVERLAY_DASH,
@@ -286,4 +296,4 @@ def test_runs_radar(name: str) -> None:
 def cost_slack_radar(name: str) -> None:
     """T4 (cost slack 0.2 %) filled, test run 2 (T3, cost slack 1 %) dashed, both on T4's scale."""
     overlay_radar(name, "T4", "T3", (f"cost slack 0.2%\n(tolerance {RUN_TOLERANCE['T4']})",
-                                     "test run 2\n(cost slack 1%)"))
+                                     "test run 2\n(cost slack 1%)"), same_cost=True)
