@@ -109,7 +109,8 @@ for the single temperature level); result folders keep the dataset names.
 `runs/mga_runs.csv` lists every MGA run of the thesis appendix. T1 (task_id 54) is the main run
 (5 time steps per year, tolerance 0.1); T2 (56) and T3 (57) are the test runs with 1 time step
 per year and tolerance 0.1 / 0.01; T4 (67) repeats T3 with a cost slack of 0.2 %; T5 (65,
-pending) repeats T1 with a cost slack of 0.2 % (max_iterations 50). All use the
+pending) repeats T1 with a cost slack of 0.2 % (max_iterations 50); T6 (64, running) is T5 with
+tolerance 0.01. All use the
 dataset `zen_europe_no_flex_no_diffusion_export0` (no diffusion limit, no exports, capacity
 additions of the axis technologies frozen in 2022 with `prep/freeze_first_year_additions.py`)
 and the axes `configs/mga/config_mga_axes_ind_heating_thesis.yaml`. Z1-Z7 are calibration runs

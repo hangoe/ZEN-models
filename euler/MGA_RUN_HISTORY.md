@@ -263,7 +263,10 @@ slack at once vs. 54); 67 vs 57 is the only clean cost-slack pair.
 task_id 65 (run T5, added 2026-11-27): 54 (5 ts/yr, tolerance_explore 0.1,
 numeric_focus 2, solver_threads 8) with epsilon 0.01 -> 0.002 and
 max_iterations 300 -> 50, i.e. the 5-ts cost-slack counterpart of 67 vs 57.
-Status pending in runs/mga_runs.csv (no job ID yet).
+Status pending in runs/mga_runs.csv (no job ID yet). Same resource profile as 54/64:
+  sbatch --array=65 --cpus-per-task=128 --mem-per-cpu=5600M euler/submit_euler_mga.sh
+Run 64 (still running, job 22390122_64) was dropped from parameters_mga.csv in
+the 2026-11-26 cleanup and restored 2026-11-27; it is T6 in runs/mga_runs.csv.
 TODO: once run 65 is done, fill in job_id/status in runs/mga_runs.csv and add
 T5 to the figures (EFFECTS in thesis_figures/mga/run_tests.py, e.g. a
 T1-vs-T5 cost-slack pair, and the polytope/radar figures as needed).

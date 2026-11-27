@@ -11,6 +11,7 @@
 # Profiles of the thesis runs (CLI flags win over the #SBATCH defaults below);
 # submit from the repository root:
 #   sbatch --array=54 --cpus-per-task=128 --mem-per-cpu=5600M euler/submit_euler_mga.sh    # T1: 5 ts, 16 x 8 threads, ~700 GB
+#   sbatch --array=65 --cpus-per-task=128 --mem-per-cpu=5600M euler/submit_euler_mga.sh    # T5 (T6 = 64 same profile)
 #   sbatch --array=56,57,67 --time=5-00:00:00 --cpus-per-task=32 --mem-per-cpu=6G euler/submit_euler_mga.sh  # T2-T4: 1 ts, 16 x 2 threads
 #   sbatch --array=21,32,33,45-47 --time=5-00:00:00 --cpus-per-task=32 --mem-per-cpu=6G euler/submit_euler_mga.sh  # Z runs (dataset not included)
 # Refine a profile from `sacct -j <jobid> --format=JobID,Elapsed,MaxRSS,State`.
